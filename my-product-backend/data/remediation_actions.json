@@ -1,0 +1,1690 @@
+[
+  {
+    "action_id": "ACT-2026-99430",
+    "case_id": "SM-2026-97457",
+    "campaign_id": "CMP-2026-439",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:38:01.921Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "9740939672fee3231b005878878e9adce4cfa9eb234e0737af35bd02a7bef1e8",
+      "rfc_message_id": "9740939672fee3231b005878878e9adce4cfa9eb234e0737af35bd02a7bef1e8",
+      "raw_hash": "9740939672fee3231b005878878e9adce4cfa9eb234e0737af35bd02a7bef1e8"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "provider_action_id": null,
+      "message": "Security Notice: A suspicious message (Case SM-2026-97457) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:38:01.921Z",
+    "executed_at": "2026-09-03T12:38:01.922Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-11397",
+    "case_id": "SM-2026-28167",
+    "campaign_id": "CMP-2026-420",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:38:02.027Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "e7919af6adcd3e6d8aa959b24b35b4f2d439ac5850d06fde47045fb5a0fe603d",
+      "rfc_message_id": "e7919af6adcd3e6d8aa959b24b35b4f2d439ac5850d06fde47045fb5a0fe603d",
+      "raw_hash": "e7919af6adcd3e6d8aa959b24b35b4f2d439ac5850d06fde47045fb5a0fe603d"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "provider_action_id": null,
+      "message": "Security Notice: A suspicious message (Case SM-2026-28167) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:38:02.027Z",
+    "executed_at": "2026-09-03T12:38:02.027Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-76570",
+    "case_id": "SM-2026-91215",
+    "campaign_id": "CMP-2026-847",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:38:02.117Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "eef49b3a4d71d9ea26a03445e5b64de8c5449f64cc9bcfc75eb73f8b1d320fef",
+      "rfc_message_id": "eef49b3a4d71d9ea26a03445e5b64de8c5449f64cc9bcfc75eb73f8b1d320fef",
+      "raw_hash": "eef49b3a4d71d9ea26a03445e5b64de8c5449f64cc9bcfc75eb73f8b1d320fef"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "provider_action_id": null,
+      "message": "Security Notice: A suspicious message (Case SM-2026-91215) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:38:02.117Z",
+    "executed_at": "2026-09-03T12:38:02.117Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-88452",
+    "case_id": "SM-2026-61925",
+    "campaign_id": "CMP-2026-835",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:38:02.398Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "2b1111ffca2f22bf013f276de41fe54c3774a548ccbead73d73c7749654c5ab2",
+      "rfc_message_id": "2b1111ffca2f22bf013f276de41fe54c3774a548ccbead73d73c7749654c5ab2",
+      "raw_hash": "2b1111ffca2f22bf013f276de41fe54c3774a548ccbead73d73c7749654c5ab2"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "provider_action_id": null,
+      "message": "Security Notice: A suspicious message (Case SM-2026-61925) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:38:02.398Z",
+    "executed_at": "2026-09-03T12:38:02.398Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-71595",
+    "case_id": "SM-2026-13394",
+    "campaign_id": "CMP-2026-149",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:38:02.524Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "ff6b10e8e00ccacb68bab66a21fc1ce82e7f103dbb10dbcc79024cf571bddfa9",
+      "rfc_message_id": "ff6b10e8e00ccacb68bab66a21fc1ce82e7f103dbb10dbcc79024cf571bddfa9",
+      "raw_hash": "ff6b10e8e00ccacb68bab66a21fc1ce82e7f103dbb10dbcc79024cf571bddfa9"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "provider_action_id": null,
+      "message": "Security Notice: A suspicious message (Case SM-2026-13394) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:38:02.524Z",
+    "executed_at": "2026-09-03T12:38:02.525Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-91622",
+    "case_id": "SM-2026-59398",
+    "campaign_id": "CMP-2026-559",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:38:02.596Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "747342d8866ba30867955890526dd753eec7a5d8e83a9ae97da37e51c24b185b",
+      "rfc_message_id": "747342d8866ba30867955890526dd753eec7a5d8e83a9ae97da37e51c24b185b",
+      "raw_hash": "747342d8866ba30867955890526dd753eec7a5d8e83a9ae97da37e51c24b185b"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "provider_action_id": null,
+      "message": "Security Notice: A suspicious message (Case SM-2026-59398) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:38:02.596Z",
+    "executed_at": "2026-09-03T12:38:02.596Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-75986",
+    "case_id": "SM-2026-42511",
+    "campaign_id": "CMP-2026-439",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:38:02.698Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "ea857439e82a3d3291246783a929cc1c7988cd92e8750e3b5f767b7c9d3cfde3",
+      "rfc_message_id": "ea857439e82a3d3291246783a929cc1c7988cd92e8750e3b5f767b7c9d3cfde3",
+      "raw_hash": "ea857439e82a3d3291246783a929cc1c7988cd92e8750e3b5f767b7c9d3cfde3"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "provider_action_id": null,
+      "message": "Security Notice: A suspicious message (Case SM-2026-42511) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:38:02.699Z",
+    "executed_at": "2026-09-03T12:38:02.699Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-26452",
+    "case_id": "SM-2026-62488",
+    "campaign_id": "CMP-2026-420",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:38:02.778Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "1741dc5c1f3fe29240f27e06e5759362eddcd2f0a9fa7178d670d93a3ecc2305",
+      "rfc_message_id": "1741dc5c1f3fe29240f27e06e5759362eddcd2f0a9fa7178d670d93a3ecc2305",
+      "raw_hash": "1741dc5c1f3fe29240f27e06e5759362eddcd2f0a9fa7178d670d93a3ecc2305"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "provider_action_id": null,
+      "message": "Security Notice: A suspicious message (Case SM-2026-62488) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:38:02.778Z",
+    "executed_at": "2026-09-03T12:38:02.779Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-20486",
+    "case_id": "SM-2026-55329",
+    "campaign_id": "CMP-2026-209",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:38:02.859Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "f63971e0f5fc359a3fe5c57f2b1b236d090ae32387c49674997ceeb8c3023c77",
+      "rfc_message_id": "f63971e0f5fc359a3fe5c57f2b1b236d090ae32387c49674997ceeb8c3023c77",
+      "raw_hash": "f63971e0f5fc359a3fe5c57f2b1b236d090ae32387c49674997ceeb8c3023c77"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "provider_action_id": null,
+      "message": "Security Notice: A suspicious message (Case SM-2026-55329) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:38:02.859Z",
+    "executed_at": "2026-09-03T12:38:02.860Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-28524",
+    "case_id": "SM-2026-57132",
+    "campaign_id": "CMP-2026-992",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:38:02.988Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "2c2c4d44c4866e3ac73032a161f037e2014666497520ecc18d5cb934b0314936",
+      "rfc_message_id": "2c2c4d44c4866e3ac73032a161f037e2014666497520ecc18d5cb934b0314936",
+      "raw_hash": "2c2c4d44c4866e3ac73032a161f037e2014666497520ecc18d5cb934b0314936"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "provider_action_id": null,
+      "message": "Security Notice: A suspicious message (Case SM-2026-57132) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:38:02.988Z",
+    "executed_at": "2026-09-03T12:38:02.989Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-34192",
+    "case_id": "SM-2026-30495",
+    "campaign_id": "CMP-2026-439",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:38:59.105Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "9740939672fee3231b005878878e9adce4cfa9eb234e0737af35bd02a7bef1e8",
+      "rfc_message_id": "9740939672fee3231b005878878e9adce4cfa9eb234e0737af35bd02a7bef1e8",
+      "raw_hash": "9740939672fee3231b005878878e9adce4cfa9eb234e0737af35bd02a7bef1e8"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "provider_action_id": null,
+      "message": "Security Notice: A suspicious message (Case SM-2026-30495) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:38:59.105Z",
+    "executed_at": "2026-09-03T12:38:59.106Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-24186",
+    "case_id": "SM-2026-82721",
+    "campaign_id": "CMP-2026-847",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:38:59.195Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "eef49b3a4d71d9ea26a03445e5b64de8c5449f64cc9bcfc75eb73f8b1d320fef",
+      "rfc_message_id": "eef49b3a4d71d9ea26a03445e5b64de8c5449f64cc9bcfc75eb73f8b1d320fef",
+      "raw_hash": "eef49b3a4d71d9ea26a03445e5b64de8c5449f64cc9bcfc75eb73f8b1d320fef"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "provider_action_id": null,
+      "message": "Security Notice: A suspicious message (Case SM-2026-82721) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:38:59.195Z",
+    "executed_at": "2026-09-03T12:38:59.196Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-62162",
+    "case_id": "SM-2026-34072",
+    "campaign_id": "CMP-2026-420",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:38:59.325Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "e7919af6adcd3e6d8aa959b24b35b4f2d439ac5850d06fde47045fb5a0fe603d",
+      "rfc_message_id": "e7919af6adcd3e6d8aa959b24b35b4f2d439ac5850d06fde47045fb5a0fe603d",
+      "raw_hash": "e7919af6adcd3e6d8aa959b24b35b4f2d439ac5850d06fde47045fb5a0fe603d"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "provider_action_id": null,
+      "message": "Security Notice: A suspicious message (Case SM-2026-34072) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:38:59.325Z",
+    "executed_at": "2026-09-03T12:38:59.326Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-94398",
+    "case_id": "SM-2026-82679",
+    "campaign_id": "CMP-2026-992",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:38:59.497Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "2c2c4d44c4866e3ac73032a161f037e2014666497520ecc18d5cb934b0314936",
+      "rfc_message_id": "2c2c4d44c4866e3ac73032a161f037e2014666497520ecc18d5cb934b0314936",
+      "raw_hash": "2c2c4d44c4866e3ac73032a161f037e2014666497520ecc18d5cb934b0314936"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "provider_action_id": null,
+      "message": "Security Notice: A suspicious message (Case SM-2026-82679) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:38:59.497Z",
+    "executed_at": "2026-09-03T12:38:59.498Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-24821",
+    "case_id": "SM-2026-55148",
+    "campaign_id": "CMP-2026-559",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:38:59.784Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "747342d8866ba30867955890526dd753eec7a5d8e83a9ae97da37e51c24b185b",
+      "rfc_message_id": "747342d8866ba30867955890526dd753eec7a5d8e83a9ae97da37e51c24b185b",
+      "raw_hash": "747342d8866ba30867955890526dd753eec7a5d8e83a9ae97da37e51c24b185b"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "provider_action_id": null,
+      "message": "Security Notice: A suspicious message (Case SM-2026-55148) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:38:59.784Z",
+    "executed_at": "2026-09-03T12:38:59.785Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-44390",
+    "case_id": "SM-2026-98880",
+    "campaign_id": "CMP-2026-835",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:38:59.912Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "2b1111ffca2f22bf013f276de41fe54c3774a548ccbead73d73c7749654c5ab2",
+      "rfc_message_id": "2b1111ffca2f22bf013f276de41fe54c3774a548ccbead73d73c7749654c5ab2",
+      "raw_hash": "2b1111ffca2f22bf013f276de41fe54c3774a548ccbead73d73c7749654c5ab2"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "provider_action_id": null,
+      "message": "Security Notice: A suspicious message (Case SM-2026-98880) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:38:59.912Z",
+    "executed_at": "2026-09-03T12:38:59.912Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-39716",
+    "case_id": "SM-2026-36911",
+    "campaign_id": "CMP-2026-439",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:39:00.047Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "ea857439e82a3d3291246783a929cc1c7988cd92e8750e3b5f767b7c9d3cfde3",
+      "rfc_message_id": "ea857439e82a3d3291246783a929cc1c7988cd92e8750e3b5f767b7c9d3cfde3",
+      "raw_hash": "ea857439e82a3d3291246783a929cc1c7988cd92e8750e3b5f767b7c9d3cfde3"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "provider_action_id": null,
+      "message": "Security Notice: A suspicious message (Case SM-2026-36911) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:39:00.047Z",
+    "executed_at": "2026-09-03T12:39:00.048Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-69561",
+    "case_id": "SM-2026-36668",
+    "campaign_id": "CMP-2026-209",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:39:00.157Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "f63971e0f5fc359a3fe5c57f2b1b236d090ae32387c49674997ceeb8c3023c77",
+      "rfc_message_id": "f63971e0f5fc359a3fe5c57f2b1b236d090ae32387c49674997ceeb8c3023c77",
+      "raw_hash": "f63971e0f5fc359a3fe5c57f2b1b236d090ae32387c49674997ceeb8c3023c77"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "provider_action_id": null,
+      "message": "Security Notice: A suspicious message (Case SM-2026-36668) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:39:00.157Z",
+    "executed_at": "2026-09-03T12:39:00.158Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-45466",
+    "case_id": "SM-2026-19635",
+    "campaign_id": "CMP-2026-420",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:39:00.266Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "1741dc5c1f3fe29240f27e06e5759362eddcd2f0a9fa7178d670d93a3ecc2305",
+      "rfc_message_id": "1741dc5c1f3fe29240f27e06e5759362eddcd2f0a9fa7178d670d93a3ecc2305",
+      "raw_hash": "1741dc5c1f3fe29240f27e06e5759362eddcd2f0a9fa7178d670d93a3ecc2305"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "provider_action_id": null,
+      "message": "Security Notice: A suspicious message (Case SM-2026-19635) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:39:00.266Z",
+    "executed_at": "2026-09-03T12:39:00.267Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-86667",
+    "case_id": "SM-2026-74351",
+    "campaign_id": "CMP-2026-149",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:39:00.374Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "ff6b10e8e00ccacb68bab66a21fc1ce82e7f103dbb10dbcc79024cf571bddfa9",
+      "rfc_message_id": "ff6b10e8e00ccacb68bab66a21fc1ce82e7f103dbb10dbcc79024cf571bddfa9",
+      "raw_hash": "ff6b10e8e00ccacb68bab66a21fc1ce82e7f103dbb10dbcc79024cf571bddfa9"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "provider_action_id": null,
+      "message": "Security Notice: A suspicious message (Case SM-2026-74351) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:39:00.375Z",
+    "executed_at": "2026-09-03T12:39:00.375Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-16183",
+    "case_id": "SM-2026-86036",
+    "campaign_id": "CMP-2026-504",
+    "action_type": "QUARANTINE_MESSAGE",
+    "status": "REVERSED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "CRITICAL_BEC_VIP"
+    },
+    "reason": "High-confidence executive impersonation with financial intent & authentication anomaly",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:46:37.600Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cfo@company.com",
+      "message_id": "a04c01553183bb0dba88832241e84e93d72ccd4ee9c87f326361b318ac1a4368",
+      "rfc_message_id": "a04c01553183bb0dba88832241e84e93d72ccd4ee9c87f326361b318ac1a4368",
+      "raw_hash": "a04c01553183bb0dba88832241e84e93d72ccd4ee9c87f326361b318ac1a4368"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "provider_action_id": "sim-act-945868",
+      "message": "SIMULATION MODE: Quarantine action simulated cleanly. No actual provider mailbox changes performed."
+    },
+    "requested_at": "2026-09-03T12:46:37.600Z",
+    "executed_at": "2026-09-03T12:46:37.601Z",
+    "completed_at": "2026-09-03T12:46:37.602Z",
+    "reversible": true,
+    "rollback": {
+      "status": "REVERSED",
+      "reversed_at": "2026-09-03T12:46:38.092Z",
+      "reversed_by": "LEAD_SOC_ANALYST"
+    }
+  },
+  {
+    "action_id": "ACT-2026-28514",
+    "case_id": "SM-2026-55333",
+    "campaign_id": "CMP-2026-283",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:46:37.904Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "employee@organization.in",
+      "message_id": "44e0f2996d426c1a93b13435c851df20b415242810601c61593d5ab0eb2ef768",
+      "rfc_message_id": "44e0f2996d426c1a93b13435c851df20b415242810601c61593d5ab0eb2ef768",
+      "raw_hash": "44e0f2996d426c1a93b13435c851df20b415242810601c61593d5ab0eb2ef768"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "provider_action_id": null,
+      "message": "Security Notice: A suspicious message (Case SM-2026-55333) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:46:37.904Z",
+    "executed_at": "2026-09-03T12:46:37.904Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-61630",
+    "case_id": "SM-2026-51904",
+    "campaign_id": "CMP-2026-504",
+    "action_type": "QUARANTINE_MESSAGE",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "CRITICAL_BEC_VIP"
+    },
+    "reason": "High-confidence executive impersonation with financial intent & authentication anomaly",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:52:19.703Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cfo@company.com",
+      "message_id": "ef830e9c80b3f90d490df183afc22c13d5cb882053a31fc9e3fb08fca40a3b4c",
+      "rfc_message_id": "ef830e9c80b3f90d490df183afc22c13d5cb882053a31fc9e3fb08fca40a3b4c",
+      "raw_hash": "ef830e9c80b3f90d490df183afc22c13d5cb882053a31fc9e3fb08fca40a3b4c"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "provider_action_id": "sim-act-736900",
+      "message": "SIMULATION MODE: Quarantine action simulated cleanly. No actual provider mailbox changes performed."
+    },
+    "requested_at": "2026-09-03T12:52:19.703Z",
+    "executed_at": "2026-09-03T12:52:19.704Z",
+    "completed_at": "2026-09-03T12:52:19.705Z",
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-21271",
+    "case_id": "SM-2026-34148",
+    "campaign_id": "CMP-2026-762",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:53:26.821Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "be99a4366a3478a6e056ee1154ac9ec539e8081dd6b273e04489a22df49ab73b",
+      "rfc_message_id": "be99a4366a3478a6e056ee1154ac9ec539e8081dd6b273e04489a22df49ab73b",
+      "raw_hash": "be99a4366a3478a6e056ee1154ac9ec539e8081dd6b273e04489a22df49ab73b"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "message": "Security Notice: A suspicious message (Case SM-2026-34148) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:53:26.821Z",
+    "executed_at": "2026-09-03T12:53:26.822Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-49871",
+    "case_id": "SM-2026-63615",
+    "campaign_id": "CMP-2026-355",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:53:31.586Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "4175b8f76500293b598f5f383e57601ba9778978541bc54b1df89f07203870bd",
+      "rfc_message_id": "4175b8f76500293b598f5f383e57601ba9778978541bc54b1df89f07203870bd",
+      "raw_hash": "4175b8f76500293b598f5f383e57601ba9778978541bc54b1df89f07203870bd"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "message": "Security Notice: A suspicious message (Case SM-2026-63615) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:53:31.586Z",
+    "executed_at": "2026-09-03T12:53:31.596Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-17839",
+    "case_id": "SM-2026-75030",
+    "campaign_id": "CMP-2026-355",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:53:32.796Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "6dae391824f95a8de846fdb43adc0de941242625144ddd0fbc9df26c6621eec5",
+      "rfc_message_id": "6dae391824f95a8de846fdb43adc0de941242625144ddd0fbc9df26c6621eec5",
+      "raw_hash": "6dae391824f95a8de846fdb43adc0de941242625144ddd0fbc9df26c6621eec5"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "message": "Security Notice: A suspicious message (Case SM-2026-75030) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:53:32.796Z",
+    "executed_at": "2026-09-03T12:53:32.797Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-69810",
+    "case_id": "SM-2026-98894",
+    "campaign_id": "CMP-2026-355",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:53:35.007Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "7775ea792bef5061c13eae591ba296df5de95554aa299ba0dfa3763730432404",
+      "rfc_message_id": "7775ea792bef5061c13eae591ba296df5de95554aa299ba0dfa3763730432404",
+      "raw_hash": "7775ea792bef5061c13eae591ba296df5de95554aa299ba0dfa3763730432404"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "message": "Security Notice: A suspicious message (Case SM-2026-98894) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:53:35.007Z",
+    "executed_at": "2026-09-03T12:53:35.008Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-59086",
+    "case_id": "SM-2026-21862",
+    "campaign_id": "CMP-2026-847",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:53:39.456Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "6c885bf25c064ff35fcc22026a9c21c918c81f7139e40d75e03e4b04131625e4",
+      "rfc_message_id": "6c885bf25c064ff35fcc22026a9c21c918c81f7139e40d75e03e4b04131625e4",
+      "raw_hash": "6c885bf25c064ff35fcc22026a9c21c918c81f7139e40d75e03e4b04131625e4"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "message": "Security Notice: A suspicious message (Case SM-2026-21862) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:53:39.456Z",
+    "executed_at": "2026-09-03T12:53:39.457Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-15665",
+    "case_id": "SM-2026-13672",
+    "campaign_id": "CMP-2026-951",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:53:56.204Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "636275965dfe9947d34b20fa43d83ce09b141741fab8314c39fe17edcf69c401",
+      "rfc_message_id": "636275965dfe9947d34b20fa43d83ce09b141741fab8314c39fe17edcf69c401",
+      "raw_hash": "636275965dfe9947d34b20fa43d83ce09b141741fab8314c39fe17edcf69c401"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "message": "Security Notice: A suspicious message (Case SM-2026-13672) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:53:56.204Z",
+    "executed_at": "2026-09-03T12:53:56.206Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-64670",
+    "case_id": "SM-2026-98347",
+    "campaign_id": "CMP-2026-319",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:53:59.231Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "859c2fd53fbb2e570a956e274fee6927b0933a9802af0862d1f12e72f56de76b",
+      "rfc_message_id": "859c2fd53fbb2e570a956e274fee6927b0933a9802af0862d1f12e72f56de76b",
+      "raw_hash": "859c2fd53fbb2e570a956e274fee6927b0933a9802af0862d1f12e72f56de76b"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "message": "Security Notice: A suspicious message (Case SM-2026-98347) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:53:59.231Z",
+    "executed_at": "2026-09-03T12:53:59.233Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-12717",
+    "case_id": "SM-2026-32956",
+    "campaign_id": "CMP-2026-577",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:54:13.937Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "3f47d3239b82bfb4870b8ec0ae4f5f12171dda1db6cc5486b404ea652faa8154",
+      "rfc_message_id": "3f47d3239b82bfb4870b8ec0ae4f5f12171dda1db6cc5486b404ea652faa8154",
+      "raw_hash": "3f47d3239b82bfb4870b8ec0ae4f5f12171dda1db6cc5486b404ea652faa8154"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "message": "Security Notice: A suspicious message (Case SM-2026-32956) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:54:13.937Z",
+    "executed_at": "2026-09-03T12:54:13.938Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-29317",
+    "case_id": "SM-2026-61787",
+    "campaign_id": "CMP-2026-721",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:54:16.211Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "7e0d4d7d34c75a2f647f51bbb0c1c845bc2861a403714e28fb27e3a1ebbf7c77",
+      "rfc_message_id": "7e0d4d7d34c75a2f647f51bbb0c1c845bc2861a403714e28fb27e3a1ebbf7c77",
+      "raw_hash": "7e0d4d7d34c75a2f647f51bbb0c1c845bc2861a403714e28fb27e3a1ebbf7c77"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "message": "Security Notice: A suspicious message (Case SM-2026-61787) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:54:16.211Z",
+    "executed_at": "2026-09-03T12:54:16.212Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-52626",
+    "case_id": "SM-2026-94728",
+    "campaign_id": "CMP-2026-721",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:54:23.496Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "fe1afcb244ef405ccd3c824d06c549e07379e40e7c3497ad51b41a32729bffa7",
+      "rfc_message_id": "fe1afcb244ef405ccd3c824d06c549e07379e40e7c3497ad51b41a32729bffa7",
+      "raw_hash": "fe1afcb244ef405ccd3c824d06c549e07379e40e7c3497ad51b41a32729bffa7"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "message": "Security Notice: A suspicious message (Case SM-2026-94728) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:54:23.497Z",
+    "executed_at": "2026-09-03T12:54:23.498Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-21528",
+    "case_id": "SM-2026-10805",
+    "campaign_id": "CMP-2026-721",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:54:26.439Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "fba50f596fee49ce32489ef7f7f4a1680a8c140a19bc229a9ba2beed554ee1eb",
+      "rfc_message_id": "fba50f596fee49ce32489ef7f7f4a1680a8c140a19bc229a9ba2beed554ee1eb",
+      "raw_hash": "fba50f596fee49ce32489ef7f7f4a1680a8c140a19bc229a9ba2beed554ee1eb"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "message": "Security Notice: A suspicious message (Case SM-2026-10805) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:54:26.439Z",
+    "executed_at": "2026-09-03T12:54:26.440Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-48195",
+    "case_id": "SM-2026-32176",
+    "campaign_id": "CMP-2026-721",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:54:30.039Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "9137589301e6ebf48504afe21ba11ed726fbf10a944b9c3523bde52d1e709e84",
+      "rfc_message_id": "9137589301e6ebf48504afe21ba11ed726fbf10a944b9c3523bde52d1e709e84",
+      "raw_hash": "9137589301e6ebf48504afe21ba11ed726fbf10a944b9c3523bde52d1e709e84"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "message": "Security Notice: A suspicious message (Case SM-2026-32176) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:54:30.039Z",
+    "executed_at": "2026-09-03T12:54:30.040Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-69953",
+    "case_id": "SM-2026-99004",
+    "campaign_id": "CMP-2026-199",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:55:02.584Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "ee62327b061ade853dd588974cbd215dab6e94faf710428f9ac0095159ad580b",
+      "rfc_message_id": "ee62327b061ade853dd588974cbd215dab6e94faf710428f9ac0095159ad580b",
+      "raw_hash": "ee62327b061ade853dd588974cbd215dab6e94faf710428f9ac0095159ad580b"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "message": "Security Notice: A suspicious message (Case SM-2026-99004) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:55:02.584Z",
+    "executed_at": "2026-09-03T12:55:02.585Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-43172",
+    "case_id": "SM-2026-75755",
+    "campaign_id": "CMP-2026-721",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:55:20.840Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "dbc6ad9280d723087828645e70dc1389a70a31602963f76de67f46587c91df99",
+      "rfc_message_id": "dbc6ad9280d723087828645e70dc1389a70a31602963f76de67f46587c91df99",
+      "raw_hash": "dbc6ad9280d723087828645e70dc1389a70a31602963f76de67f46587c91df99"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "message": "Security Notice: A suspicious message (Case SM-2026-75755) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:55:20.840Z",
+    "executed_at": "2026-09-03T12:55:20.842Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-34940",
+    "case_id": "SM-2026-37853",
+    "campaign_id": "CMP-2026-199",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T12:58:57.162Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "352b6bc40a89bf962bbad584efa8e60b7ecd36a4c5541bd7b65afd2f1c701f29",
+      "rfc_message_id": "352b6bc40a89bf962bbad584efa8e60b7ecd36a4c5541bd7b65afd2f1c701f29",
+      "raw_hash": "352b6bc40a89bf962bbad584efa8e60b7ecd36a4c5541bd7b65afd2f1c701f29"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "message": "Security Notice: A suspicious message (Case SM-2026-37853) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T12:58:57.162Z",
+    "executed_at": "2026-09-03T12:58:57.163Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-57370",
+    "case_id": "SM-2026-51597",
+    "campaign_id": "CMP-2026-199",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T13:02:23.541Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "a33f629c44caab3fc247649605be567e7fef9ebfefe04a12b0bdd0a5aa973de4",
+      "rfc_message_id": "a33f629c44caab3fc247649605be567e7fef9ebfefe04a12b0bdd0a5aa973de4",
+      "raw_hash": "a33f629c44caab3fc247649605be567e7fef9ebfefe04a12b0bdd0a5aa973de4"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "message": "Security Notice: A suspicious message (Case SM-2026-51597) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T13:02:23.541Z",
+    "executed_at": "2026-09-03T13:02:23.542Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-23390",
+    "case_id": "SM-2026-69102",
+    "campaign_id": "CMP-2026-847",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T13:03:02.969Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "79e4566b17a8cd7bb1842e961877665387cd9de3a1e672d38f47334a9eded460",
+      "rfc_message_id": "79e4566b17a8cd7bb1842e961877665387cd9de3a1e672d38f47334a9eded460",
+      "raw_hash": "79e4566b17a8cd7bb1842e961877665387cd9de3a1e672d38f47334a9eded460"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "message": "Security Notice: A suspicious message (Case SM-2026-69102) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T13:03:02.969Z",
+    "executed_at": "2026-09-03T13:03:02.970Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-88752",
+    "case_id": "SM-2026-84126",
+    "campaign_id": "CMP-2026-684",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T13:04:35.471Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "73d8edf3d381ba3e59f4da89e0d5417a57aec32f21da355b687fa3d59c7fa368",
+      "rfc_message_id": "73d8edf3d381ba3e59f4da89e0d5417a57aec32f21da355b687fa3d59c7fa368",
+      "raw_hash": "73d8edf3d381ba3e59f4da89e0d5417a57aec32f21da355b687fa3d59c7fa368"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "message": "Security Notice: A suspicious message (Case SM-2026-84126) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T13:04:35.471Z",
+    "executed_at": "2026-09-03T13:04:35.472Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-22201",
+    "case_id": "SM-2026-20054",
+    "campaign_id": "CMP-2026-684",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T13:05:43.096Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "6e1996d8d82b74b411e196d7e0abd9ec180cd10f5c9bb0db2c6764a7cb357a64",
+      "rfc_message_id": "6e1996d8d82b74b411e196d7e0abd9ec180cd10f5c9bb0db2c6764a7cb357a64",
+      "raw_hash": "6e1996d8d82b74b411e196d7e0abd9ec180cd10f5c9bb0db2c6764a7cb357a64"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "message": "Security Notice: A suspicious message (Case SM-2026-20054) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T13:05:43.096Z",
+    "executed_at": "2026-09-03T13:05:43.098Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-95955",
+    "case_id": "SM-2026-93814",
+    "campaign_id": "CMP-2026-684",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T13:06:07.957Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "14570715252a0753995c709e8bcc9724bf5b635a990fcea0f71cddf56394c9cd",
+      "rfc_message_id": "14570715252a0753995c709e8bcc9724bf5b635a990fcea0f71cddf56394c9cd",
+      "raw_hash": "14570715252a0753995c709e8bcc9724bf5b635a990fcea0f71cddf56394c9cd"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "message": "Security Notice: A suspicious message (Case SM-2026-93814) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T13:06:07.958Z",
+    "executed_at": "2026-09-03T13:06:07.959Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-12861",
+    "case_id": "SM-2026-74697",
+    "campaign_id": "CMP-2026-684",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T13:06:46.893Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "03fd924b449e05f9c14dbc001013483916a374a678ba8f5f04358adc3a6f06ac",
+      "rfc_message_id": "03fd924b449e05f9c14dbc001013483916a374a678ba8f5f04358adc3a6f06ac",
+      "raw_hash": "03fd924b449e05f9c14dbc001013483916a374a678ba8f5f04358adc3a6f06ac"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "message": "Security Notice: A suspicious message (Case SM-2026-74697) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T13:06:46.893Z",
+    "executed_at": "2026-09-03T13:06:46.895Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-24779",
+    "case_id": "SM-2026-70775",
+    "campaign_id": "CMP-2026-439",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T13:07:53.754Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "f0608e5a995ee0a7a8a2a5947066fdf28b025c680cfbc0a5bdaa3fe7f75b4617",
+      "rfc_message_id": "f0608e5a995ee0a7a8a2a5947066fdf28b025c680cfbc0a5bdaa3fe7f75b4617",
+      "raw_hash": "f0608e5a995ee0a7a8a2a5947066fdf28b025c680cfbc0a5bdaa3fe7f75b4617"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "message": "Security Notice: A suspicious message (Case SM-2026-70775) was detected and is under investigation by security team."
+    },
+    "requested_at": "2026-09-03T13:07:53.754Z",
+    "executed_at": "2026-09-03T13:07:53.756Z",
+    "completed_at": null,
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  }
+]

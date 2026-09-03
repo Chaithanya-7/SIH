@@ -1,0 +1,16 @@
+node_modules/
+**/node_modules/
+.env
+**/.env
+data/*.sqlite
+**/*.sqlite
+data/cases.json
+data/remediation_actions.json
+data/processed_messages.json
+data/imap_state.json
+*.log
+**/*.log
+dist/
+**/dist/
+.vscode/
+.idea/
