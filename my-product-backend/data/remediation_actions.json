@@ -2,9 +2,18 @@
   {
     "action_id": "ACT-2026-99430",
     "case_id": "SM-2026-97457",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-439",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-97457_ALERT_RECIPIENT_1788618096550",
+    "requested_at": "2026-09-03T12:38:01.921Z",
+    "started_at": "2026-09-05T14:21:36.550Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -27,9 +36,6 @@
       "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-97457) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:38:01.921Z",
-    "executed_at": "2026-09-03T12:38:01.922Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -40,9 +46,18 @@
   {
     "action_id": "ACT-2026-11397",
     "case_id": "SM-2026-28167",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-420",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-28167_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:38:02.027Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -65,9 +80,6 @@
       "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-28167) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:38:02.027Z",
-    "executed_at": "2026-09-03T12:38:02.027Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -78,9 +90,18 @@
   {
     "action_id": "ACT-2026-76570",
     "case_id": "SM-2026-91215",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-847",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-91215_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:38:02.117Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -103,9 +124,6 @@
       "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-91215) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:38:02.117Z",
-    "executed_at": "2026-09-03T12:38:02.117Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -116,9 +134,18 @@
   {
     "action_id": "ACT-2026-88452",
     "case_id": "SM-2026-61925",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-835",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-61925_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:38:02.398Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -141,9 +168,6 @@
       "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-61925) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:38:02.398Z",
-    "executed_at": "2026-09-03T12:38:02.398Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -154,9 +178,18 @@
   {
     "action_id": "ACT-2026-71595",
     "case_id": "SM-2026-13394",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-149",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-13394_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:38:02.524Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -179,9 +212,6 @@
       "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-13394) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:38:02.524Z",
-    "executed_at": "2026-09-03T12:38:02.525Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -192,9 +222,18 @@
   {
     "action_id": "ACT-2026-91622",
     "case_id": "SM-2026-59398",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-559",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-59398_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:38:02.596Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -217,9 +256,6 @@
       "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-59398) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:38:02.596Z",
-    "executed_at": "2026-09-03T12:38:02.596Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -230,9 +266,18 @@
   {
     "action_id": "ACT-2026-75986",
     "case_id": "SM-2026-42511",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-439",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-42511_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:38:02.699Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -255,9 +300,6 @@
       "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-42511) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:38:02.699Z",
-    "executed_at": "2026-09-03T12:38:02.699Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -268,9 +310,18 @@
   {
     "action_id": "ACT-2026-26452",
     "case_id": "SM-2026-62488",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-420",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-62488_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:38:02.778Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -293,9 +344,6 @@
       "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-62488) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:38:02.778Z",
-    "executed_at": "2026-09-03T12:38:02.779Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -306,9 +354,18 @@
   {
     "action_id": "ACT-2026-20486",
     "case_id": "SM-2026-55329",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-209",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-55329_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:38:02.859Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -331,9 +388,6 @@
       "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-55329) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:38:02.859Z",
-    "executed_at": "2026-09-03T12:38:02.860Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -344,9 +398,18 @@
   {
     "action_id": "ACT-2026-28524",
     "case_id": "SM-2026-57132",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-992",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-57132_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:38:02.988Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -369,9 +432,6 @@
       "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-57132) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:38:02.988Z",
-    "executed_at": "2026-09-03T12:38:02.989Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -382,9 +442,18 @@
   {
     "action_id": "ACT-2026-34192",
     "case_id": "SM-2026-30495",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-439",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-30495_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:38:59.105Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -407,9 +476,6 @@
       "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-30495) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:38:59.105Z",
-    "executed_at": "2026-09-03T12:38:59.106Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -420,9 +486,18 @@
   {
     "action_id": "ACT-2026-24186",
     "case_id": "SM-2026-82721",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-847",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-82721_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:38:59.195Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -445,9 +520,6 @@
       "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-82721) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:38:59.195Z",
-    "executed_at": "2026-09-03T12:38:59.196Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -458,9 +530,18 @@
   {
     "action_id": "ACT-2026-62162",
     "case_id": "SM-2026-34072",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-420",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-34072_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:38:59.325Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -483,9 +564,6 @@
       "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-34072) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:38:59.325Z",
-    "executed_at": "2026-09-03T12:38:59.326Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -496,9 +574,18 @@
   {
     "action_id": "ACT-2026-94398",
     "case_id": "SM-2026-82679",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-992",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-82679_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:38:59.497Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -521,9 +608,6 @@
       "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-82679) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:38:59.497Z",
-    "executed_at": "2026-09-03T12:38:59.498Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -534,9 +618,18 @@
   {
     "action_id": "ACT-2026-24821",
     "case_id": "SM-2026-55148",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-559",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-55148_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:38:59.784Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -559,9 +652,6 @@
       "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-55148) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:38:59.784Z",
-    "executed_at": "2026-09-03T12:38:59.785Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -572,9 +662,18 @@
   {
     "action_id": "ACT-2026-44390",
     "case_id": "SM-2026-98880",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-835",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-98880_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:38:59.912Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -597,9 +696,6 @@
       "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-98880) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:38:59.912Z",
-    "executed_at": "2026-09-03T12:38:59.912Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -610,9 +706,18 @@
   {
     "action_id": "ACT-2026-39716",
     "case_id": "SM-2026-36911",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-439",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-36911_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:39:00.047Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -635,9 +740,6 @@
       "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-36911) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:39:00.047Z",
-    "executed_at": "2026-09-03T12:39:00.048Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -648,9 +750,18 @@
   {
     "action_id": "ACT-2026-69561",
     "case_id": "SM-2026-36668",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-209",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-36668_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:39:00.157Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -673,9 +784,6 @@
       "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-36668) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:39:00.157Z",
-    "executed_at": "2026-09-03T12:39:00.158Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -686,9 +794,18 @@
   {
     "action_id": "ACT-2026-45466",
     "case_id": "SM-2026-19635",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-420",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-19635_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:39:00.266Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -711,9 +828,6 @@
       "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-19635) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:39:00.266Z",
-    "executed_at": "2026-09-03T12:39:00.267Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -724,9 +838,18 @@
   {
     "action_id": "ACT-2026-86667",
     "case_id": "SM-2026-74351",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-149",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-74351_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:39:00.375Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -749,9 +872,6 @@
       "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-74351) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:39:00.375Z",
-    "executed_at": "2026-09-03T12:39:00.375Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -762,9 +882,18 @@
   {
     "action_id": "ACT-2026-16183",
     "case_id": "SM-2026-86036",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-504",
+    "type": "QUARANTINE_MESSAGE",
     "action_type": "QUARANTINE_MESSAGE",
     "status": "REVERSED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-86036_QUARANTINE_MESSAGE_1788618096551",
+    "requested_at": "2026-09-03T12:46:37.600Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": "2026-09-03T12:46:37.602Z",
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "CRITICAL_BEC_VIP"
@@ -787,9 +916,6 @@
       "provider_action_id": "sim-act-945868",
       "message": "SIMULATION MODE: Quarantine action simulated cleanly. No actual provider mailbox changes performed."
     },
-    "requested_at": "2026-09-03T12:46:37.600Z",
-    "executed_at": "2026-09-03T12:46:37.601Z",
-    "completed_at": "2026-09-03T12:46:37.602Z",
     "reversible": true,
     "rollback": {
       "status": "REVERSED",
@@ -800,9 +926,18 @@
   {
     "action_id": "ACT-2026-28514",
     "case_id": "SM-2026-55333",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-283",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-55333_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:46:37.904Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -825,9 +960,6 @@
       "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-55333) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:46:37.904Z",
-    "executed_at": "2026-09-03T12:46:37.904Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -838,9 +970,18 @@
   {
     "action_id": "ACT-2026-61630",
     "case_id": "SM-2026-51904",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-504",
+    "type": "QUARANTINE_MESSAGE",
     "action_type": "QUARANTINE_MESSAGE",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-51904_QUARANTINE_MESSAGE_1788618096551",
+    "requested_at": "2026-09-03T12:52:19.703Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": "2026-09-03T12:52:19.705Z",
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "CRITICAL_BEC_VIP"
@@ -863,9 +1004,6 @@
       "provider_action_id": "sim-act-736900",
       "message": "SIMULATION MODE: Quarantine action simulated cleanly. No actual provider mailbox changes performed."
     },
-    "requested_at": "2026-09-03T12:52:19.703Z",
-    "executed_at": "2026-09-03T12:52:19.704Z",
-    "completed_at": "2026-09-03T12:52:19.705Z",
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -876,9 +1014,18 @@
   {
     "action_id": "ACT-2026-21271",
     "case_id": "SM-2026-34148",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-762",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-34148_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:53:26.821Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -898,11 +1045,9 @@
     },
     "provider_result": {
       "status": "CONFIRMED",
+      "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-34148) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:53:26.821Z",
-    "executed_at": "2026-09-03T12:53:26.822Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -913,9 +1058,18 @@
   {
     "action_id": "ACT-2026-49871",
     "case_id": "SM-2026-63615",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-355",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-63615_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:53:31.586Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -935,11 +1089,9 @@
     },
     "provider_result": {
       "status": "CONFIRMED",
+      "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-63615) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:53:31.586Z",
-    "executed_at": "2026-09-03T12:53:31.596Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -950,9 +1102,18 @@
   {
     "action_id": "ACT-2026-17839",
     "case_id": "SM-2026-75030",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-355",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-75030_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:53:32.796Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -972,11 +1133,9 @@
     },
     "provider_result": {
       "status": "CONFIRMED",
+      "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-75030) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:53:32.796Z",
-    "executed_at": "2026-09-03T12:53:32.797Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -987,9 +1146,18 @@
   {
     "action_id": "ACT-2026-69810",
     "case_id": "SM-2026-98894",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-355",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-98894_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:53:35.007Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -1009,11 +1177,9 @@
     },
     "provider_result": {
       "status": "CONFIRMED",
+      "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-98894) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:53:35.007Z",
-    "executed_at": "2026-09-03T12:53:35.008Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -1024,9 +1190,18 @@
   {
     "action_id": "ACT-2026-59086",
     "case_id": "SM-2026-21862",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-847",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-21862_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:53:39.456Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -1046,11 +1221,9 @@
     },
     "provider_result": {
       "status": "CONFIRMED",
+      "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-21862) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:53:39.456Z",
-    "executed_at": "2026-09-03T12:53:39.457Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -1061,9 +1234,18 @@
   {
     "action_id": "ACT-2026-15665",
     "case_id": "SM-2026-13672",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-951",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-13672_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:53:56.204Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -1083,11 +1265,9 @@
     },
     "provider_result": {
       "status": "CONFIRMED",
+      "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-13672) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:53:56.204Z",
-    "executed_at": "2026-09-03T12:53:56.206Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -1098,9 +1278,18 @@
   {
     "action_id": "ACT-2026-64670",
     "case_id": "SM-2026-98347",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-319",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-98347_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:53:59.231Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -1120,11 +1309,9 @@
     },
     "provider_result": {
       "status": "CONFIRMED",
+      "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-98347) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:53:59.231Z",
-    "executed_at": "2026-09-03T12:53:59.233Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -1135,9 +1322,18 @@
   {
     "action_id": "ACT-2026-12717",
     "case_id": "SM-2026-32956",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-577",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-32956_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:54:13.937Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -1157,11 +1353,9 @@
     },
     "provider_result": {
       "status": "CONFIRMED",
+      "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-32956) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:54:13.937Z",
-    "executed_at": "2026-09-03T12:54:13.938Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -1172,9 +1366,18 @@
   {
     "action_id": "ACT-2026-29317",
     "case_id": "SM-2026-61787",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-721",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-61787_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:54:16.211Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -1194,11 +1397,9 @@
     },
     "provider_result": {
       "status": "CONFIRMED",
+      "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-61787) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:54:16.211Z",
-    "executed_at": "2026-09-03T12:54:16.212Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -1209,9 +1410,18 @@
   {
     "action_id": "ACT-2026-52626",
     "case_id": "SM-2026-94728",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-721",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-94728_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:54:23.497Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -1231,11 +1441,9 @@
     },
     "provider_result": {
       "status": "CONFIRMED",
+      "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-94728) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:54:23.497Z",
-    "executed_at": "2026-09-03T12:54:23.498Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -1246,9 +1454,18 @@
   {
     "action_id": "ACT-2026-21528",
     "case_id": "SM-2026-10805",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-721",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-10805_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:54:26.439Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -1268,11 +1485,9 @@
     },
     "provider_result": {
       "status": "CONFIRMED",
+      "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-10805) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:54:26.439Z",
-    "executed_at": "2026-09-03T12:54:26.440Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -1283,9 +1498,18 @@
   {
     "action_id": "ACT-2026-48195",
     "case_id": "SM-2026-32176",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-721",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-32176_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:54:30.039Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -1305,11 +1529,9 @@
     },
     "provider_result": {
       "status": "CONFIRMED",
+      "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-32176) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:54:30.039Z",
-    "executed_at": "2026-09-03T12:54:30.040Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -1320,9 +1542,18 @@
   {
     "action_id": "ACT-2026-69953",
     "case_id": "SM-2026-99004",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-199",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-99004_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:55:02.584Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -1342,11 +1573,9 @@
     },
     "provider_result": {
       "status": "CONFIRMED",
+      "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-99004) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:55:02.584Z",
-    "executed_at": "2026-09-03T12:55:02.585Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -1357,9 +1586,18 @@
   {
     "action_id": "ACT-2026-43172",
     "case_id": "SM-2026-75755",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-721",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-75755_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:55:20.840Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -1379,11 +1617,9 @@
     },
     "provider_result": {
       "status": "CONFIRMED",
+      "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-75755) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:55:20.840Z",
-    "executed_at": "2026-09-03T12:55:20.842Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -1394,9 +1630,18 @@
   {
     "action_id": "ACT-2026-34940",
     "case_id": "SM-2026-37853",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-199",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-37853_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T12:58:57.162Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -1416,11 +1661,9 @@
     },
     "provider_result": {
       "status": "CONFIRMED",
+      "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-37853) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T12:58:57.162Z",
-    "executed_at": "2026-09-03T12:58:57.163Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -1431,9 +1674,18 @@
   {
     "action_id": "ACT-2026-57370",
     "case_id": "SM-2026-51597",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-199",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-51597_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T13:02:23.541Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -1453,11 +1705,9 @@
     },
     "provider_result": {
       "status": "CONFIRMED",
+      "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-51597) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T13:02:23.541Z",
-    "executed_at": "2026-09-03T13:02:23.542Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -1468,9 +1718,18 @@
   {
     "action_id": "ACT-2026-23390",
     "case_id": "SM-2026-69102",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-847",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-69102_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T13:03:02.969Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -1490,11 +1749,9 @@
     },
     "provider_result": {
       "status": "CONFIRMED",
+      "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-69102) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T13:03:02.969Z",
-    "executed_at": "2026-09-03T13:03:02.970Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -1505,9 +1762,18 @@
   {
     "action_id": "ACT-2026-88752",
     "case_id": "SM-2026-84126",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-684",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-84126_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T13:04:35.471Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -1527,11 +1793,9 @@
     },
     "provider_result": {
       "status": "CONFIRMED",
+      "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-84126) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T13:04:35.471Z",
-    "executed_at": "2026-09-03T13:04:35.472Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -1542,9 +1806,18 @@
   {
     "action_id": "ACT-2026-22201",
     "case_id": "SM-2026-20054",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-684",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-20054_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T13:05:43.096Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -1564,11 +1837,9 @@
     },
     "provider_result": {
       "status": "CONFIRMED",
+      "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-20054) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T13:05:43.096Z",
-    "executed_at": "2026-09-03T13:05:43.098Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -1579,9 +1850,18 @@
   {
     "action_id": "ACT-2026-95955",
     "case_id": "SM-2026-93814",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-684",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-93814_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T13:06:07.958Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -1601,11 +1881,9 @@
     },
     "provider_result": {
       "status": "CONFIRMED",
+      "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-93814) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T13:06:07.958Z",
-    "executed_at": "2026-09-03T13:06:07.959Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -1616,9 +1894,18 @@
   {
     "action_id": "ACT-2026-12861",
     "case_id": "SM-2026-74697",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-684",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-74697_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T13:06:46.893Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -1638,11 +1925,9 @@
     },
     "provider_result": {
       "status": "CONFIRMED",
+      "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-74697) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T13:06:46.893Z",
-    "executed_at": "2026-09-03T13:06:46.895Z",
-    "completed_at": null,
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",
@@ -1653,9 +1938,18 @@
   {
     "action_id": "ACT-2026-24779",
     "case_id": "SM-2026-70775",
+    "organization_id": null,
+    "mailbox_connection_id": null,
     "campaign_id": "CMP-2026-439",
+    "type": "ALERT_RECIPIENT",
     "action_type": "ALERT_RECIPIENT",
     "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-70775_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T13:07:53.754Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
+    "completed_at": null,
+    "failure_reason": null,
     "trigger": {
       "type": "POLICY",
       "policy_id": "SUSPICIOUS_USER_WARNING"
@@ -1675,11 +1969,141 @@
     },
     "provider_result": {
       "status": "CONFIRMED",
+      "provider_action_id": null,
       "message": "Security Notice: A suspicious message (Case SM-2026-70775) was detected and is under investigation by security team."
     },
-    "requested_at": "2026-09-03T13:07:53.754Z",
-    "executed_at": "2026-09-03T13:07:53.756Z",
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-55327",
+    "case_id": "SM-2026-43847",
+    "organization_id": null,
+    "mailbox_connection_id": null,
+    "campaign_id": "CMP-2026-439",
+    "type": "ALERT_RECIPIENT",
+    "action_type": "ALERT_RECIPIENT",
+    "status": "ACTION_SUCCEEDED",
+    "requested_by": "SYSTEM",
+    "idempotency_key": "idemp_SM-2026-43847_ALERT_RECIPIENT_1788618096551",
+    "requested_at": "2026-09-03T13:09:18.716Z",
+    "started_at": "2026-09-05T14:21:36.551Z",
     "completed_at": null,
+    "failure_reason": null,
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "SUSPICIOUS_USER_WARNING"
+    },
+    "reason": "Moderate threat anomaly warrants recipient warning header",
+    "authorization": {
+      "mode": "AUTO_EXECUTE",
+      "authorized_by": "POLICY_ENGINE",
+      "authorized_at": "2026-09-03T13:09:18.716Z"
+    },
+    "target": {
+      "provider": "simulation",
+      "mailbox": "cha7thanya@gmail.com",
+      "message_id": "3b4ce7dc09dd17a43d82e6087873086525b7eb02e8f2d394220f7a65dbcaace6",
+      "rfc_message_id": "3b4ce7dc09dd17a43d82e6087873086525b7eb02e8f2d394220f7a65dbcaace6",
+      "raw_hash": "3b4ce7dc09dd17a43d82e6087873086525b7eb02e8f2d394220f7a65dbcaace6"
+    },
+    "provider_result": {
+      "status": "CONFIRMED",
+      "provider_action_id": null,
+      "message": "Security Notice: A suspicious message (Case SM-2026-43847) was detected and is under investigation by security team."
+    },
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-17792",
+    "case_id": "SM-2026-63BB29",
+    "organization_id": "org_a49ad5e1b0117cb1",
+    "mailbox_connection_id": null,
+    "campaign_id": null,
+    "type": "CONFIRM_THREAT",
+    "action_type": "CONFIRM_THREAT",
+    "status": "COMPLETED",
+    "requested_by": "usr_f194dc417ad95365",
+    "idempotency_key": "confirm_SM-2026-63BB29",
+    "requested_at": "2026-09-05T14:21:54.325Z",
+    "started_at": "2026-09-05T14:21:54.325Z",
+    "completed_at": "2026-09-05T14:21:54.325Z",
+    "failure_reason": null,
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "DEFAULT_POLICY"
+    },
+    "reason": "MALICIOUS_PHISH",
+    "authorization": {
+      "mode": "REQUIRE_APPROVAL",
+      "authorized_by": "usr_f194dc417ad95365",
+      "authorized_at": "2026-09-05T14:21:54.325Z"
+    },
+    "target": {
+      "provider": "GMAIL",
+      "mailbox": "victim@org-i.com",
+      "message_id": "",
+      "rfc_message_id": "",
+      "raw_hash": ""
+    },
+    "provider_result": {
+      "status": "PENDING",
+      "provider_action_id": null,
+      "message": ""
+    },
+    "reversible": true,
+    "rollback": {
+      "status": "AVAILABLE",
+      "reversed_at": null,
+      "reversed_by": null
+    }
+  },
+  {
+    "action_id": "ACT-2026-60859",
+    "case_id": "SM-2026-AE762A",
+    "organization_id": "org_5fb96ae3d16089e0",
+    "mailbox_connection_id": null,
+    "campaign_id": null,
+    "type": "CONFIRM_THREAT",
+    "action_type": "CONFIRM_THREAT",
+    "status": "COMPLETED",
+    "requested_by": "usr_f194dc417ad95365",
+    "idempotency_key": "confirm_SM-2026-AE762A",
+    "requested_at": "2026-09-05T14:23:26.640Z",
+    "started_at": "2026-09-05T14:23:26.640Z",
+    "completed_at": "2026-09-05T14:23:26.640Z",
+    "failure_reason": null,
+    "trigger": {
+      "type": "POLICY",
+      "policy_id": "DEFAULT_POLICY"
+    },
+    "reason": "MALICIOUS_PHISH",
+    "authorization": {
+      "mode": "REQUIRE_APPROVAL",
+      "authorized_by": "usr_f194dc417ad95365",
+      "authorized_at": "2026-09-05T14:23:26.640Z"
+    },
+    "target": {
+      "provider": "GMAIL",
+      "mailbox": "victim@org-i.com",
+      "message_id": "",
+      "rfc_message_id": "",
+      "raw_hash": ""
+    },
+    "provider_result": {
+      "status": "PENDING",
+      "provider_action_id": null,
+      "message": ""
+    },
     "reversible": true,
     "rollback": {
       "status": "AVAILABLE",

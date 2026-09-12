@@ -71,6 +71,11 @@ export default function CaseInvestigationView({ selectedCase, onOpenReport }) {
             <span style={{ backgroundColor: verdictBg, color: verdictColor, fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', textTransform: 'uppercase' }}>
               {verdict.replace('_', ' ')}
             </span>
+            {(detection.is_dev_fallback || detection.verification_status?.includes('DEVELOPMENT')) && (
+              <span style={{ backgroundColor: 'rgba(245, 158, 11, 0.18)', color: '#f59e0b', fontSize: '0.65rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', border: '1px solid #f59e0b' }}>
+                DEVELOPMENT / NOT SUBLIME VERIFIED
+              </span>
+            )}
           </div>
           <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#f8fafc' }}>
             {selectedCase.message?.subject || '(No Subject)'}
@@ -161,9 +166,11 @@ export default function CaseInvestigationView({ selectedCase, onOpenReport }) {
       {activeSection === 'detection' && (
         <div style={{ backgroundColor: '#0d1322', borderRadius: '6px', border: '1px solid #1e293b', padding: '14px', fontSize: '0.75rem', color: '#94a3b8', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <div><strong>Detection Verdict:</strong> <span style={{ color: verdictColor, fontWeight: 700 }}>{verdict}</span></div>
+          <div><strong>Verification Status:</strong> <span style={{ color: (detection.is_dev_fallback || detection.verification_status?.includes('DEVELOPMENT')) ? '#f59e0b' : '#10b981', fontWeight: 700 }}>{detection.verification_status || (detection.provider === 'sublime' ? 'SUBLIME_MQL_VERIFIED' : 'UNVERIFIED')}</span></div>
+          <div><strong>Detection Provider:</strong> <span style={{ color: '#f8fafc', fontWeight: 600 }}>{detection.provider || 'sublime'}</span></div>
           <div><strong>Matched Rules:</strong> {(detection.matched_rules || []).join(', ') || 'None'}</div>
           <div><strong>Detection Signals:</strong> {(detection.signals || []).join(', ') || 'None'}</div>
-          <div><strong>Analysis Engine:</strong> Automated Email Threat Protection</div>
+          <div><strong>Analysis Engine:</strong> {detection.is_dev_fallback ? 'Development Fallback Engine (Not Sublime Verified)' : 'Automated Sublime/MQL Threat Protection'}</div>
         </div>
       )}
 

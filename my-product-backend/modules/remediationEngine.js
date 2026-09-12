@@ -1,11 +1,14 @@
 const fs = require('fs');
 const path = require('path');
 const RemediationAction = require('../models/RemediationAction');
-const mailboxActionAdapter = require('../adapters/mailboxActionAdapter');
+const gmailActionAdapter = require('../adapters/gmailActionAdapter');
+const gmailIngestionAdapter = require('../adapters/gmailIngestionAdapter');
+const mailboxConnectionManager = require('../modules/mailboxConnectionManager');
 const notificationAdapter = require('../adapters/notificationAdapter');
 const campaignResponsePlanner = require('./campaignResponsePlanner');
 const iocResponseManager = require('./iocResponseManager');
 const auditLogger = require('./auditLogger');
+const caseManager = require('./caseManager');
 
 class RemediationEngine {
     constructor() {
@@ -16,6 +19,10 @@ class RemediationEngine {
 
     loadStorage() {
         try {
+            const dataDir = path.dirname(this.storageFile);
+            if (!fs.existsSync(dataDir)) {
+                fs.mkdirSync(dataDir, { recursive: true });
+            }
             if (fs.existsSync(this.storageFile)) {
                 const data = JSON.parse(fs.readFileSync(this.storageFile, 'utf8'));
                 (data || []).forEach(item => {
@@ -37,206 +44,394 @@ class RemediationEngine {
         }
     }
 
+    /**
+     * Automatic Policy Evaluation & Containment Execution
+     */
     async executePolicyDecision(threatObject, policyDecision) {
         console.log(`[RemediationEngine] Processing policy decision '${policyDecision.policy_id}' for Case ${threatObject.case_id}...`);
 
-        // Track IOCs in internal response list
+        // Track IOCs
         iocResponseManager.processThreatIOCs(threatObject);
 
-        // Generate Campaign Response Plan if campaign exists
+        // Generate Campaign Plan if applicable
         if (threatObject.campaign) {
             const campaignPlan = campaignResponsePlanner.generateResponsePlan(threatObject.campaign, [threatObject]);
             threatObject.remediation.campaign_plan = campaignPlan;
         }
 
-        if (policyDecision.authorization_mode === 'NO_ACTION' || policyDecision.action_type === 'NO_ACTION') {
+        if (policyDecision.authorization_mode === 'NO_ACTION' || policyDecision.action_type === 'NO_ACTION' || threatObject.detection?.verdict === 'SAFE') {
             threatObject.remediation.status = 'NO_ACTION';
-            auditLogger.log({
-                case_id: threatObject.case_id,
-                event_type: 'POLICY_EVALUATED',
-                source: 'REMEDIATION_ENGINE',
-                description: `Policy ${policyDecision.policy_id} evaluated: No remediation required.`
-            });
+            threatObject.mailbox.status = 'INBOX';
+            threatObject.review.status = 'NOT_REQUIRED';
+            threatObject.provider_action.status = 'NOT_REQUESTED';
             return threatObject;
         }
 
-        // Initialize RemediationAction Object
-        const actionRecord = new RemediationAction({
-            case_id: threatObject.case_id,
-            campaign_id: threatObject.campaign?.campaign_id || null,
-            action_type: policyDecision.action_type,
-            status: 'POLICY_TRIGGERED',
-            trigger: { type: 'POLICY', policy_id: policyDecision.policy_id },
-            reason: policyDecision.reason,
-            authorization: {
-                mode: policyDecision.authorization_mode,
-                authorized_by: policyDecision.authorization_mode === 'AUTO_EXECUTE' ? 'POLICY_ENGINE' : 'AWAITING_APPROVAL',
-                authorized_at: new Date().toISOString()
-            },
-            target: {
-                provider: (process.env.REMEDIATION_MODE || 'simulation') === 'live' ? (process.env.MAILBOX_PROVIDER || 'gmail') : 'simulation',
-                mailbox: threatObject.message?.recipient || '',
-                message_id: threatObject.message?.provider_message_id || threatObject.message?.raw_hash || threatObject.case_id,
-                rfc_message_id: threatObject.message?.raw_hash || '',
-                raw_hash: threatObject.message?.raw_hash || ''
-            }
-        });
-
-        // Audit Policy Trigger
-        auditLogger.log({
-            case_id: threatObject.case_id,
-            event_type: 'POLICY_TRIGGERED',
-            source: 'REMEDIATION_ENGINE',
-            description: `Policy ${policyDecision.policy_id} triggered action ${actionRecord.action_type} (Mode: ${actionRecord.authorization.mode})`
-        });
-
-        if (policyDecision.authorization_mode === 'AUTO_EXECUTE') {
-            return await this.processExecution(actionRecord, threatObject);
+        // Automatic containment allowed only for HIGH_RISK cases
+        if (threatObject.detection?.verdict === 'HIGH_RISK') {
+            return await this.executeAutomaticContainment(threatObject, policyDecision);
         } else {
-            // Require Human SOC Approval
-            actionRecord.status = 'ACTION_REQUESTED';
-            this.actions.set(actionRecord.action_id, actionRecord);
-            this.saveStorage();
-
-            threatObject.remediation.status = 'PENDING_APPROVAL';
-            threatObject.remediation.remediation_action_id = actionRecord.action_id;
-
-            auditLogger.log({
-                case_id: threatObject.case_id,
-                event_type: 'ACTION_REQUESTED',
-                source: 'REMEDIATION_ENGINE',
-                description: `Action ${actionRecord.action_id} (${actionRecord.action_type}) queued for SOC Analyst approval.`
-            });
-
+            // SUSPICIOUS or other non-HIGH_RISK verdict -> visible for review, no auto-containment
+            threatObject.mailbox.status = 'INBOX';
+            threatObject.review.status = 'PENDING_ADMIN';
+            threatObject.provider_action.status = 'NOT_REQUESTED';
             return threatObject;
         }
     }
 
-    async processExecution(actionRecord, threatObject) {
-        actionRecord.status = 'ACTION_EXECUTING';
-        actionRecord.executed_at = new Date().toISOString();
+    /**
+     * Execute Automatic Containment with Dev Fallback Safety Guard
+     */
+    async executeAutomaticContainment(threatObject, policyDecision) {
+        // 1. Mandatory Development Fallback Safety Guard
+        const isDevFallback = !!(threatObject.detection?.is_dev_fallback || threatObject.detection?.verification_status?.includes('DEVELOPMENT'));
+        const allowDevContainment = process.env.DEV_ALLOW_FALLBACK_CONTAINMENT === 'true';
+
+        if (isDevFallback && !allowDevContainment) {
+            console.warn(`⚠️ [RemediationEngine] DEVELOPMENT / NOT SUBLIME VERIFIED result for ${threatObject.case_id}. Automatic real Gmail containment BLOCKED by dev-safety guard.`);
+            threatObject.mailbox.status = 'INBOX';
+            threatObject.review.status = 'PENDING_ADMIN';
+            threatObject.provider_action.status = 'NOT_REQUESTED';
+            threatObject.remediation.status = 'DEV_FALLBACK_GUARD_BLOCKED';
+
+            auditLogger.log({
+                case_id: threatObject.case_id,
+                org_id: threatObject.org_id,
+                event_type: 'CONTAINMENT_SKIPPED_DEV_FALLBACK',
+                source: 'REMEDIATION_ENGINE',
+                description: `Real automatic Gmail containment blocked because detection is DEVELOPMENT / NOT SUBLIME VERIFIED.`
+            });
+            return threatObject;
+        }
+
+        // 2. Resolve Recipient Mailbox Provenance
+        const recipientEmail = threatObject.mailbox_provenance?.provider_account || threatObject.message?.recipient;
+        const providerMsgId = threatObject.mailbox_provenance?.provider_message_id;
+
+        if (!recipientEmail || !providerMsgId) {
+            console.warn(`[RemediationEngine] Cannot execute containment for ${threatObject.case_id}: Missing recipient email or provider_message_id.`);
+            threatObject.mailbox.status = 'ACTION_FAILED';
+            threatObject.provider_action.status = 'FAILED';
+            threatObject.remediation.status = 'FAILED';
+            return threatObject;
+        }
+
+        // 3. Resolve OAuth Credentials for Recipient Mailbox
+        let accessToken = null;
+        try {
+            accessToken = await gmailIngestionAdapter.getValidAccessTokenByMailbox(recipientEmail);
+        } catch (tokenErr) {
+            console.warn(`[RemediationEngine] OAuth token resolution failed for mailbox ${recipientEmail}:`, tokenErr.message);
+            threatObject.mailbox.status = 'ACTION_FAILED';
+            threatObject.provider_action.status = 'FAILED';
+            threatObject.remediation.status = 'REAUTH_REQUIRED';
+            auditLogger.log({
+                case_id: threatObject.case_id,
+                org_id: threatObject.org_id,
+                event_type: 'CONTAINMENT_FAILED',
+                source: 'REMEDIATION_ENGINE',
+                description: `Gmail OAuth access token resolution failed for ${recipientEmail}: ${tokenErr.message}`
+            });
+            return threatObject;
+        }
+
+        // 4. Create Durable RemediationAction Record
+        const idempotencyKey = `contain_${threatObject.case_id}`;
+        const actionRecord = new RemediationAction({
+            case_id: threatObject.case_id,
+            organization_id: threatObject.org_id,
+            mailbox_connection_id: threatObject.mailbox_provenance?.mailbox_connection_id,
+            type: 'QUARANTINE',
+            status: 'EXECUTING',
+            requested_by: 'POLICY_ENGINE',
+            idempotency_key: idempotencyKey,
+            started_at: new Date().toISOString(),
+            target: {
+                provider: 'GMAIL',
+                mailbox: recipientEmail,
+                message_id: providerMsgId
+            }
+        });
+        this.actions.set(actionRecord.action_id, actionRecord);
+        this.saveStorage();
+
+        threatObject.mailbox.status = 'CONTAINMENT_REQUESTED';
+        threatObject.provider_action.status = 'REQUESTED';
 
         auditLogger.log({
-            case_id: actionRecord.case_id,
-            event_type: 'ACTION_EXECUTING',
+            case_id: threatObject.case_id,
+            org_id: threatObject.org_id,
+            event_type: 'CONTAINMENT_REQUESTED',
             source: 'REMEDIATION_ENGINE',
-            description: `Executing action ${actionRecord.action_type} via ${actionRecord.target.provider} adapter...`
+            description: `Automated Gmail containment requested for message ${providerMsgId} on recipient mailbox ${recipientEmail}`
         });
 
-        if (actionRecord.action_type === 'QUARANTINE_MESSAGE') {
-            const providerResult = await mailboxActionAdapter.quarantineMessage(actionRecord.target);
-            actionRecord.provider_result = {
-                status: providerResult.success ? 'CONFIRMED' : 'FAILED',
-                provider_action_id: providerResult.provider_action_id,
-                message: providerResult.message
-            };
+        // 5. Execute Gmail Containment & Perform Read-Back Verification
+        const result = await gmailActionAdapter.containMessage(accessToken, providerMsgId);
 
-            if (providerResult.success) {
-                actionRecord.status = 'ACTION_SUCCEEDED';
-                actionRecord.completed_at = new Date().toISOString();
-                if (threatObject) threatObject.remediation.status = 'QUARANTINED';
-            } else {
-                actionRecord.status = 'ACTION_FAILED';
-                if (threatObject) threatObject.remediation.status = 'FAILED';
-            }
-        } else if (actionRecord.action_type === 'ALERT_RECIPIENT') {
-            const isContained = threatObject?.remediation?.status === 'QUARANTINED';
-            const alertResult = await notificationAdapter.dispatchRecipientWarning(threatObject, isContained);
-            actionRecord.status = 'ACTION_SUCCEEDED';
-            actionRecord.provider_result = { status: 'CONFIRMED', message: alertResult.message };
-            if (threatObject) threatObject.remediation.status = 'USER_WARNED';
-        } else if (actionRecord.action_type === 'ALERT_SOC') {
-            await notificationAdapter.dispatchSocAlert(threatObject, actionRecord.trigger.policy_id);
-            actionRecord.status = 'ACTION_SUCCEEDED';
-            actionRecord.provider_result = { status: 'CONFIRMED', message: 'SOC Alert Dispatched' };
+        if (result.verified) {
+            threatObject.mailbox.status = 'QUARANTINED';
+            threatObject.review.status = 'PENDING_ADMIN';
+            threatObject.provider_action.status = 'PROVIDER_CONFIRMED';
+            threatObject.containment_context.label_id = result.labelId;
+            threatObject.containment_context.contained_at = new Date().toISOString();
+            threatObject.remediation.status = 'QUARANTINED';
+
+            actionRecord.status = 'COMPLETED';
+            actionRecord.completed_at = new Date().toISOString();
+            actionRecord.provider_result = { status: 'PROVIDER_CONFIRMED', message: 'Gmail containment verified via API read-back.' };
+
+            auditLogger.log({
+                case_id: threatObject.case_id,
+                org_id: threatObject.org_id,
+                event_type: 'CONTAINMENT_CONFIRMED',
+                source: 'REMEDIATION_ENGINE',
+                description: `Gmail containment verified via API read-back. INBOX: absent | SecureMail/Quarantine label: present.`
+            });
         } else {
-            actionRecord.status = 'UNSUPPORTED';
-            actionRecord.provider_result = { status: 'FAILED', message: `Action type ${actionRecord.action_type} is unsupported.` };
+            threatObject.mailbox.status = 'ACTION_FAILED';
+            threatObject.provider_action.status = 'FAILED';
+            threatObject.remediation.status = 'FAILED';
+
+            actionRecord.status = 'FAILED';
+            actionRecord.completed_at = new Date().toISOString();
+            actionRecord.failure_reason = result.error;
+            actionRecord.provider_result = { status: 'FAILED', message: result.error };
+
+            auditLogger.log({
+                case_id: threatObject.case_id,
+                org_id: threatObject.org_id,
+                event_type: 'CONTAINMENT_FAILED',
+                source: 'REMEDIATION_ENGINE',
+                description: `Gmail containment failed or provider verification mismatch: ${result.error}`
+            });
         }
 
         this.actions.set(actionRecord.action_id, actionRecord);
         this.saveStorage();
-
-        auditLogger.log({
-            case_id: actionRecord.case_id,
-            event_type: actionRecord.status === 'ACTION_SUCCEEDED' ? 'ACTION_SUCCEEDED' : 'ACTION_FAILED',
-            source: 'REMEDIATION_ENGINE',
-            description: `Remediation Action ${actionRecord.action_id} completed with status ${actionRecord.status}: ${actionRecord.provider_result.message}`
-        });
-
-        if (threatObject) {
-            threatObject.remediation.remediation_action_id = actionRecord.action_id;
-            threatObject.remediation.action_record = actionRecord;
-        }
-
         return threatObject;
     }
 
-    async approveAction(actionId, analystUser = 'SOC_ANALYST', reason = 'Manually approved by SOC Analyst') {
-        const actionRecord = this.actions.get(actionId);
-        if (!actionRecord) throw new Error(`Action ID ${actionId} not found.`);
+    /**
+     * Admin Release Endpoint Logic (Idempotent & Concurrency Safe)
+     */
+    async releaseCase(caseId, adminUser, decisionReason = 'FALSE_POSITIVE', adminNote = '') {
+        const threatObject = caseManager.getCase(caseId);
+        if (!threatObject) {
+            throw new Error(`Case ${caseId} not found.`);
+        }
 
-        console.log(`[RemediationEngine] 👤 Action ${actionId} approved by ${analystUser}: ${reason}`);
+        // Admin Authorization & Org Isolation Enforcement
+        if (!adminUser || adminUser.role !== 'ADMIN') {
+            throw new Error('Insufficient permissions. Admin role required.');
+        }
+        if (threatObject.org_id && adminUser.organization_id && adminUser.organization_id !== threatObject.org_id) {
+            throw new Error(`Access denied. Case ${caseId} belongs to another organization.`);
+        }
 
-        actionRecord.authorization.authorized_by = analystUser;
-        actionRecord.authorization.authorized_at = new Date().toISOString();
-        actionRecord.reason = `${actionRecord.reason} (Approved by ${analystUser}: ${reason})`;
+        // Idempotency & Terminal Decision Guard
+        if (threatObject.review?.status === 'CONFIRMED_THREAT') {
+            throw new Error('Cannot release a case that has been confirmed as a threat by an administrator.');
+        }
+        if (threatObject.mailbox?.status === 'RELEASED' && threatObject.review?.status === 'RELEASED_BY_ADMIN') {
+            console.log(`[RemediationEngine] Case ${caseId} is already RELEASED. Returning existing state (Idempotent).`);
+            return { success: true, case: threatObject, alreadyCompleted: true };
+        }
 
-        auditLogger.log({
-            case_id: actionRecord.case_id,
-            event_type: 'ACTION_APPROVED',
-            source: `ANALYST:${analystUser}`,
-            description: `Action ${actionId} approved by ${analystUser}`
+        const idempotencyKey = `release_${caseId}`;
+        const existingAction = Array.from(this.actions.values()).find(a => a.idempotency_key === idempotencyKey);
+
+        if (existingAction && existingAction.status === 'EXECUTING') {
+            throw new Error('A release action is currently executing for this case. Concurrency lock enforced.');
+        }
+
+        // Create Durable RemediationAction Record for Release
+        const actionRecord = new RemediationAction({
+            case_id: caseId,
+            organization_id: threatObject.org_id,
+            mailbox_connection_id: threatObject.mailbox_provenance?.mailbox_connection_id,
+            type: 'RELEASE',
+            status: 'EXECUTING',
+            requested_by: adminUser.id || adminUser.email,
+            idempotency_key: idempotencyKey,
+            started_at: new Date().toISOString(),
+            reason: decisionReason,
+            target: {
+                provider: 'GMAIL',
+                mailbox: threatObject.mailbox_provenance?.provider_account || threatObject.message?.recipient,
+                message_id: threatObject.mailbox_provenance?.provider_message_id
+            }
         });
 
-        return await this.processExecution(actionRecord, null);
-    }
+        this.actions.set(actionRecord.action_id, actionRecord);
+        this.saveStorage();
 
-    async rollbackAction(actionId, analystUser = 'SOC_ANALYST', reason = 'False positive restoration requested') {
-        const actionRecord = this.actions.get(actionId);
-        if (!actionRecord) throw new Error(`Action ID ${actionId} not found.`);
-        if (!actionRecord.reversible) throw new Error(`Action ID ${actionId} is not reversible.`);
+        threatObject.mailbox.status = 'RELEASE_REQUESTED';
+        threatObject.provider_action.status = 'REQUESTED';
+        caseManager.saveCase(threatObject);
 
-        console.log(`[RemediationEngine] 🔄 Executing rollback for Action ${actionId} (${analystUser})...`);
-
-        actionRecord.status = 'REVERSAL_REQUESTED';
         auditLogger.log({
-            case_id: actionRecord.case_id,
-            event_type: 'ROLLBACK_REQUESTED',
-            source: `ANALYST:${analystUser}`,
-            description: `Rollback requested for Action ${actionId} by ${analystUser}: ${reason}`
+            case_id: caseId,
+            org_id: threatObject.org_id,
+            user_id: adminUser.id,
+            event_type: 'RELEASE_REQUESTED',
+            source: `ADMIN:${adminUser.email}`,
+            description: `Admin ${adminUser.email} requested release for Case ${caseId} (Reason: ${decisionReason}).`
         });
 
-        const restoreResult = await mailboxActionAdapter.restoreMessage(actionRecord.target);
+        // Resolve Recipient Mailbox OAuth Access Token
+        const recipientEmail = threatObject.mailbox_provenance?.provider_account || threatObject.message?.recipient;
+        const providerMsgId = threatObject.mailbox_provenance?.provider_message_id;
 
-        if (restoreResult.success) {
-            actionRecord.status = 'REVERSED';
-            actionRecord.rollback = {
-                status: 'REVERSED',
-                reversed_at: new Date().toISOString(),
-                reversed_by: analystUser
-            };
+        let accessToken = null;
+        try {
+            accessToken = await gmailIngestionAdapter.getValidAccessTokenByMailbox(recipientEmail);
+        } catch (tokenErr) {
+            actionRecord.status = 'FAILED';
+            actionRecord.completed_at = new Date().toISOString();
+            actionRecord.failure_reason = tokenErr.message;
+            this.actions.set(actionRecord.action_id, actionRecord);
+            this.saveStorage();
+
+            threatObject.mailbox.status = 'ACTION_FAILED';
+            threatObject.provider_action.status = 'FAILED';
+            caseManager.saveCase(threatObject);
 
             auditLogger.log({
-                case_id: actionRecord.case_id,
-                event_type: 'ROLLBACK_SUCCEEDED',
+                case_id: caseId,
+                org_id: threatObject.org_id,
+                user_id: adminUser.id,
+                event_type: 'RELEASE_FAILED',
                 source: 'REMEDIATION_ENGINE',
-                description: `Rollback completed for Action ${actionId}: Message restored to INBOX.`
+                description: `Release failed for ${caseId}: Recipient mailbox OAuth token error: ${tokenErr.message}`
+            });
+
+            throw new Error(`Gmail release failed: ${tokenErr.message}`);
+        }
+
+        // Execute Gmail Release Action & Verification Read-Back
+        const labelId = threatObject.containment_context?.label_id;
+        const releaseResult = await gmailActionAdapter.releaseMessage(accessToken, providerMsgId, labelId);
+
+        if (releaseResult.verified) {
+            threatObject.mailbox.status = 'RELEASED';
+            threatObject.review.status = 'RELEASED_BY_ADMIN';
+            threatObject.provider_action.status = 'PROVIDER_CONFIRMED';
+            threatObject.containment_context.released_at = new Date().toISOString();
+            threatObject.containment_context.decision_reason = decisionReason;
+            threatObject.containment_context.admin_note = adminNote || '';
+
+            actionRecord.status = 'COMPLETED';
+            actionRecord.completed_at = new Date().toISOString();
+            actionRecord.provider_result = { status: 'PROVIDER_CONFIRMED', message: 'Gmail release verified via API read-back.' };
+
+            auditLogger.log({
+                case_id: caseId,
+                org_id: threatObject.org_id,
+                user_id: adminUser.id,
+                event_type: 'RELEASE_CONFIRMED',
+                source: `ADMIN:${adminUser.email}`,
+                description: `Gmail release verified for Case ${caseId}. INBOX: restored | Quarantine Label: removed.`
             });
         } else {
-            actionRecord.status = 'ACTION_FAILED';
+            threatObject.mailbox.status = 'ACTION_FAILED';
+            threatObject.provider_action.status = 'FAILED';
+
+            actionRecord.status = 'FAILED';
+            actionRecord.completed_at = new Date().toISOString();
+            actionRecord.failure_reason = releaseResult.error;
+
             auditLogger.log({
-                case_id: actionRecord.case_id,
-                event_type: 'ACTION_FAILED',
+                case_id: caseId,
+                org_id: threatObject.org_id,
+                user_id: adminUser.id,
+                event_type: 'RELEASE_FAILED',
                 source: 'REMEDIATION_ENGINE',
-                description: `Rollback failed for Action ${actionId}: ${restoreResult.message}`
+                description: `Gmail release verification failed for Case ${caseId}: ${releaseResult.error}`
             });
         }
 
         this.actions.set(actionRecord.action_id, actionRecord);
         this.saveStorage();
+        caseManager.saveCase(threatObject);
 
-        return actionRecord;
+        return {
+            success: releaseResult.verified,
+            case: threatObject,
+            action: actionRecord
+        };
+    }
+
+    /**
+     * Admin Confirm Threat Endpoint Logic (Idempotent & Concurrency Safe)
+     */
+    async confirmThreat(caseId, adminUser, decisionReason = 'MALICIOUS_PHISH', adminNote = '') {
+        const threatObject = caseManager.getCase(caseId);
+        if (!threatObject) {
+            throw new Error(`Case ${caseId} not found.`);
+        }
+
+        // Admin Authorization & Org Isolation Enforcement
+        if (!adminUser || adminUser.role !== 'ADMIN') {
+            throw new Error('Insufficient permissions. Admin role required.');
+        }
+        if (threatObject.org_id && adminUser.organization_id && adminUser.organization_id !== threatObject.org_id) {
+            throw new Error(`Access denied. Case ${caseId} belongs to another organization.`);
+        }
+
+        // Terminal Decision Guard
+        if (threatObject.review?.status === 'RELEASED_BY_ADMIN') {
+            throw new Error('Cannot confirm threat on a case that has already been released by an administrator.');
+        }
+        if (threatObject.review?.status === 'CONFIRMED_THREAT') {
+            console.log(`[RemediationEngine] Case ${caseId} threat is already CONFIRMED_THREAT. Returning existing state (Idempotent).`);
+            return { success: true, case: threatObject, alreadyCompleted: true };
+        }
+
+        const idempotencyKey = `confirm_${caseId}`;
+
+        // Create Durable RemediationAction Record
+        const actionRecord = new RemediationAction({
+            case_id: caseId,
+            organization_id: threatObject.org_id,
+            mailbox_connection_id: threatObject.mailbox_provenance?.mailbox_connection_id,
+            type: 'CONFIRM_THREAT',
+            status: 'COMPLETED',
+            requested_by: adminUser.id || adminUser.email,
+            idempotency_key: idempotencyKey,
+            started_at: new Date().toISOString(),
+            completed_at: new Date().toISOString(),
+            reason: decisionReason,
+            target: {
+                provider: 'GMAIL',
+                mailbox: threatObject.mailbox_provenance?.provider_account || threatObject.message?.recipient,
+                message_id: threatObject.mailbox_provenance?.provider_message_id
+            }
+        });
+
+        // Update Review Status & Metadata (Message remains in verified quarantine label/state; message is NOT deleted)
+        threatObject.review.status = 'CONFIRMED_THREAT';
+        threatObject.containment_context.decision_reason = decisionReason;
+        threatObject.containment_context.admin_note = adminNote || '';
+
+        this.actions.set(actionRecord.action_id, actionRecord);
+        this.saveStorage();
+        caseManager.saveCase(threatObject);
+
+        auditLogger.log({
+            case_id: caseId,
+            org_id: threatObject.org_id,
+            user_id: adminUser.id,
+            event_type: 'THREAT_CONFIRMED',
+            source: `ADMIN:${adminUser.email}`,
+            description: `Admin ${adminUser.email} confirmed threat for Case ${caseId}. Review status: CONFIRMED_THREAT. Mailbox state remains verified quarantine.`
+        });
+
+        return {
+            success: true,
+            case: threatObject,
+            action: actionRecord
+        };
     }
 
     getAllActions() {

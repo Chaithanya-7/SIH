@@ -103,12 +103,16 @@ class IMAPAdapter {
                             msg.on('body', (stream) => {
                                 let buffer = '';
                                 stream.on('data', (chunk) => buffer += chunk.toString('utf8'));
-                                stream.once('end', () => {
-                                    if (currentUid > 0) {
-                                        this.saveLastUid(currentUid);
-                                    }
+                                stream.once('end', async () => {
                                     if (this.onMailReceived) {
-                                        this.onMailReceived(buffer, 'IMAP_INBOX');
+                                        try {
+                                            await this.onMailReceived(buffer, 'IMAP_INBOX', null, currentUid);
+                                            if (currentUid > 0) {
+                                                this.saveLastUid(currentUid);
+                                            }
+                                        } catch (err) {
+                                            console.error(`[IMAPAdapter] Pipeline execution failed for UID ${currentUid}, UID state not advanced:`, err.message);
+                                        }
                                     }
                                 });
                             });

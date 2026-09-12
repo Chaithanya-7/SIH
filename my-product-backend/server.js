@@ -26,10 +26,34 @@ const iocResponseManager = require('./modules/iocResponseManager');
 const pdfReportGenerator = require('./modules/pdfReportGenerator');
 const dedupStore = require('./modules/dedupStore');
 
+// Google Auth, Organization & Gmail Modules
+const userManager = require('./modules/userManager');
+const organizationManager = require('./modules/organizationManager');
+const tokenStore = require('./modules/tokenStore');
+const mailboxConnectionManager = require('./modules/mailboxConnectionManager');
+const gmailIngestionAdapter = require('./adapters/gmailIngestionAdapter');
+
+const { requireAuth, requireRole } = require('./middleware/authMiddleware');
+const axios = require('axios');
+
 const app = express();
 const PORT = config.port;
 
-app.use(cors());
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+    ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+    : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3005', 'http://localhost:5173'];
+
+app.use(cors({
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
+            callback(null, true);
+        } else {
+            callback(new Error('CORS policy restricted access.'));
+        }
+    },
+    credentials: true
+}));
+
 app.use(bodyParser.json({ limit: '50mb' }));
 
 console.log('='.repeat(70));
@@ -125,19 +149,327 @@ async function processPipeline(emailContent, source = 'MANUAL_API', clientMessag
     }
 }
 
-// Start Real-Time Mail Ingestion Layer (Local SMTP Gateway on :2525 + IMAP Inbox Poller)
+// Start Real-Time Mail Ingestion Layer
 mailIngestionAdapter.startIngestion(processPipeline);
+gmailIngestionAdapter.setPipelineHandler(processPipeline);
+
+// Protect sensitive SOC administration and data APIs
+app.use(['/api/cases', '/api/graph', '/api/audit', '/api/remediate', '/api/reports', '/api/auth/me', '/api/org', '/api/mailbox'], requireAuth);
+
+// ==================== GOOGLE AUTHENTICATION ENDPOINTS ====================
+app.post('/api/auth/google/verify', (req, res) => {
+    try {
+        const { googleAccountId, email, name, avatarUrl } = req.body;
+        if (!email) return res.status(400).json({ success: false, error: 'Email is required for authentication.' });
+
+        const { user, sessionToken } = userManager.findOrCreateFromGoogleProfile({
+            googleAccountId: googleAccountId || `g_${crypto.randomBytes(6).toString('hex')}`,
+            email,
+            name,
+            avatarUrl
+        });
+
+        const org = user.organization_id ? organizationManager.getOrganizationById(user.organization_id) : null;
+        const connection = mailboxConnectionManager.getConnectionByUser(user.id);
+
+        res.json({
+            success: true,
+            sessionToken,
+            user,
+            organization: org,
+            mailboxConnection: connection
+        });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+app.get('/api/auth/me', (req, res) => {
+    const org = req.user.organization_id ? organizationManager.getOrganizationById(req.user.organization_id) : null;
+    const connection = mailboxConnectionManager.getConnectionByUser(req.user.id);
+    res.json({
+        success: true,
+        user: req.user,
+        organization: org,
+        mailboxConnection: connection
+    });
+});
+
+// ==================== ORGANIZATION ENDPOINTS ====================
+app.post('/api/org/create', (req, res) => {
+    try {
+        const { name, approvedDomain } = req.body;
+        const result = organizationManager.createOrganization(req.user.id, name, approvedDomain);
+        res.json({ success: true, organization: result.organization, user: result.user });
+    } catch (e) {
+        res.status(400).json({ success: false, error: e.message });
+    }
+});
+
+app.post('/api/org/join', (req, res) => {
+    try {
+        const { inviteCode } = req.body;
+        const result = organizationManager.joinOrganizationWithInviteCode(req.user.id, inviteCode);
+        res.json({ success: true, organization: result.organization, user: result.user });
+    } catch (e) {
+        res.status(400).json({ success: false, error: e.message });
+    }
+});
+
+app.get('/api/org/current', (req, res) => {
+    if (!req.user.organization_id) {
+        return res.json({ success: true, organization: null, members: [] });
+    }
+    const org = organizationManager.getOrganizationById(req.user.organization_id);
+    const members = userManager.getAllUsersInOrg(req.user.organization_id);
+    res.json({ success: true, organization: org, members });
+});
+
+app.post('/api/org/rotate-invite', requireRole('ADMIN'), (req, res) => {
+    try {
+        const org = organizationManager.rotateInviteCode(req.user.organization_id, req.user.id);
+        res.json({ success: true, organization: org });
+    } catch (e) {
+        res.status(400).json({ success: false, error: e.message });
+    }
+});
+
+// ==================== GMAIL AUTHORIZATION & MAILBOX ENDPOINTS ====================
+app.get('/api/auth/gmail/url', (req, res) => {
+    const url = gmailIngestionAdapter.getAuthUrl(req.user.id);
+    res.json({ success: true, url });
+});
+
+app.post('/api/auth/gmail/exchange', async (req, res) => {
+    try {
+        const { code } = req.body;
+        if (!code) return res.status(400).json({ success: false, error: 'Authorization code is required.' });
+
+        const tokenData = await gmailIngestionAdapter.exchangeCodeForTokens(code);
+        const profile = await gmailIngestionAdapter.getGmailProfile(tokenData.access_token);
+
+        tokenStore.saveTokens(req.user.id, profile.emailAddress, tokenData);
+
+        const connection = mailboxConnectionManager.saveConnection({
+            userId: req.user.id,
+            organizationId: req.user.organization_id,
+            providerAccount: profile.emailAddress,
+            historyId: profile.historyId,
+            status: 'CONNECTED'
+        });
+
+        res.json({ success: true, connection });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+app.get('/api/mailbox/status', (req, res) => {
+    const connection = mailboxConnectionManager.getConnectionByUser(req.user.id);
+    const orgConnections = req.user.organization_id 
+        ? mailboxConnectionManager.getAllConnectionsInOrg(req.user.organization_id)
+        : (connection ? [connection] : []);
+
+    res.json({
+        success: true,
+        connection: connection || null,
+        orgConnections: req.user.role === 'ADMIN' ? orgConnections : undefined
+    });
+});
+
+app.post('/api/mailbox/sync', async (req, res) => {
+    try {
+        const connection = mailboxConnectionManager.getConnectionByUser(req.user.id);
+        if (!connection || connection.status !== 'CONNECTED') {
+            return res.status(400).json({ success: false, error: 'No active connected Gmail mailbox found for sync.' });
+        }
+
+        const syncResult = await gmailIngestionAdapter.syncGmailHistory(connection);
+        res.json({ success: true, result: syncResult });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+app.post('/api/mailbox/disconnect', (req, res) => {
+    const connection = mailboxConnectionManager.getConnectionByUser(req.user.id);
+    if (connection) {
+        mailboxConnectionManager.updateStatus(connection.id, 'DISCONNECTED');
+        tokenStore.revokeTokens(req.user.id);
+    }
+    res.json({ success: true, status: 'DISCONNECTED' });
+});
+
+// ==================== GMAIL OAUTH SCOPE STATUS ENDPOINT ====================
+app.get('/api/auth/gmail/scope-status', (req, res) => {
+    const hasModify = gmailIngestionAdapter.hasModifyScope(req.user.id);
+    const reauthUrl = gmailIngestionAdapter.getAuthUrl(req.user.id, 'modify');
+    res.json({
+        success: true,
+        hasModifyScope: hasModify,
+        reauthUrl: hasModify ? null : reauthUrl
+    });
+});
+
+// ==================== ADMIN QUARANTINE QUEUE & REVIEW ENDPOINTS ====================
+app.get('/api/admin/quarantine', requireRole('ADMIN'), (req, res) => {
+    try {
+        const orgId = req.user.organization_id;
+        const allCases = caseManager.getAllCases();
+
+        // Admin Quarantine Queue: Filter by Organization & Reviewable/Quarantined Statuses
+        const queueCases = allCases.filter(c => {
+            const matchesOrg = !c.org_id || !orgId || c.org_id === orgId;
+            const isQuarantinedOrReviewable = 
+                c.mailbox?.status === 'QUARANTINED' ||
+                c.mailbox?.status === 'CONTAINMENT_REQUESTED' ||
+                c.mailbox?.status === 'RELEASE_REQUESTED' ||
+                c.mailbox?.status === 'ACTION_FAILED' ||
+                c.review?.status === 'PENDING_ADMIN' ||
+                c.review?.status === 'UNDER_REVIEW' ||
+                c.review?.status === 'CONFIRMED_THREAT' ||
+                c.review?.status === 'RELEASED_BY_ADMIN';
+            
+            return matchesOrg && isQuarantinedOrReviewable;
+        });
+
+        res.json({
+            success: true,
+            cases: queueCases,
+            count: queueCases.length,
+            organization_id: orgId
+        });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+app.post('/api/admin/quarantine/:caseId/release', requireRole('ADMIN'), async (req, res) => {
+    try {
+        const { caseId } = req.params;
+        const { decisionReason, note } = req.body;
+
+        if (!decisionReason) {
+            return res.status(400).json({ success: false, error: 'Release decision reason is required.' });
+        }
+
+        const result = await remediationEngine.releaseCase(caseId, req.user, decisionReason, note);
+        res.json({ success: true, ...result });
+    } catch (e) {
+        const statusCode = e.message.includes('Insufficient permissions') || e.message.includes('Access denied') ? 403 : 400;
+        res.status(statusCode).json({ success: false, error: e.message });
+    }
+});
+
+app.post('/api/admin/quarantine/:caseId/confirm-threat', requireRole('ADMIN'), async (req, res) => {
+    try {
+        const { caseId } = req.params;
+        const { decisionReason, note } = req.body;
+
+        const result = await remediationEngine.confirmThreat(caseId, req.user, decisionReason || 'CONFIRMED_THREAT', note);
+        res.json({ success: true, ...result });
+    } catch (e) {
+        const statusCode = e.message.includes('Insufficient permissions') || e.message.includes('Access denied') ? 403 : 400;
+        res.status(statusCode).json({ success: false, error: e.message });
+    }
+});
+
+// ==================== PUB/SUB WEBHOOK ENDPOINT (AUTHENTICATED & SECURE) ====================
+async function verifyPubSubRequest(req) {
+    const authHeader = req.headers['authorization'];
+    const secretParam = req.query.secret || req.headers['x-pubsub-secret'];
+    const rotatedSecret = process.env.PUBSUB_SECRET;
+    const isProduction = process.env.NODE_ENV === 'production';
+    const devSecretEnabled = process.env.ENABLE_DEV_PUBSUB_SECRET === 'true' || !isProduction;
+
+    // 1. Production OIDC / Bearer Token Verification (Google Pub/Sub Push Authentication)
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        const idToken = authHeader.substring(7).trim();
+        try {
+            // Validate Google OIDC ID Token server-side via Google OAuth2 tokeninfo API
+            const verifyRes = await axios.get(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`, { timeout: 5000 });
+            const tokenData = verifyRes.data;
+            const validIssuer = tokenData.iss === 'https://accounts.google.com' || tokenData.iss === 'accounts.google.com';
+            
+            if (validIssuer && tokenData.email_verified) {
+                console.log(`[PubSub Verification] Verified Google Cloud Pub/Sub Service Account Push Token (${tokenData.email || 'Google PubSub'}).`);
+                return { valid: true, type: 'GOOGLE_OIDC' };
+            }
+        } catch (e) {
+            console.warn('[PubSub Verification] Failed to verify Google Bearer ID Token:', e.response?.data?.error_description || e.message);
+        }
+    }
+
+    // 2. Dev-only secret verification (Disabled in Production unless explicitly permitted)
+    if (devSecretEnabled && secretParam && secretParam === rotatedSecret) {
+        return { valid: true, type: 'DEV_SECRET' };
+    }
+
+    // 3. Fail closed if neither authenticated OIDC nor dev secret is valid
+    console.warn('[PubSub Verification] Unauthorized Pub/Sub notification attempt blocked. Rejection enforced.');
+    return { valid: false, reason: 'UNAUTHORIZED_NOTIFICATION_SOURCE' };
+}
+
+app.post('/api/webhooks/gmail', async (req, res) => {
+    try {
+        const authCheck = await verifyPubSubRequest(req);
+        if (!authCheck.valid) {
+            return res.status(403).json({ success: false, error: 'Unauthorized Pub/Sub notification source.' });
+        }
+
+        const message = req.body?.message;
+        if (!message || !message.data) {
+            return res.status(400).json({ success: false, error: 'Invalid Pub/Sub payload.' });
+        }
+
+        const decodedString = Buffer.from(message.data, 'base64').toString('utf8');
+        const pubsubData = JSON.parse(decodedString || '{}');
+
+        console.log(`📡 [PubSub Webhook] Received Gmail Push Event for ${pubsubData.emailAddress} (HistoryId: ${pubsubData.historyId}) [Auth: ${authCheck.type}]`);
+
+        const connection = mailboxConnectionManager.getConnectionByMailbox(pubsubData.emailAddress);
+        if (!connection || connection.status !== 'CONNECTED') {
+            return res.status(200).json({ status: 'IGNORED', reason: 'No active connected mailbox found.' });
+        }
+
+        // Trigger history sync asynchronously
+        gmailIngestionAdapter.syncGmailHistory(connection, pubsubData.historyId).catch(err => {
+            console.error('[PubSub Webhook] Async sync error:', err.message);
+        });
+
+        res.json({ success: true, status: 'RECEIVED', verification: authCheck.type });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
 
 // ==================== HEALTH & METRICS ====================
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (req, res) => {
+    let detectionStatus = 'UNAVAILABLE';
+    try {
+        const probeRes = await axios.get(`${config.detection.endpoint}/v1/health`, { timeout: 2500 });
+        if (probeRes.status === 200) {
+            detectionStatus = 'READY';
+        }
+    } catch (e) {
+        detectionStatus = process.env.DEV_DETECTION_FALLBACK === 'true' ? 'UNAVAILABLE (DEV FALLBACK ACTIVE)' : 'UNAVAILABLE';
+    }
+
+    const overallStatus = detectionStatus === 'READY' ? 'OPERATIONAL' : 'DEGRADED';
+
     res.json({
-        status: 'ok',
-        system: 'SecureMail AI Platform Engine',
-        mailIngestionStatus: 'ACTIVE (Port 2525 SMTP Gateway + IMAP)',
+        status: overallStatus,
+        services: {
+            backend: 'READY',
+            detection: detectionStatus,
+            database: 'READY',
+            ingestion: 'ACTIVE',
+            remediation: (process.env.REMEDIATION_MODE || 'simulation').toUpperCase()
+        },
         dedupMetrics: dedupStore.getStats(),
-        remediationMode: process.env.REMEDIATION_MODE || 'simulation',
         mailboxProvider: process.env.MAILBOX_PROVIDER || 'gmail',
-        detectionProvider: config.detection.provider
+        detectionProvider: config.detection.provider,
+        devDetectionFallback: process.env.DEV_DETECTION_FALLBACK === 'true'
     });
 });
 
@@ -164,9 +496,22 @@ app.post('/api/ingest/email', async (req, res) => {
     }
 });
 
-// ==================== CASES API ====================
+// ==================== CASES API (DATA ISOLATION) ====================
 app.get('/api/cases', (req, res) => {
-    res.json({ success: true, count: caseManager.getAllCases().length, cases: caseManager.getAllCases() });
+    let allCases = caseManager.getAllCases();
+
+    if (req.user) {
+        if (req.user.role === 'EMPLOYEE') {
+            allCases = allCases.filter(c => 
+                (c.message?.recipient || '').toLowerCase().includes(req.user.email.toLowerCase()) ||
+                (c.message?.sender || '').toLowerCase().includes(req.user.email.toLowerCase())
+            );
+        } else if (req.user.organization_id) {
+            allCases = allCases.filter(c => !c.organization_id || c.organization_id === req.user.organization_id);
+        }
+    }
+
+    res.json({ success: true, count: allCases.length, cases: allCases });
 });
 
 app.get('/api/cases/:id', (req, res) => {
@@ -196,7 +541,7 @@ app.get('/api/remediate/actions', (req, res) => {
     res.json({ success: true, actions: remediationEngine.getAllActions() });
 });
 
-app.post('/api/remediate/approve', async (req, res) => {
+app.post('/api/remediate/approve', requireRole('ADMIN'), async (req, res) => {
     try {
         const { actionId, analystUser, reason } = req.body;
         if (!actionId) return res.status(400).json({ success: false, error: 'actionId is required' });
@@ -207,7 +552,7 @@ app.post('/api/remediate/approve', async (req, res) => {
     }
 });
 
-app.post('/api/remediate/rollback', async (req, res) => {
+app.post('/api/remediate/rollback', requireRole('ADMIN'), async (req, res) => {
     try {
         const { actionId, analystUser, reason } = req.body;
         if (!actionId) return res.status(400).json({ success: false, error: 'actionId is required' });
@@ -230,7 +575,7 @@ app.get('/api/remediate/campaign/:id', async (req, res) => {
     res.json({ success: true, plan });
 });
 
-app.post('/api/remediate/override', async (req, res) => {
+app.post('/api/remediate/override', requireRole('ADMIN'), async (req, res) => {
     const { caseId, action, adminUser } = req.body;
     if (!caseId || !action) return res.status(400).json({ success: false, error: 'caseId and action are required' });
     const result = await remediationEngine.adminOverride(caseId, action, adminUser || 'SOC_ADMIN');

@@ -24,11 +24,33 @@ class SublimeAdapter {
 
             return {
                 success: true,
+                isDevFallback: false,
+                verificationStatus: 'SUBLIME_MQL_VERIFIED',
                 rawResponse: response.data
             };
         } catch (error) {
             console.error('[SublimeAdapter] Full error details:', error.response?.data || error.message);
-            throw new Error('Email detection service is temporarily unavailable.');
+
+            // Gated explicitly behind environment flag (Default: OFF)
+            if (process.env.DEV_DETECTION_FALLBACK === 'true') {
+                console.warn('⚠️ [SublimeAdapter] DEV_DETECTION_FALLBACK=true. Sublime unavailable. Utilizing DEVELOPMENT / NOT SUBLIME VERIFIED fallback.');
+                return {
+                    success: true,
+                    isDevFallback: true,
+                    verificationStatus: 'DEVELOPMENT / NOT SUBLIME VERIFIED',
+                    rawResponse: {
+                        status: 'FLAGGED',
+                        is_dev_fallback: true,
+                        verification_status: 'DEVELOPMENT / NOT SUBLIME VERIFIED',
+                        matched_rules: ['DEV: Local Fallback Detection (Not Sublime Verified)'],
+                        signals: ['dev_fallback_mode', 'not_sublime_verified'],
+                        data_model: {}
+                    }
+                };
+            }
+
+            // Normal Production Behavior: Fail truthfully when Sublime is unavailable
+            throw new Error('Sublime/MQL detection service is unavailable. Pipeline execution failed (Production Mode).');
         }
     }
 }

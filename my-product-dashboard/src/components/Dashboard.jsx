@@ -9,6 +9,9 @@ import ExecutiveView from './ExecutiveView';
 import RemediationTimeline from './RemediationTimeline';
 import AuditTimeline from './AuditTimeline';
 import ForensicReportModal from './ForensicReportModal';
+import AuthModal from './AuthModal';
+import AdminQuarantineQueue from './AdminQuarantineQueue';
+import { User, Building, Mail, Lock } from 'lucide-react';
 
 export default function Dashboard() {
   const [activeNav, setActiveNav] = useState('investigations');
@@ -21,9 +24,37 @@ export default function Dashboard() {
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [systemHealth, setSystemHealth] = useState({
+    status: 'OPERATIONAL',
+    services: { backend: 'READY', detection: 'READY', database: 'READY', ingestion: 'ACTIVE', remediation: 'SIMULATION' }
+  });
+  const [currentUser, setCurrentUser] = useState(null);
+  const [currentOrg, setCurrentOrg] = useState(null);
+  const [mailboxConn, setMailboxConn] = useState(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   const loadData = async () => {
     try {
+      try {
+        const userRes = await api.getCurrentUser();
+        if (userRes && userRes.user) {
+          setCurrentUser(userRes.user);
+          setCurrentOrg(userRes.organization);
+          setMailboxConn(userRes.mailboxConnection);
+        }
+      } catch (e) {
+        // Guest/Dev mode
+      }
+
+      try {
+        const healthRes = await api.getHealth();
+        if (healthRes && healthRes.status) {
+          setSystemHealth(healthRes);
+        }
+      } catch (err) {
+        setSystemHealth({ status: 'DEGRADED', services: { backend: 'READY', detection: 'UNAVAILABLE' } });
+      }
+
       const casesRes = await api.getCases();
       const casesList = casesRes.cases || [];
       setCases(casesList);
@@ -70,6 +101,7 @@ export default function Dashboard() {
   const navItems = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
     { id: 'investigations', label: 'Investigations', icon: ShieldAlert },
+    { id: 'quarantine', label: 'Quarantine Queue', icon: Lock },
     { id: 'campaigns', label: 'Campaigns', icon: Network },
     { id: 'graph', label: 'Intelligence Graph', icon: Network },
     { id: 'executive', label: 'Executive Protection', icon: UserCheck },
@@ -159,8 +191,10 @@ export default function Dashboard() {
         {!sidebarCollapsed && (
           <div style={{ padding: '12px 14px', borderTop: '1px solid #1e293b', fontSize: '0.68rem', color: '#64748b' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-              <Activity size={12} color="#10b981" />
-              <span style={{ color: '#10b981', fontWeight: 600 }}>Systems Operational</span>
+              <Activity size={12} color={systemHealth.status === 'OPERATIONAL' ? '#10b981' : '#f59e0b'} />
+              <span style={{ color: systemHealth.status === 'OPERATIONAL' ? '#10b981' : '#f59e0b', fontWeight: 600 }}>
+                {systemHealth.status === 'OPERATIONAL' ? 'Systems Operational' : `System Degraded (${systemHealth.services?.detection || 'Degraded'})`}
+              </span>
             </div>
             <div>Automated Threat Engine</div>
           </div>
@@ -178,9 +212,9 @@ export default function Dashboard() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: '#10b981' }}>
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10b981' }}></span>
-              <span>Systems Operational</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: systemHealth.status === 'OPERATIONAL' ? '#10b981' : '#f59e0b' }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: systemHealth.status === 'OPERATIONAL' ? '#10b981' : '#f59e0b' }}></span>
+              <span>{systemHealth.status === 'OPERATIONAL' ? 'Systems Operational' : `System Degraded (${systemHealth.services?.detection || 'Degraded'})`}</span>
             </div>
 
             <button
@@ -284,6 +318,11 @@ export default function Dashboard() {
             <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <AuditTimeline events={auditLogs} />
             </div>
+          )}
+
+          {/* QUARANTINE QUEUE NAV */}
+          {activeNav === 'quarantine' && (
+            <AdminQuarantineQueue currentUser={currentUser} currentOrg={currentOrg} onRefresh={loadData} />
           )}
         </div>
       </main>

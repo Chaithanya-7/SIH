@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const executiveGuard = require('./executiveGuard');
 const policyEngine = require('./policyEngine');
 
@@ -21,43 +22,38 @@ class CaseManager {
                 const list = JSON.parse(raw || '[]');
                 
                 list.forEach(c => {
-                    // Enrich with P1 Executive Guard if missing
+                    // Preserving loaded case data without mutating historical remediation states
                     if (!c.executive_context) {
-                        try {
-                            executiveGuard.evaluateTarget(c);
-                        } catch (err) {
-                            c.executive_context = { is_targeted: false, is_impersonated: false, matched_vip: null };
-                        }
+                        c.executive_context = { is_targeted: false, is_impersonated: false, matched_vip: null };
                     }
-
-                    // Enrich with P1 Policy & Remediation Status if PENDING or missing
-                    if (!c.remediation || c.remediation.status === 'PENDING') {
-                        try {
-                            const policyDecision = policyEngine.evaluate(c);
-                            if (policyDecision.actions.includes('QUARANTINE')) {
-                                c.remediation = c.remediation || {};
-                                c.remediation.status = 'QUARANTINED';
-                                c.remediation.policy_matched = policyDecision.policy_id;
-                                c.remediation.executed_actions = [
-                                    { action: 'QUARANTINE', timestamp: c.timestamps?.ingested_at || new Date().toISOString(), status: 'EXECUTED' }
-                                ];
-                            }
-                        } catch (err) {
-                            // Keep existing
-                        }
-                    }
-
                     this.cases.set(c.case_id, c);
                 });
-                console.log(`[CaseManager] Loaded and enriched ${this.cases.size} persistent case(s) from disk.`);
-                this.persistToDisk();
+                console.log(`[CaseManager] Loaded ${this.cases.size} persistent case(s) from disk without mutating historical states.`);
             }
         } catch (e) {
             console.error('[CaseManager] Error initializing storage:', e.message);
         }
     }
 
+    generateUniqueCaseId() {
+        const year = new Date().getFullYear();
+        let caseId = '';
+        let attempts = 0;
+        do {
+            const suffix = crypto.randomBytes(3).toString('hex').toUpperCase();
+            caseId = `SM-${year}-${suffix}`;
+            attempts++;
+        } while (this.cases.has(caseId) && attempts < 100);
+        return caseId;
+    }
+
     saveCase(threatObject) {
+        if (!threatObject.case_id || (this.cases.has(threatObject.case_id) && this.cases.get(threatObject.case_id).message?.raw_hash !== threatObject.message?.raw_hash)) {
+            const newCaseId = this.generateUniqueCaseId();
+            console.log(`[CaseManager] Assigning collision-safe Case ID: ${newCaseId} (previous: ${threatObject.case_id || 'NONE'})`);
+            threatObject.case_id = newCaseId;
+        }
+
         console.log(`[CaseManager] Saving case ${threatObject.case_id} to persistent store...`);
         this.cases.set(threatObject.case_id, threatObject);
         this.persistToDisk();
@@ -75,7 +71,14 @@ class CaseManager {
     persistToDisk() {
         try {
             const list = Array.from(this.cases.values());
-            fs.writeFileSync(this.storageFile, JSON.stringify(list, null, 2), 'utf8');
+            const tmpFile = `${this.storageFile}.tmp`;
+            fs.writeFileSync(tmpFile, JSON.stringify(list, null, 2), 'utf8');
+            try {
+                fs.renameSync(tmpFile, this.storageFile);
+            } catch (renameErr) {
+                fs.writeFileSync(this.storageFile, JSON.stringify(list, null, 2), 'utf8');
+                if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
+            }
         } catch (e) {
             console.error('[CaseManager] Error persisting cases to disk:', e.message);
         }
