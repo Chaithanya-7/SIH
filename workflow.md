@@ -1,3 +1,4 @@
+```text
 ┌─────────────────────────────┐
 │       INCOMING EMAIL        │
 └──────────────┬──────────────┘
@@ -58,3 +59,4 @@
    QUARANTINE / ADMIN REVIEW
                ↓
        FORENSIC REPORT
+```
