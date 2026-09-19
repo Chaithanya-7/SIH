@@ -261,6 +261,11 @@ class GmailIngestionAdapter {
                     continue;
                 }
 
+                if (dedupCheck.isDuplicate && dedupCheck.isProcessing) {
+                    console.log(`[GmailIngestion] Message ${msgId} (${messageKey}) is already processing. Skipping concurrent execution.`);
+                    continue;
+                }
+
                 if (this.pipelineHandler) {
                     await this.pipelineHandler(rawMime, 'GMAIL_PUSH', messageKey);
                     processedCount++;

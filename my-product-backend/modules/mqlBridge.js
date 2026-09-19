@@ -3,7 +3,7 @@ const crypto = require('crypto');
 
 class MQLBridge {
     normalize(detectionResult, rawEmailString) {
-        console.log('[MQLBridge] Normalizing raw detection data into canonical SecureMail ThreatObject...');
+        console.log('[MQLBridge] Normalizing raw detection data into canonical PhishLens ThreatObject...');
 
         const rawData = (detectionResult && detectionResult.rawResponse) ? detectionResult.rawResponse : (detectionResult || {});
         const dataModel = rawData.data_model || {};
@@ -60,7 +60,7 @@ class MQLBridge {
             verdict = rawVerdict;
         }
 
-        // Instantiate Canonical SecureMail ThreatObject
+        // Instantiate canonical PhishLens ThreatObject
         const threatObject = new ThreatObject({
             message: {
                 sender: formattedSender,

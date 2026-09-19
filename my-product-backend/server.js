@@ -11,7 +11,9 @@ const mailIngestionAdapter = require('./adapters/mailIngestionAdapter');
 // P0 & P1 Modules Pipeline
 const mqlBridge = require('./modules/mqlBridge');
 const forensicEngine = require('./modules/forensicEngine');
+const attachmentAnalyzer = require('./modules/attachmentAnalyzer');
 const iocExtractor = require('./modules/iocExtractor');
+const nlpAnalyzer = require('./modules/nlpAnalyzer');
 const infraEnricher = require('./modules/infraEnricher');
 const evidenceFusion = require('./modules/evidenceFusion');
 const confidenceEngine = require('./modules/confidenceEngine');
@@ -45,7 +47,9 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
 
 app.use(cors({
     origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
+        // Browser clients must always be explicitly allow-listed. Requests without an
+        // Origin header are non-browser clients and are separately authenticated.
+        if (!origin || allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
             callback(new Error('CORS policy restricted access.'));
@@ -57,7 +61,7 @@ app.use(cors({
 app.use(bodyParser.json({ limit: '50mb' }));
 
 console.log('='.repeat(70));
-console.log('🚀 SECUREMAIL AI BACKEND — REAL-TIME AUTOMATED INGESTION & PIPELINE');
+console.log('🚀 PHISHLENS BACKEND — REAL-TIME AUTOMATED INGESTION & PIPELINE');
 console.log(`🔑 Detection Provider: ${config.detection.provider}`);
 console.log(`🌐 Detection Endpoint: ${config.detection.endpoint}`);
 console.log(`📡 Server Listening on: http://localhost:${PORT}`);
@@ -67,6 +71,7 @@ console.log('='.repeat(70));
 // ==================== CORE AUTOMATED PIPELINE EXECUTION ====================
 async function processPipeline(emailContent, source = 'MANUAL_API', clientMessageKey = null) {
     console.log(`\n📨 ===== AUTOMATED FORENSIC PIPELINE TRIGGERED (${source}) =====`);
+    let messageKey = null;
     try {
         // Base64 encode raw message if needed
         let encodedMessage = emailContent;
@@ -78,19 +83,34 @@ async function processPipeline(emailContent, source = 'MANUAL_API', clientMessag
         const rfcMatch = emailContent ? emailContent.match(/^Message-ID:\s*(<[^>]+>)/mi) : null;
         const rfcMessageId = rfcMatch ? rfcMatch[1] : null;
         const rawHash = crypto.createHash('sha256').update(emailContent || '').digest('hex');
-        const messageKey = clientMessageKey || dedupStore.computeMessageKey(rfcMessageId, emailContent);
+        messageKey = clientMessageKey || dedupStore.computeMessageKey(rfcMessageId, emailContent);
 
-        const dedupCheck = dedupStore.reserveMessageKey(messageKey, {
-            source,
-            rfc_message_id: rfcMessageId,
-            raw_sha256: rawHash
-        });
+        // SMTP, IMAP and Gmail reserve their key before calling the shared pipeline.
+        // Manual API requests reserve here. Reserving a pre-reserved key again makes
+        // a concurrent request look eligible for processing and can create two cases.
+        if (clientMessageKey) {
+            const reservation = dedupStore.getRecord(messageKey);
+            if (!reservation || reservation.processing_status !== 'PROCESSING') {
+                throw new Error(`Pipeline requires an active dedup reservation for ${messageKey}.`);
+            }
+        } else {
+            const dedupCheck = dedupStore.reserveMessageKey(messageKey, {
+                source,
+                rfc_message_id: rfcMessageId,
+                raw_sha256: rawHash
+            });
 
-        if (dedupCheck.isDuplicate && dedupCheck.record.case_id) {
-            console.log(`[Dedup] DUPLICATE MESSAGE (${messageKey}) -> Returning existing Case ${dedupCheck.record.case_id}`);
-            const existingCase = caseManager.getCase(dedupCheck.record.case_id);
-            if (existingCase) {
-                return existingCase;
+            if (dedupCheck.isDuplicate && dedupCheck.isCompleted && dedupCheck.record.case_id) {
+                console.log(`[Dedup] DUPLICATE MESSAGE (${messageKey}) -> Returning existing Case ${dedupCheck.record.case_id}`);
+                const existingCase = caseManager.getCase(dedupCheck.record.case_id);
+                if (existingCase) {
+                    return existingCase;
+                }
+                throw new Error(`Dedup record ${messageKey} references missing case ${dedupCheck.record.case_id}.`);
+            }
+
+            if (dedupCheck.isDuplicate && dedupCheck.isProcessing) {
+                throw new Error(`Message ${messageKey} is already being processed.`);
             }
         }
 
@@ -111,31 +131,37 @@ async function processPipeline(emailContent, source = 'MANUAL_API', clientMessag
         // 3. Header Forensics & Trust-Aware SMTP Relay Reconstruction
         threatObject = await forensicEngine.analyzeHeaders(threatObject);
 
-        // 4. IOC Extraction (IPs, Domains, URLs, Hashes)
+        // 4. Safe attachment metadata and hash analysis (no execution)
+        threatObject = attachmentAnalyzer.analyze(threatObject);
+
+        // 5. IOC Extraction (IPs, Domains, URLs, Hashes)
         threatObject = iocExtractor.extract(threatObject);
 
-        // 5. Infrastructure & Geolocation Enrichment
+        // 6. Explainable NLP / social-engineering signal analysis
+        threatObject = nlpAnalyzer.analyze(threatObject);
+
+        // 6. Infrastructure & Geolocation Enrichment
         threatObject = await infraEnricher.enrich(threatObject);
 
-        // 6. Persistent Knowledge Graph & Cross-Case Campaign Correlation (SQLite)
+        // 7. Persistent Knowledge Graph & Cross-Case Campaign Correlation (SQLite)
         threatObject = await campaignGraph.processThreatObject(threatObject);
 
-        // 7. Evidence Fusion Engine (Normalizes all findings into EvidenceObject[])
+        // 8. Evidence Fusion Engine (Normalizes all findings into EvidenceObject[])
         threatObject = evidenceFusion.fuse(threatObject);
 
-        // 8. Executive Protection Guard (VIP Target Context)
+        // 9. Executive Protection Guard (VIP Target Context)
         threatObject = executiveGuard.evaluateTarget(threatObject);
 
-        // 9. 3-Tier Confidence Calculation Engine
+        // 10. 3-Tier Confidence Calculation Engine
         threatObject = confidenceEngine.calculate(threatObject);
 
-        // 10. Contextual Policy Engine Evaluation
+        // 11. Contextual Policy Engine Evaluation
         const policyDecision = policyEngine.evaluate(threatObject);
 
-        // 11. Active Disruption & Real Remediation Lifecycle Execution
+        // 12. Active Disruption & Real Remediation Lifecycle Execution
         threatObject = await remediationEngine.executePolicyDecision(threatObject, policyDecision);
 
-        // 12. Persistent Case Storage & Deduplication Binding
+        // 13. Persistent Case Storage & Deduplication Binding
         threatObject = caseManager.saveCase(threatObject);
         dedupStore.bindCaseId(messageKey, threatObject.case_id);
 
@@ -144,6 +170,9 @@ async function processPipeline(emailContent, source = 'MANUAL_API', clientMessag
         return threatObject;
 
     } catch (error) {
+        if (messageKey) {
+            dedupStore.markFailed(messageKey, error.message);
+        }
         console.error('❌ Automated Pipeline Execution Error:', error.stack || error.message);
         throw error;
     }
@@ -154,16 +183,52 @@ mailIngestionAdapter.startIngestion(processPipeline);
 gmailIngestionAdapter.setPipelineHandler(processPipeline);
 
 // Protect sensitive SOC administration and data APIs
-app.use(['/api/cases', '/api/graph', '/api/audit', '/api/remediate', '/api/reports', '/api/auth/me', '/api/org', '/api/mailbox'], requireAuth);
+app.use([
+    '/api/analyze',
+    '/api/ingest/email',
+    '/api/cases',
+    '/api/graph',
+    '/api/vips',
+    '/api/audit',
+    '/api/remediate',
+    '/api/reports',
+    '/api/auth/me',
+    '/api/auth/gmail',
+    '/api/org',
+    '/api/mailbox',
+    '/api/admin'
+], requireAuth);
 
 // ==================== GOOGLE AUTHENTICATION ENDPOINTS ====================
 app.post('/api/auth/google/verify', (req, res) => {
     try {
-        const { googleAccountId, email, name, avatarUrl } = req.body;
-        if (!email) return res.status(400).json({ success: false, error: 'Email is required for authentication.' });
+        const { googleAccountId, email, name, avatarUrl, idToken } = req.body;
+        const isProduction = process.env.NODE_ENV === 'production';
+        const demoIdentityEnabled = process.env.ENABLE_DEMO_IDENTITY === 'true';
+
+        // This endpoint used to trust a user-supplied email address and call it
+        // Google authentication. Only an explicitly enabled local demo may use
+        // that behavior; production identity must be verified separately.
+        if (isProduction) {
+            return res.status(501).json({
+                success: false,
+                error: 'Google ID-token verification is not configured. Production identity login is disabled.'
+            });
+        }
+
+        if (!demoIdentityEnabled) {
+            return res.status(403).json({
+                success: false,
+                error: 'Demo identity is disabled. Configure real Google ID-token verification before enabling user login.'
+            });
+        }
+
+        if (!email || !email.includes('@')) {
+            return res.status(400).json({ success: false, error: 'A valid email is required for the explicitly enabled demo identity.' });
+        }
 
         const { user, sessionToken } = userManager.findOrCreateFromGoogleProfile({
-            googleAccountId: googleAccountId || `g_${crypto.randomBytes(6).toString('hex')}`,
+            googleAccountId: googleAccountId || `demo_${crypto.randomBytes(6).toString('hex')}`,
             email,
             name,
             avatarUrl
@@ -587,10 +652,10 @@ app.get('/api/reports/pdf/:id', (req, res) => {
     const caseItem = caseManager.getCase(req.params.id);
     if (!caseItem) return res.status(404).json({ success: false, error: 'Case not found' });
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="SecureMail_Forensic_Report_${caseItem.case_id}.pdf"`);
+    res.setHeader('Content-Disposition', `attachment; filename="PhishLens_Forensic_Report_${caseItem.case_id}.pdf"`);
     pdfReportGenerator.generateReport(caseItem, res);
 });
 
 app.listen(PORT, () => {
-    console.log(`✅ SecureMail AI Platform active on port ${PORT}`);
+    console.log(`✅ PhishLens Platform active on port ${PORT}`);
 });

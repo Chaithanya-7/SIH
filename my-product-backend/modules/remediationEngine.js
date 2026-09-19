@@ -186,7 +186,7 @@ class RemediationEngine {
                 org_id: threatObject.org_id,
                 event_type: 'CONTAINMENT_CONFIRMED',
                 source: 'REMEDIATION_ENGINE',
-                description: `Gmail containment verified via API read-back. INBOX: absent | SecureMail/Quarantine label: present.`
+                description: `Gmail containment verified via API read-back. INBOX: absent | PhishLens/Quarantine label: present.`
             });
         } else {
             threatObject.mailbox.status = 'ACTION_FAILED';

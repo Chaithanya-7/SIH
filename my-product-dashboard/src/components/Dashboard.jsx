@@ -80,7 +80,7 @@ export default function Dashboard() {
       setAuditLogs(auditRes.events || []);
 
     } catch (e) {
-      console.error('[SecureMail SOC] Telemetry sync error:', e);
+      console.error('[PhishLens SOC] Telemetry sync error:', e);
     } finally {
       setLoading(false);
     }
@@ -134,7 +134,7 @@ export default function Dashboard() {
                 <Shield size={16} color="#ffffff" />
               </div>
               <div>
-                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#f8fafc', letterSpacing: '-0.02em' }}>SecureMail AI</div>
+                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#f8fafc', letterSpacing: '-0.02em' }}>PhishLens</div>
                 <div style={{ fontSize: '0.62rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Enterprise SOC</div>
               </div>
             </div>
@@ -206,7 +206,7 @@ export default function Dashboard() {
         {/* Minimal Top Bar */}
         <header style={{ backgroundColor: '#0d1322', borderBottom: '1px solid #1e293b', padding: '10px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: '0.82rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ color: '#64748b' }}>SecureMail AI</span>
+            <span style={{ color: '#64748b' }}>PhishLens</span>
             <span style={{ color: '#334155' }}>/</span>
             <span style={{ color: '#f8fafc', fontWeight: 600, textTransform: 'capitalize' }}>{activeNav}</span>
           </div>

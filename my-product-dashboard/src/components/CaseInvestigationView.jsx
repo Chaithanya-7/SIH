@@ -19,10 +19,12 @@ export default function CaseInvestigationView({ selectedCase, onOpenReport }) {
 
   const auth = selectedCase.forensics?.authentication || {};
   const iocs = selectedCase.iocs || {};
+  const attachments = selectedCase.attachments || [];
   const evidence = selectedCase.evidence || [];
   const campaignAssoc = selectedCase.campaign_association || {};
   const campaign = selectedCase.campaign || {};
   const detection = selectedCase.detection || {};
+  const nlp = selectedCase.nlp || { status: 'NOT_ANALYZED', signals: [], score: 0 };
   const verdict = detection.verdict || 'UNKNOWN';
 
   let verdictBg = 'rgba(100, 116, 139, 0.12)';
@@ -104,9 +106,11 @@ export default function CaseInvestigationView({ selectedCase, onOpenReport }) {
           { id: 'overview', label: 'Overview' },
           { id: 'detection', label: 'Detection' },
           { id: 'authentication', label: 'Authentication' },
+          { id: 'nlp', label: `Language Analysis (${nlp.signals.length})` },
           { id: 'infrastructure', label: 'Infrastructure' },
           { id: 'evidence', label: `Evidence (${evidence.length})` },
           { id: 'iocs', label: 'IOCs' },
+          { id: 'attachments', label: `Attachments (${attachments.length})` },
           { id: 'campaign', label: 'Campaign' },
           { id: 'timeline', label: 'Timeline' },
           { id: 'response', label: 'Response' }
@@ -207,6 +211,29 @@ export default function CaseInvestigationView({ selectedCase, onOpenReport }) {
         </div>
       )}
 
+      {/* EXPLAINABLE NLP SECTION */}
+      {activeSection === 'nlp' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ backgroundColor: '#0d1322', borderRadius: '6px', border: '1px solid #1e293b', padding: '12px', fontSize: '0.75rem', color: '#94a3b8' }}>
+            <div><strong>Analysis Engine:</strong> {nlp.engine || 'Not analyzed'}</div>
+            <div style={{ marginTop: '4px' }}><strong>Language Signal Score:</strong> {Math.round((nlp.score || 0) * 100)}%</div>
+            <div style={{ marginTop: '6px', fontStyle: 'italic', color: '#64748b' }}>{nlp.limitation || 'Language analysis is supporting evidence only.'}</div>
+          </div>
+          {nlp.signals.length === 0 ? (
+            <div style={{ color: '#64748b', fontSize: '0.78rem', fontStyle: 'italic' }}>No supported social-engineering language signals were identified.</div>
+          ) : nlp.signals.map((signal, idx) => (
+            <div key={`${signal.type}-${idx}`} style={{ backgroundColor: '#0d1322', borderRadius: '6px', border: '1px solid #1e293b', padding: '10px 12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
+                <span style={{ color: '#f8fafc', fontSize: '0.8rem', fontWeight: 600 }}>{signal.type.replace(/_/g, ' ')}</span>
+                <span style={{ color: signal.severity === 'HIGH' ? '#ef4444' : '#f59e0b', fontSize: '0.68rem' }}>{signal.severity} • {Math.round(signal.confidence * 100)}%</span>
+              </div>
+              <div style={{ color: '#94a3b8', fontSize: '0.72rem', marginTop: '5px' }}>{signal.explanation}</div>
+              <div className="font-mono" style={{ color: '#3b82f6', fontSize: '0.7rem', marginTop: '6px' }}>Matched terms: {signal.matched_terms.join(', ')}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* EVIDENCE SECTION */}
       {activeSection === 'evidence' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -247,6 +274,22 @@ export default function CaseInvestigationView({ selectedCase, onOpenReport }) {
           <div><strong>IP Addresses:</strong> <span className="font-mono" style={{ color: '#3b82f6' }}>{iocs.ips?.length > 0 ? iocs.ips.join(', ') : 'None extracted'}</span></div>
           <div><strong>Domains:</strong> <span className="font-mono" style={{ color: '#f59e0b' }}>{iocs.domains?.length > 0 ? iocs.domains.join(', ') : 'None extracted'}</span></div>
           <div><strong>URLs:</strong> <span className="font-mono" style={{ color: '#10b981' }}>{iocs.urls?.length > 0 ? iocs.urls.join(', ') : 'None extracted'}</span></div>
+        </div>
+      )}
+
+      {/* ATTACHMENT FORENSICS SECTION */}
+      {activeSection === 'attachments' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {attachments.length === 0 ? (
+            <div style={{ color: '#64748b', fontSize: '0.78rem', fontStyle: 'italic' }}>No MIME attachments were identified.</div>
+          ) : attachments.map((attachment, idx) => (
+            <div key={`${attachment.sha256}-${idx}`} style={{ backgroundColor: '#0d1322', borderRadius: '6px', border: '1px solid #1e293b', padding: '10px 12px', fontSize: '0.74rem', color: '#94a3b8' }}>
+              <div style={{ color: '#f8fafc', fontWeight: 600 }}>{attachment.file_name}</div>
+              <div style={{ marginTop: '5px' }}>MIME: {attachment.mime_type} · Size: {attachment.size_bytes} bytes · Extension: {attachment.extension || 'none'}</div>
+              <div className="font-mono" style={{ color: '#3b82f6', marginTop: '5px', overflowWrap: 'anywhere' }}>SHA-256: {attachment.sha256}</div>
+              <div style={{ color: '#64748b', fontStyle: 'italic', marginTop: '5px' }}>{attachment.limitation}</div>
+            </div>
+          ))}
         </div>
       )}
 

@@ -8,6 +8,10 @@ class IOCExtractor {
         const urls = new Set();
         const hashes = new Set();
 
+        (threatObject.attachments || []).forEach(attachment => {
+            if (attachment.sha256) hashes.add(attachment.sha256);
+        });
+
         // 1. Extract Origin & Relay IPs
         const originIp = threatObject.infrastructure?.origin_ip || threatObject.infrastructure?.origin?.origin_ip;
         if (originIp && originIp !== 'UNAVAILABLE') {

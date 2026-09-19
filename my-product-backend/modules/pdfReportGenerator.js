@@ -12,7 +12,7 @@ class PDFReportGenerator {
         // Header & Title
         doc.fillColor('#1a1a2e')
            .fontSize(20)
-           .text('SECUREMAIL AI — INVESTIGATOR-READY FORENSIC REPORT', { align: 'center' });
+           .text('PHISHLENS — INVESTIGATOR-READY FORENSIC REPORT', { align: 'center' });
 
         doc.fontSize(10)
            .fillColor('#666666')
@@ -132,7 +132,7 @@ class PDFReportGenerator {
         doc.fontSize(12).fillColor('#1a1a2e').text('11. Audit Trail', { underline: true });
         doc.moveDown(0.5);
         doc.fontSize(8).fillColor('#666666')
-           .text(`Generated automatically by SecureMail AI Platform. Chain-of-Custody SHA-256: ${threatObject.message?.raw_hash}`);
+           .text(`Generated automatically by PhishLens. Chain-of-Custody SHA-256: ${threatObject.message?.raw_hash}`);
 
         doc.end();
     }

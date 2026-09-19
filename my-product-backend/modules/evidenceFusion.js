@@ -7,8 +7,6 @@ class EvidenceFusion {
         const evidenceList = [];
         const auth = threatObject.forensics?.authentication || {};
         const rawDataModel = threatObject._raw_data_model || {};
-        const subject = threatObject.message?.subject || '';
-        const bodyText = rawDataModel.body?.plain?.raw || '';
         const originIp = threatObject.infrastructure?.origin_ip || threatObject.infrastructure?.origin?.origin_ip || 'N/A';
 
         // 1. Authentication Anomaly Evidence
@@ -61,20 +59,19 @@ class EvidenceFusion {
             }));
         }
 
-        // 3. BEC & Social Engineering Urgency Keywords
-        const becKeywords = ['urgent', 'wire transfer', 'bank account', 'gift card', 'payroll', 'ceo', 'immediate', 'fund transfer'];
-        const matchedKw = becKeywords.filter(kw => subject.toLowerCase().includes(kw) || bodyText.toLowerCase().includes(kw));
-        if (matchedKw.length > 0) {
+        // 3. Explainable NLP / social-engineering evidence
+        const nlpSignals = threatObject.nlp?.signals || [];
+        nlpSignals.forEach(signal => {
             evidenceList.push(new EvidenceObject({
-                evidence_type: 'BEC_KEYWORD',
+                evidence_type: `NLP_${signal.type}`,
                 source: 'NLP_TEXT_ANALYZER',
-                finding: `Financial Urgency Indicators Detected (${matchedKw.join(', ')})`,
-                severity: 'HIGH',
-                confidence: 0.85,
-                explanation: 'Email contains strong social-engineering financial urgency cues common in BEC attacks.',
-                provenance: { source_type: 'MESSAGE_BODY', source_reference: 'Subject/Body' }
+                finding: `${signal.type.replace(/_/g, ' ')} (${signal.matched_terms.join(', ')})`,
+                severity: signal.severity,
+                confidence: signal.confidence,
+                explanation: `${signal.explanation} ${threatObject.nlp.limitation}`,
+                provenance: { source_type: 'MESSAGE_BODY', source_reference: 'Subject/Body language analysis' }
             }));
-        }
+        });
 
         // 4. Independent Anonymization Evidence (VPN, Proxy, Tor, Hosting)
         const anon = threatObject.infrastructure?.anonymization || {};

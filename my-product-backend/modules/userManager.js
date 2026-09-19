@@ -79,7 +79,7 @@ class UserManager {
             user.updated_at = now;
         }
 
-        // Issue application's own SecureMail session
+        // Issue the application's own PhishLens session.
         const sessionToken = `sm_sess_${crypto.randomBytes(24).toString('hex')}`;
         const sessionRecord = {
             token: sessionToken,

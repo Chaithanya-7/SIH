@@ -41,7 +41,7 @@ class NotificationAdapter {
         console.log(`[NotificationAdapter] 📩 Dispatching Recipient Notification for Case ${threatObject.case_id}...`);
 
         const messageText = isContained
-            ? `Security Alert: SecureMail AI detected a high-risk email (Case ${threatObject.case_id}). The message has been safely contained. Do not click links or respond.`
+            ? `Security Alert: PhishLens detected a high-risk email (Case ${threatObject.case_id}). The message has been safely contained. Do not click links or respond.`
             : `Security Notice: A suspicious message (Case ${threatObject.case_id}) was detected and is under investigation by security team.`;
 
         auditLogger.log({

@@ -52,7 +52,7 @@ class ThreatObject {
         // 6. Containment Context & Audit Metadata
         this.containment_context = {
             label_id: data.containment_context?.label_id || null,
-            label_name: data.containment_context?.label_name || 'SecureMail/Quarantine',
+            label_name: data.containment_context?.label_name || 'PhishLens/Quarantine',
             contained_at: data.containment_context?.contained_at || null,
             released_at: data.containment_context?.released_at || null,
             decision_reason: data.containment_context?.decision_reason || null,
@@ -67,6 +67,15 @@ class ThreatObject {
             hashes: data.iocs?.hashes || []
         };
         this.evidence = data.evidence || [];
+        this.nlp = data.nlp || {
+            status: 'NOT_ANALYZED',
+            engine: null,
+            analyzed_fields: { subject: false, body: false },
+            score: 0,
+            signals: [],
+            limitation: 'No language analysis has been performed.'
+        };
+        this.attachments = data.attachments || [];
         this.forensics = {
             authentication: data.forensics?.authentication || { spf: 'unknown', dkim: 'unknown', dmarc: 'unknown' },
             smtp_relay: data.forensics?.smtp_relay || []
@@ -74,14 +83,26 @@ class ThreatObject {
         this.infrastructure = {
             origin_ip: data.infrastructure?.origin_ip || '',
             asn: data.infrastructure?.asn || '',
-            geo: data.infrastructure?.geo || {}
+            geo: data.infrastructure?.geo || {},
+            origin: data.infrastructure?.origin || null,
+            reputation: data.infrastructure?.reputation || {},
+            anonymization: data.infrastructure?.anonymization || {}
         };
         this.correlations = data.correlations || [];
+        this.campaign_association = data.campaign_association || {
+            confidence: 0,
+            status: 'UNASSOCIATED',
+            related_cases: [],
+            factors: [],
+            limitation: 'No campaign association has been established.'
+        };
         this.confidence = {
             threat: data.confidence?.threat || 0.0,
             infrastructure_origin: data.confidence?.infrastructure_origin || 0.0,
             campaign_association: data.confidence?.campaign_association || 0.0,
-            actor_attribution: data.confidence?.actor_attribution || 'INSUFFICIENT EVIDENCE'
+            actor_attribution: data.confidence?.actor_attribution || 'INSUFFICIENT EVIDENCE',
+            scoring_version: data.confidence?.scoring_version || 'PHISHLENS_EVIDENCE_FUSION_V2',
+            contributions: data.confidence?.contributions || []
         };
         this.remediation = {
             status: data.remediation?.status || 'PENDING',

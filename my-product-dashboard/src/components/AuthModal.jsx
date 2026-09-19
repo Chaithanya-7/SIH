@@ -30,7 +30,7 @@ export default function AuthModal({ currentUser, currentOrg, mailboxConn, onAuth
       });
 
       if (res.success) {
-        setMessage('Identity verified cleanly via Google Auth.');
+        setMessage('Development demo identity enabled. Configure Google ID-token verification before production use.');
         if (!res.user.organization_id) {
           setMode('org');
         } else {
@@ -154,7 +154,7 @@ export default function AuthModal({ currentUser, currentOrg, mailboxConn, onAuth
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', borderBottom: '1px solid #1e293b', pb: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Shield size={20} color="#3b82f6" />
-            <span style={{ fontWeight: 700, fontSize: '1rem' }}>SecureMail Account & Identity</span>
+            <span style={{ fontWeight: 700, fontSize: '1rem' }}>PhishLens Account & Identity</span>
           </div>
           {onClose && (
             <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1.2rem' }}>×</button>
@@ -177,7 +177,7 @@ export default function AuthModal({ currentUser, currentOrg, mailboxConn, onAuth
 
         {/* Tab Navigation */}
         <div style={{ display: 'flex', gap: '4px', backgroundColor: '#131b2e', padding: '4px', borderRadius: '6px', marginBottom: '18px' }}>
-          <button onClick={() => setMode('login')} style={{ flex: 1, padding: '6px', fontSize: '0.75rem', borderRadius: '4px', border: 'none', backgroundColor: mode === 'login' ? '#1e293b' : 'transparent', color: mode === 'login' ? '#f8fafc' : '#64748b', cursor: 'pointer' }}>Google Identity</button>
+          <button onClick={() => setMode('login')} style={{ flex: 1, padding: '6px', fontSize: '0.75rem', borderRadius: '4px', border: 'none', backgroundColor: mode === 'login' ? '#1e293b' : 'transparent', color: mode === 'login' ? '#f8fafc' : '#64748b', cursor: 'pointer' }}>Demo Identity</button>
           <button onClick={() => setMode('org')} style={{ flex: 1, padding: '6px', fontSize: '0.75rem', borderRadius: '4px', border: 'none', backgroundColor: mode === 'org' ? '#1e293b' : 'transparent', color: mode === 'org' ? '#f8fafc' : '#64748b', cursor: 'pointer' }}>Organization</button>
           <button onClick={() => setMode('mailbox')} style={{ flex: 1, padding: '6px', fontSize: '0.75rem', borderRadius: '4px', border: 'none', backgroundColor: mode === 'mailbox' ? '#1e293b' : 'transparent', color: mode === 'mailbox' ? '#f8fafc' : '#64748b', cursor: 'pointer' }}>Gmail Connection</button>
         </div>

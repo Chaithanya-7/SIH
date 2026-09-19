@@ -1,6 +1,6 @@
 /**
- * SecureMail AI Authentication & Authorization Middleware Boundary
- * Validates SecureMail session tokens (sm_sess_...) and populates req.user.
+ * PhishLens authentication and authorization middleware boundary.
+ * Validates PhishLens session tokens and populates req.user.
  */
 
 const userManager = require('../modules/userManager');
@@ -18,18 +18,14 @@ const requireAuth = (req, res, next) => {
             return next();
         }
 
-        // 2. Secret API key for dev test suite or daemon
-        const expectedKey = process.env.SECUREMAIL_API_KEY || 'securemail_dev_key_2026';
-        if (token === expectedKey) {
-            req.user = { id: 'dev-admin', email: 'admin@securemail.ai', role: 'ADMIN', organization_id: 'org_dev' };
+        // A service key is intended for a controlled ingestion daemon or test suite.
+        // Never provide a built-in fallback: a default key turns authentication into
+        // an unauthenticated public endpoint as soon as the source is available.
+        const expectedKey = process.env.PHISHLENS_API_KEY;
+        if (expectedKey && token === expectedKey) {
+            req.user = { id: 'service-admin', email: 'admin@phishlens.local', role: 'ADMIN', organization_id: 'org_dev' };
             return next();
         }
-    }
-
-    // Allow local dev requests if NODE_ENV !== 'production' when no header provided
-    if (process.env.NODE_ENV !== 'production' && !authHeader) {
-        req.user = { id: 'dev-admin', email: 'admin@securemail.ai', role: 'ADMIN', organization_id: 'org_dev' };
-        return next();
     }
 
     return res.status(401).json({ success: false, error: 'Authentication required. Authorization session token missing or expired.' });

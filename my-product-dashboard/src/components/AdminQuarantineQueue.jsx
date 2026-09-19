@@ -143,7 +143,7 @@ export default function AdminQuarantineQueue({ currentUser, currentOrg, onRefres
             <Key size={18} color="#f59e0b" />
             <div>
               <div style={{ fontWeight: 700, fontSize: '0.82rem', color: '#f8fafc' }}>Gmail Modify Permission Required</div>
-              <div style={{ fontSize: '0.74rem', color: '#cbd5e1' }}>SecureMail needs permission to contain and restore high-risk messages in your connected Gmail mailbox.</div>
+              <div style={{ fontSize: '0.74rem', color: '#cbd5e1' }}>PhishLens needs permission to contain and restore high-risk messages in your connected Gmail mailbox.</div>
             </div>
           </div>
           <a

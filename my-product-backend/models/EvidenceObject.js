@@ -2,7 +2,7 @@ class EvidenceObject {
     constructor(data = {}) {
         this.id = data.id || `EV-${Math.floor(10000 + Math.random() * 90000)}`;
         this.evidence_type = data.evidence_type || 'GENERAL_SIGNAL';
-        this.source = data.source || 'SECUREMAIL_ENGINE';
+        this.source = data.source || 'PHISHLENS_ENGINE';
         this.finding = data.finding || '';
         this.severity = data.severity || 'MEDIUM'; // CRITICAL, HIGH, MEDIUM, LOW
         this.confidence = data.confidence !== undefined ? data.confidence : 0.5;

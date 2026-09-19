@@ -3,12 +3,12 @@ const axios = require('axios');
 class GmailActionAdapter {
     constructor() {
         this.apiBase = 'https://gmail.googleapis.com/gmail/v1/users/me';
-        this.quarantineLabelName = 'SecureMail/Quarantine';
+        this.quarantineLabelName = 'PhishLens/Quarantine';
         this.cachedLabelId = null;
     }
 
     /**
-     * Fetch or create the SecureMail/Quarantine label in Gmail
+     * Fetch or create the PhishLens/Quarantine label in Gmail
      */
     async getOrCreateQuarantineLabel(accessToken) {
         if (this.cachedLabelId) {
@@ -70,7 +70,7 @@ class GmailActionAdapter {
 
     /**
      * Reversible Containment Action:
-     * Removes INBOX label, applies SecureMail/Quarantine label, reads back state from Gmail API to verify.
+     * Removes INBOX label, applies PhishLens/Quarantine label, reads back state from Gmail API to verify.
      */
     async containMessage(accessToken, providerMessageId) {
         if (!accessToken || !providerMessageId) {
@@ -125,7 +125,7 @@ class GmailActionAdapter {
 
     /**
      * Reversible Release Action:
-     * Restores INBOX label, removes SecureMail/Quarantine label, reads back state from Gmail API to verify.
+     * Restores INBOX label, removes PhishLens/Quarantine label, reads back state from Gmail API to verify.
      */
     async releaseMessage(accessToken, providerMessageId, quarantineLabelId = null) {
         if (!accessToken || !providerMessageId) {

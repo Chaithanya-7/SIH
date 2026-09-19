@@ -12,7 +12,9 @@ class IMAPAdapter {
             host: process.env.IMAP_HOST || 'imap.gmail.com',
             port: parseInt(process.env.IMAP_PORT || '993'),
             tls: true,
-            tlsOptions: { rejectUnauthorized: false }
+            // Do not silently accept an intercepted or invalid TLS certificate.
+            // A lab server with a private CA must opt in explicitly.
+            tlsOptions: { rejectUnauthorized: process.env.IMAP_ALLOW_INVALID_CERT !== 'true' }
         };
         this.onMailReceived = null;
         this.stateFile = path.join(__dirname, '../data/imap_state.json');
@@ -93,32 +95,57 @@ class IMAPAdapter {
                         console.log(`📬 [IMAPAdapter] Found ${newUids.length} new unprocessed message(s) (UIDs: ${newUids.join(', ')})`);
 
                         const f = imap.fetch(newUids, { bodies: '', struct: true });
+                        const processingTasks = [];
 
                         f.on('message', (msg, seqno) => {
                             let currentUid = 0;
+                            let rawMessage = '';
+                            let resolveTask;
+                            let receivedBody = false;
+                            let taskFinished = false;
+                            const processingTask = new Promise(resolve => { resolveTask = resolve; });
+                            const finishTask = () => {
+                                if (!taskFinished) {
+                                    taskFinished = true;
+                                    resolveTask();
+                                }
+                            };
+                            processingTasks.push(processingTask);
+
                             msg.once('attributes', (attrs) => {
                                 currentUid = attrs.uid;
                             });
 
                             msg.on('body', (stream) => {
-                                let buffer = '';
-                                stream.on('data', (chunk) => buffer += chunk.toString('utf8'));
+                                receivedBody = true;
+                                stream.on('data', (chunk) => rawMessage += chunk.toString('utf8'));
                                 stream.once('end', async () => {
-                                    if (this.onMailReceived) {
-                                        try {
-                                            await this.onMailReceived(buffer, 'IMAP_INBOX', null, currentUid);
+                                    try {
+                                        if (this.onMailReceived) {
+                                            await this.onMailReceived(rawMessage, 'IMAP_INBOX', null, currentUid);
                                             if (currentUid > 0) {
                                                 this.saveLastUid(currentUid);
                                             }
-                                        } catch (err) {
-                                            console.error(`[IMAPAdapter] Pipeline execution failed for UID ${currentUid}, UID state not advanced:`, err.message);
                                         }
+                                    } catch (err) {
+                                        console.error(`[IMAPAdapter] Pipeline execution failed for UID ${currentUid}, UID state not advanced:`, err.message);
+                                    } finally {
+                                        finishTask();
                                     }
                                 });
                             });
+
+                            // A malformed IMAP response without a message body must
+                            // not leave the poller locked forever.
+                            msg.once('end', () => {
+                                if (!receivedBody) finishTask();
+                            });
                         });
 
-                        f.once('end', () => {
+                        f.once('end', async () => {
+                            // Do not release the poll lock or close IMAP before each
+                            // message reaches a durable pipeline result/checkpoint.
+                            await Promise.all(processingTasks);
                             this.isProcessing = false;
                             imap.end();
                         });

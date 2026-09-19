@@ -14,3 +14,4 @@ dist/
 **/dist/
 .vscode/
 .idea/
+.npm-cache/
