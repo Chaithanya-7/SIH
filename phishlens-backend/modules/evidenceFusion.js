@@ -146,6 +146,7 @@ class EvidenceFusion {
                 severity: rule.severity,
                 confidence: rule.confidence,
                 explanation: `${rule.matched_because} (Rule ${rule.id}; source: ${rule.source})`,
+                decisive: rule.decisive === true,
                 provenance: { source_type: 'MQL_RULE', source_reference: rule.id }
             }));
         });

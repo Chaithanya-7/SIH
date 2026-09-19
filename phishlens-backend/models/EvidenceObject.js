@@ -9,6 +9,13 @@ class EvidenceObject {
         this.timestamp = data.timestamp || new Date().toISOString();
         this.related_ioc = data.related_ioc || null;
         this.explanation = data.explanation || '';
+        /**
+         * A confirmatory finding that establishes high risk on its own, rather
+         * than one that merely contributes weight. Reserved for facts with no
+         * benign reading, such as a link that is currently listed on a
+         * malicious-URL feed.
+         */
+        this.decisive = data.decisive === true;
         this.provenance = {
             source_type: data.provenance?.source_type || 'SYSTEM',
             source_reference: data.provenance?.source_reference || 'UNKNOWN'

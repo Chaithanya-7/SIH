@@ -9,6 +9,7 @@ class ConfidenceEngine {
         if (type === 'MQL_URL') return 'URL_RISK';
         if (type === 'MQL_ATT') return 'ATTACHMENT_RISK';
         if (type === 'MQL_BEC') return 'BEC_COMPOSITE';
+        if (type === 'MQL_INTEL') return 'THREAT_INTEL';
         if (type.startsWith('BEHAVIOUR_')) return 'BEHAVIOURAL';
         if (type === 'LEARNED_PATTERN_MATCH') return 'LEARNED_PATTERN';
         return type || 'GENERAL';
@@ -35,7 +36,11 @@ class ConfidenceEngine {
         const caps = {
             AUTHENTICATION: 0.30, LANGUAGE: 0.25, CAMPAIGN: 0.25, IDENTITY: 0.25,
             INFRASTRUCTURE: 0.25, URL_RISK: 0.20, ATTACHMENT_RISK: 0.20,
-            BEC_COMPOSITE: 0.35, BEHAVIOURAL: 0.25, LEARNED_PATTERN: 0.15, GENERAL: 0.20
+            BEC_COMPOSITE: 0.35, BEHAVIOURAL: 0.25, LEARNED_PATTERN: 0.15,
+            // A confirmed indicator-feed match is among the strongest single
+            // facts available: someone has already observed this exact URL, host
+            // or netblock being used maliciously.
+            THREAT_INTEL: 0.35, GENERAL: 0.20
         };
         const contributions = [];
         let threatScore = 0;
@@ -58,7 +63,24 @@ class ConfidenceEngine {
                 explanation: `Strongest finding in this family contributes in full; ${sorted.length - 1} further finding(s) contribute at progressively halved weight, capped at ${caps[family] || 0.20}.`
             });
         });
-        const threatConfidence = Math.min(0.99, threatScore);
+        let threatConfidence = Math.min(0.99, threatScore);
+
+        // The family caps exist to stop correlated facts compounding. They must
+        // not also stop a single confirmatory fact from being decisive: a link
+        // currently listed on a malicious-URL feed cannot be capped down to
+        // "suspicious" merely because nothing else about the message looked
+        // unusual. Applied as a visible floor that appears in the contributions,
+        // never as a silent override.
+        const decisiveFinding = (threatObject.evidence || []).find(e => e.decisive);
+        if (decisiveFinding && threatConfidence < 0.70) {
+            contributions.push({
+                family: 'DECISIVE_FINDING',
+                contribution: Number((0.70 - threatConfidence).toFixed(2)),
+                representative_finding: decisiveFinding.finding,
+                explanation: 'A confirmatory finding with no benign interpretation raised this case to high risk on its own. The weighted evidence score alone was lower.'
+            });
+            threatConfidence = 0.70;
+        }
         const originConfidence = Number(threatObject.infrastructure?.origin?.origin_confidence);
         const campaignConfidence = Number(threatObject.campaign_association?.confidence);
 

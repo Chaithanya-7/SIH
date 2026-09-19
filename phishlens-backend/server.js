@@ -20,6 +20,9 @@ const ruleEngine = require('./modules/ruleEngine');
 const behavioralAnalyzer = require('./modules/behavioralAnalyzer');
 const adaptiveLearning = require('./modules/adaptiveLearning');
 const infraEnricher = require('./modules/infraEnricher');
+const threatIntelStore = require('./modules/threatIntelStore');
+const threatIntelEnricher = require('./modules/threatIntelEnricher');
+const rdapAdapter = require('./adapters/rdapAdapter');
 const evidenceFusion = require('./modules/evidenceFusion');
 const confidenceEngine = require('./modules/confidenceEngine');
 const caseManager = require('./modules/caseManager');
@@ -170,18 +173,25 @@ async function processPipeline(emailContent, source = 'MANUAL_API', clientMessag
         // Branch 1 - Forensic engine: trust-aware SMTP relay reconstruction
         threatObject = await forensicEngine.analyzeHeaders(threatObject);
 
-        // Branch 2 - Behavioural analysis  ]  mutually independent,
-        // Branch 3 - IOC + infrastructure  ]  so run concurrently
-        const [behavioralResult, infraResult] = await Promise.all([
+        // Branch 2 - Behavioural analysis   ]
+        // Branch 3 - IOC + infrastructure   ]  mutually independent,
+        //            + threat intelligence  ]  so run concurrently
+        // Each enriches a different region of the same ThreatObject.
+        await Promise.all([
             Promise.resolve(behavioralAnalyzer.analyze(threatObject, parsedEmail)),
-            infraEnricher.enrich(threatObject)
+            infraEnricher.enrich(threatObject),
+            threatIntelEnricher.enrich(threatObject)
         ]);
-        threatObject = infraResult || behavioralResult || threatObject;
 
         // Branch 4 - Campaign correlation across cases (persistent SQLite graph)
         threatObject = await campaignGraph.processThreatObject(threatObject);
 
         // ===== CONVERGENCE: fusion, scoring, decision =====
+
+        // Second MQL pass for rules that reason over what the branches produced
+        // (indicator-feed matches, domain registration age) rather than over the
+        // message alone. Detection logic stays in one auditable, cited place.
+        threatObject = ruleEngine.evaluate(threatObject, parsedEmail, 'enrichment');
 
         // 9. Adaptive scoring against characteristics learned from confirmed mail
         threatObject = adaptiveLearning.score(threatObject, parsedEmail);
@@ -236,6 +246,7 @@ app.use([
     '/api/cases',
     '/api/summary',
     '/api/learning',
+    '/api/threat-intelligence',
     '/api/graph',
     '/api/vips',
     '/api/audit',
@@ -719,6 +730,29 @@ app.get('/api/learning', (req, res) => {
     });
 });
 
+/**
+ * Threat-intelligence state: which open feeds are loaded, how current they are,
+ * how many indicators are held, and each feed's licence. Surfaced so an
+ * operator can see exactly what the matching is based on, and under what terms.
+ */
+app.get('/api/threat-intelligence', (req, res) => {
+    res.json({
+        success: true,
+        status: threatIntelStore.getStatus(),
+        available_feeds: threatIntelStore.availableFeeds(),
+        domain_age_cache: rdapAdapter.getStats()
+    });
+});
+
+app.post('/api/threat-intelligence/sync', requireRole('ADMIN'), async (req, res) => {
+    try {
+        const result = await threatIntelStore.sync();
+        res.json({ success: true, ...result });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
 app.get('/api/cases/:id', (req, res) => {
     const caseItem = caseManager.getCase(req.params.id);
     if (!caseItem) return res.status(404).json({ success: false, error: 'Case not found' });
@@ -796,6 +830,31 @@ app.get('/api/reports/pdf/:id', (req, res) => {
     pdfReportGenerator.generateReport(caseItem, res);
 });
 
+/**
+ * Keeps the local indicator set current without ever blocking startup or
+ * message processing. Detection works from whatever is already on disk; a
+ * refresh simply improves coverage when the network allows it. Set
+ * THREAT_INTEL_AUTO_SYNC=false for a deployment that must never reach out.
+ */
+function scheduleThreatIntelSync() {
+    if (process.env.THREAT_INTEL_AUTO_SYNC === 'false') {
+        console.log('ℹ️  [ThreatIntel] Automatic feed sync disabled. Detection uses the indicators already stored locally.');
+        return;
+    }
+
+    const intervalHours = Number(process.env.THREAT_INTEL_SYNC_HOURS) || 6;
+    const runIfStale = () => {
+        const age = threatIntelStore.ageHours();
+        if (age === null || age >= intervalHours) {
+            threatIntelStore.sync().catch(err => console.warn('[ThreatIntel] Scheduled sync failed:', err.message));
+        }
+    };
+
+    setTimeout(runIfStale, 5000).unref?.();
+    setInterval(runIfStale, intervalHours * 3600 * 1000).unref?.();
+}
+
 app.listen(PORT, () => {
     console.log(`✅ PhishLens Platform active on port ${PORT}`);
+    scheduleThreatIntelSync();
 });

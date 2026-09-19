@@ -150,6 +150,19 @@ class AdaptiveLearning {
             }
         });
 
+        (threatObject.threat_intelligence?.matches || []).forEach(m => {
+            features.add(`intel:${m.indicator_type}_${m.matched}`);
+            if (m.feed) features.add(`intel_feed:${m.feed}`);
+        });
+
+        // Bucketed rather than exact, so the characteristic generalises to the
+        // next freshly-registered domain instead of memorising this one.
+        (threatObject.threat_intelligence?.domain_ages || []).forEach(d => {
+            if (d.status !== 'AVAILABLE' || d.age_days === null) return;
+            const bucket = d.age_days <= 7 ? '0-7d' : d.age_days <= 30 ? '8-30d' : d.age_days <= 365 ? '31-365d' : 'over-1y';
+            features.add(`${d.is_sender_domain ? 'sender' : 'linked'}_domain_age:${bucket}`);
+        });
+
         (threatObject.detection?.matched_rules || []).forEach(r => features.add(`rule:${r.id}`));
         (threatObject.nlp?.signals || []).forEach(s => features.add(`nlp:${s.type}`));
         (threatObject.behavioral?.signals || []).forEach(s => features.add(`behaviour:${s.type}`));

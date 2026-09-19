@@ -94,6 +94,13 @@ class ThreatObject {
             contributions: [],
             limitation: 'No adaptive scoring has been performed.'
         };
+        this.threat_intelligence = data.threat_intelligence || {
+            status: 'NOT_ANALYZED',
+            feed_state: { synced: false, last_sync: null, indicator_totals: {} },
+            matches: [],
+            domain_ages: [],
+            limitation: 'No threat-intelligence matching has been performed.'
+        };
         /** Compact characteristics captured for later learning; never message body text. */
         this.learning_features = data.learning_features || [];
         this.forensics = {

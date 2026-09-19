@@ -365,6 +365,89 @@ const RULES = [
     },
 
     // ---------------------------------------------------------------
+    // THREAT INTELLIGENCE  (family: THREAT_INTEL)
+    // Evaluated after the enrichment branches, since these rules reason over
+    // indicator-feed matches and registration data rather than over the
+    // message alone.
+    // ---------------------------------------------------------------
+    {
+        id: 'MQL-INTEL-101',
+        name: 'Link matches a known malicious URL in open threat intelligence',
+        category: 'INTEL',
+        stage: 'enrichment',
+        severity: 'CRITICAL',
+        confidence: 0.95,
+        // Confirmatory rather than suggestive: a third party has directly
+        // observed this exact resource being used for phishing or malware
+        // delivery, and it is still listed. There is no benign reading of a
+        // message linking to it, so this finding stands on its own.
+        decisive: true,
+        source: 'abuse.ch URLhaus / OpenPhish / ThreatFox open indicator feeds',
+        description: 'A link in this message is itself listed in an open threat-intelligence feed as malicious or phishing.',
+        test: (ctx) => {
+            const hit = (ctx.intelMatches || []).find(m => m.indicator_type === 'URL' && m.matched === 'EXACT_URL');
+            return hit && `The exact URL ${hit.indicator} is listed in the ${hit.feed} feed.`;
+        }
+    },
+    {
+        id: 'MQL-INTEL-102',
+        name: 'Link points to a host known to serve malicious content',
+        category: 'INTEL',
+        stage: 'enrichment',
+        severity: 'HIGH',
+        confidence: 0.85,
+        source: 'abuse.ch URLhaus / OpenPhish / ThreatFox open indicator feeds',
+        description: 'A link points to a host that open threat intelligence has recorded serving malicious or phishing content, though at a different path. Multi-tenant platforms are excluded from this check.',
+        test: (ctx) => {
+            const hit = (ctx.intelMatches || []).find(m => m.indicator_type === 'URL' && (m.matched === 'URL_HOST' || m.matched === 'DOMAIN'));
+            return hit && `The host ${hit.indicator} appears in the ${hit.feed} feed as serving malicious content.`;
+        }
+    },
+    {
+        id: 'MQL-INTEL-103',
+        name: 'Message infrastructure matches a known malicious IP or netblock',
+        category: 'INTEL',
+        stage: 'enrichment',
+        severity: 'HIGH',
+        confidence: 0.85,
+        source: 'abuse.ch Feodo Tracker (botnet C2) / Spamhaus DROP (hijacked netblocks)',
+        description: 'An IP address associated with this message is listed as botnet command-and-control infrastructure, or falls inside a netblock published as hijacked or attacker-controlled.',
+        test: (ctx) => {
+            const hit = (ctx.intelMatches || []).find(m => m.indicator_type === 'IP');
+            return hit && `${hit.indicator} matches ${hit.matched === 'NETBLOCK' ? 'netblock ' + hit.indicator : 'a listed address'} in the ${hit.feed} feed.`;
+        }
+    },
+    {
+        id: 'MQL-INTEL-104',
+        name: 'Sender domain was registered very recently',
+        category: 'INTEL',
+        stage: 'enrichment',
+        severity: 'HIGH',
+        confidence: 0.80,
+        source: 'RDAP registration data (RFC 9083); APWG / CISA guidance on newly-registered domains in phishing',
+        description: 'The sender domain was registered within the last 30 days. Phishing infrastructure is typically registered shortly before use, whereas an organisation a message claims to represent has usually held its domain for years.',
+        test: (ctx) => {
+            const sender = (ctx.domainAges || []).find(d => d.is_sender_domain && d.status === 'AVAILABLE');
+            return sender && sender.age_days !== null && sender.age_days <= 30 &&
+                `Sender domain ${sender.domain} was registered ${sender.age_days} day(s) ago (${sender.registered_at}).`;
+        }
+    },
+    {
+        id: 'MQL-INTEL-105',
+        name: 'Linked domain was registered very recently',
+        category: 'INTEL',
+        stage: 'enrichment',
+        severity: 'MEDIUM',
+        confidence: 0.65,
+        source: 'RDAP registration data (RFC 9083); APWG / CISA guidance on newly-registered domains in phishing',
+        description: 'A domain linked in this message was registered within the last 30 days, a common characteristic of phishing landing pages.',
+        test: (ctx) => {
+            const linked = (ctx.domainAges || []).find(d => !d.is_sender_domain && d.status === 'AVAILABLE' && d.age_days !== null && d.age_days <= 30);
+            return linked && `Linked domain ${linked.domain} was registered ${linked.age_days} day(s) ago (${linked.registered_at}).`;
+        }
+    },
+
+    // ---------------------------------------------------------------
     // BUSINESS EMAIL COMPROMISE COMPOSITE  (family: BEC_COMPOSITE)
     // ---------------------------------------------------------------
     {
@@ -430,16 +513,28 @@ class RuleEngine {
             textBody: parsedEmail.textBody || '',
             urls: threatObject.iocs?.urls || [],
             attachments: threatObject.attachments || [],
-            nlpSignalTypes
+            nlpSignalTypes,
+            intelMatches: threatObject.threat_intelligence?.matches || [],
+            domainAges: threatObject.threat_intelligence?.domain_ages || []
         };
     }
 
-    evaluate(threatObject, parsedEmail) {
-        console.log('[RuleEngine] Evaluating native MQL detection rules...');
+    /**
+     * Rules are evaluated in two stages.
+     *
+     * 'message' rules reason only over the message itself and run in the
+     * detection layer, before any enrichment. 'enrichment' rules reason over
+     * what the analysis branches produced - indicator-feed matches,
+     * registration age - and so must run after them. Matches from both stages
+     * accumulate onto the same case.
+     */
+    evaluate(threatObject, parsedEmail, stage = 'message') {
+        console.log(`[RuleEngine] Evaluating native MQL detection rules (${stage} stage)...`);
         const ctx = this.buildContext(threatObject, parsedEmail);
 
+        const applicable = RULES.filter(r => (r.stage || 'message') === stage);
         const matched = [];
-        for (const rule of RULES) {
+        for (const rule of applicable) {
             let result;
             try {
                 result = rule.test(ctx);
@@ -457,18 +552,26 @@ class RuleEngine {
                 confidence: rule.confidence,
                 source: rule.source,
                 description: rule.description,
+                decisive: rule.decisive === true,
                 matched_because: typeof result === 'string' ? result : rule.description
             });
         }
 
         threatObject.detection = threatObject.detection || {};
-        threatObject.detection.matched_rules = matched;
-        threatObject.detection.signals = matched.map(r => r.id);
+
+        // Later stages add to the case rather than replacing what an earlier
+        // stage already established.
+        const existing = stage === 'message' ? [] : (threatObject.detection.matched_rules || []);
+        const combined = existing.concat(matched.filter(m => !existing.some(e => e.id === m.id)));
+
+        threatObject.detection.matched_rules = combined;
+        threatObject.detection.signals = combined.map(r => r.id);
         threatObject.detection.verification_status = 'PHISHLENS_NATIVE_MQL_VERIFIED';
         threatObject.detection.rule_engine = {
             engine: 'PHISHLENS_NATIVE_MQL_V1',
-            rules_evaluated: RULES.length,
-            rules_matched: matched.length
+            rules_evaluated: stage === 'message' ? applicable.length : RULES.length,
+            rules_matched: combined.length,
+            stages_run: stage === 'message' ? ['message'] : ((threatObject.detection.rule_engine?.stages_run || []).concat(stage))
         };
 
         return threatObject;
