@@ -78,6 +78,14 @@ This file tracks completed implementation work. It is updated as each verified i
 - Removed the stale "Sublime Dashboard: http://localhost:3000" line from `start-all.bat` — no `sublime-platform` service exists in this repository, so the line was misleading.
 - Re-verified after the rename: backend boots cleanly on a test port (loads persisted case/remediation/graph state, SMTP/IMAP correctly report disabled), and the dashboard `npm run build` still succeeds.
 
+## 2026-09-19 — PII discovered and purged from git history
+
+- While finishing the rename commit, found `data/remediation_actions.json` (a tracked file, 2114 lines of synthetic remediation-action test records) contained a real-looking personal Gmail address (`cha7thanya@gmail.com`) among mostly-placeholder addresses (`cfo@company.com`, `victim@org-i.com`). It had been present since the Initial commit.
+- Root cause: a nested `my-product-backend/.gitignore` had `!data/cases.json` / `!data/remediation_actions.json` negation rules that force-included these files despite the root `.gitignore` listing them as ignored. Removed the negation rules.
+- Untracked both files (kept locally on disk; they are real local runtime state, not deleted).
+- Confirmed with the user before doing anything destructive. With explicit approval, rewrote all local git history with `git filter-branch --index-filter` to strip both files from every commit, verified the new `main` tip and its full reachable history contain neither the file paths nor the leaked email string, then force-pushed the rewritten history to `origin/main` (`92936ed...557a58d main -> main (forced update)`), overwriting the previously pushed commits that contained the PII. Deleted local filter-branch backup refs (`refs/original/*`) and ran `git gc --prune=now --aggressive` to drop the old blobs from the local object store too.
+- Residual risk noted to the user: the PII was live on GitHub for a few minutes between the first push and the force-push; a force-push cannot retroactively clear anything GitHub itself may have cached (e.g. code search indexing) in that window — outside what a client-side rewrite can control.
+
 ### Next architectural gap (not yet started)
 
 - `DETECTION_PROVIDER` is still hardcoded to `sublime` with no local Sublime service in this repository — every ingestion path still calls out to an external, unconfigured detection dependency for MQL/rule matching (`mqlBridge.js` only normalizes a Sublime response; it does not run its own rules). This is the single largest remaining gap against the master plan's Phase 3 (Detection Engine): a native, source-cited MQL/rule engine (MITRE ATT&CK, APWG, CISA, OWASP, abuse.ch/OpenPhish/PhishTank-seeded rules per the compact plan) is not yet implemented, so the platform has no working detection path without an external Sublime instance.
