@@ -1,20 +1,33 @@
 {
   "manifest_version": 3,
   "name": "PhishLens — Threat Shield",
-  "version": "1.0.0",
-  "description": "Real-time AI email threat detection, executive spoof guard & forensic intelligence",
+  "version": "1.1.0",
+  "description": "Compact live view of PhishLens email threat detections, with one-click handoff to the full PhishLens SOC application.",
   "permissions": [
     "activeTab",
-    "storage"
+    "storage",
+    "alarms"
   ],
   "host_permissions": [
-    "http://localhost:3001/*"
+    "http://localhost:3001/*",
+    "http://127.0.0.1:3001/*"
   ],
   "action": {
     "default_popup": "popup.html",
     "default_title": "PhishLens Shield"
   },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "scripts": ["background.js"]
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "phishlens@phishlens.local",
+      "strict_min_version": "115.0"
+    }
   }
 }

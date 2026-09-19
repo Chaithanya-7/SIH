@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>PhishLens Extension Settings</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="options-body">
+  <div class="options-container">
+    <h1>PhishLens Extension Settings</h1>
+    <p class="options-intro">
+      The extension is a thin client. It reads verdict counts from your PhishLens
+      backend and hands off to the installed PhishLens desktop application for
+      full investigation. It performs no detection of its own.
+    </p>
+
+    <label class="field">
+      <span>Backend API URL</span>
+      <input type="url" id="api-base-url" placeholder="http://localhost:3001">
+    </label>
+
+    <label class="field">
+      <span>Web console URL (fallback when the desktop app is not installed)</span>
+      <input type="url" id="dashboard-url" placeholder="http://localhost:3005">
+    </label>
+
+    <label class="field">
+      <span>API key</span>
+      <input type="password" id="api-key" placeholder="PHISHLENS_API_KEY value from your backend .env">
+      <small>
+        Stored only in this browser's extension storage and sent solely to the backend
+        URL above. Use a key issued for this workstation, not a shared production secret.
+      </small>
+    </label>
+
+    <div class="options-actions">
+      <button id="btn-save" class="btn-primary">Save</button>
+      <button id="btn-test" class="btn-secondary">Test connection</button>
+    </div>
+
+    <div id="status" class="status"></div>
+  </div>
+  <script src="config.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

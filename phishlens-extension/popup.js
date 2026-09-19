@@ -1,62 +1,139 @@
+/**
+ * PhishLens popup: a thin client.
+ *
+ * It shows only headline verdict counts and the most recent detections. All
+ * deep investigation happens in the installed PhishLens desktop application
+ * (or, as a fallback, the web console) - the popup never duplicates detection
+ * logic or renders full case data.
+ */
 document.addEventListener('DOMContentLoaded', () => {
-  const btnScan = document.getElementById('btn-scan');
-  const loading = document.getElementById('loading');
-  const resultCard = document.getElementById('result-card');
-  const badgeVerdict = document.getElementById('badge-verdict');
-  const riskScore = document.getElementById('risk-score');
-  const txtSender = document.getElementById('txt-sender');
-  const txtSubject = document.getElementById('txt-subject');
-  const whyList = document.getElementById('why-list');
-  const btnReport = document.getElementById('btn-report');
-  const btnDashboard = document.getElementById('btn-dashboard');
+  const ext = globalThis.browser || globalThis.chrome;
 
-  const API_BASE = typeof PHISHLENS_CONFIG !== 'undefined' ? PHISHLENS_CONFIG.API_BASE_URL : 'http://localhost:3001';
-  const DASHBOARD_URL = typeof PHISHLENS_CONFIG !== 'undefined' ? PHISHLENS_CONFIG.DASHBOARD_URL : 'http://localhost:3005';
+  const connectionState = document.getElementById('connection-state');
+  const setupNotice = document.getElementById('setup-notice');
+  const setupMessage = document.getElementById('setup-message');
+  const summary = document.getElementById('summary');
+  const recentList = document.getElementById('recent-list');
 
-  btnScan.addEventListener('click', () => {
-    alert('ℹ️ Live Gmail integration not configured. Chrome Extension active scanning will be enabled in the upcoming Google/Gmail integration milestone.');
-  });
+  const defaults = {
+    apiBaseUrl: PHISHLENS_CONFIG.API_BASE_URL,
+    dashboardUrl: PHISHLENS_CONFIG.DASHBOARD_URL,
+    apiKey: ''
+  };
 
-  function renderResults(threatObject) {
-    const verdict = threatObject.detection?.verdict || 'UNKNOWN';
-    const confidencePct = Math.round((threatObject.confidence?.threat || 0) * 100);
+  function readSettings() {
+    return new Promise(resolve => {
+      if (!ext?.storage?.local) return resolve(defaults);
+      ext.storage.local.get(defaults, stored => resolve({ ...defaults, ...stored }));
+    });
+  }
 
-    badgeVerdict.textContent = verdict.replace('_', ' ');
-    riskScore.textContent = `${confidencePct}% Risk Score`;
+  function openUrl(url) {
+    if (ext?.tabs?.create) ext.tabs.create({ url });
+    else window.open(url, '_blank');
+  }
 
-    if (verdict === 'HIGH_RISK') {
-      badgeVerdict.className = 'badge badge-high';
-    } else if (verdict === 'SUSPICIOUS') {
-      badgeVerdict.className = 'badge badge-suspicious';
+  function openOptions() {
+    if (ext?.runtime?.openOptionsPage) ext.runtime.openOptionsPage();
+    else openUrl('options.html');
+  }
+
+  function showSetupNotice(message) {
+    setupMessage.textContent = message;
+    setupNotice.classList.remove('hidden');
+    summary.classList.add('hidden');
+  }
+
+  function verdictClass(verdict) {
+    if (verdict === 'HIGH_RISK') return 'high';
+    if (verdict === 'SUSPICIOUS') return 'suspicious';
+    return 'safe';
+  }
+
+  function renderSummary(data) {
+    document.getElementById('count-high').textContent = data.counts.high_risk;
+    document.getElementById('count-suspicious').textContent = data.counts.suspicious;
+    document.getElementById('count-safe').textContent = data.counts.safe;
+    document.getElementById('count-quarantined').textContent = data.quarantined;
+    document.getElementById('count-review').textContent = data.awaiting_review;
+
+    recentList.innerHTML = '';
+    if (!data.recent.length) {
+      const li = document.createElement('li');
+      li.className = 'empty';
+      li.textContent = 'No messages analyzed yet.';
+      recentList.appendChild(li);
     } else {
-      badgeVerdict.className = 'badge badge-safe';
-    }
-
-    txtSender.textContent = threatObject.message?.sender || 'Unknown';
-    txtSubject.textContent = threatObject.message?.subject || '(No Subject)';
-
-    // Plain English "Why is this dangerous?"
-    whyList.innerHTML = '';
-    const evidenceItems = threatObject.evidence || [];
-
-    if (evidenceItems.length === 0) {
-      whyList.innerHTML = '<li>No threat indicators detected. Email appears safe.</li>';
-    } else {
-      evidenceItems.forEach(item => {
+      data.recent.forEach(item => {
         const li = document.createElement('li');
-        li.textContent = `${item.finding} — ${item.explanation}`;
-        whyList.appendChild(li);
+        li.className = 'recent-item';
+
+        const subject = document.createElement('span');
+        subject.className = 'recent-subject';
+        subject.textContent = item.subject;
+
+        const badge = document.createElement('span');
+        badge.className = `badge ${verdictClass(item.verdict)}`;
+        badge.textContent = item.verdict.replace('_', ' ');
+
+        li.appendChild(subject);
+        li.appendChild(badge);
+        recentList.appendChild(li);
       });
     }
 
-    resultCard.classList.remove('hidden');
+    setupNotice.classList.add('hidden');
+    summary.classList.remove('hidden');
+    connectionState.textContent = `${data.total} message${data.total === 1 ? '' : 's'} analyzed`;
   }
 
-  btnReport.addEventListener('click', () => {
-    alert('🚨 Incident reported directly to SOC Analysts for high-priority review.');
+  async function loadSummary() {
+    const settings = await readSettings();
+
+    if (!settings.apiKey) {
+      connectionState.textContent = 'Not configured';
+      showSetupNotice('An API key is required before the extension can read detections from your PhishLens backend.');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${settings.apiBaseUrl}/api/summary`, {
+        headers: { 'x-api-key': settings.apiKey }
+      });
+
+      if (response.status === 401 || response.status === 403) {
+        connectionState.textContent = 'Not authorized';
+        showSetupNotice('The configured API key was rejected by the PhishLens backend.');
+        return;
+      }
+      if (!response.ok) {
+        connectionState.textContent = 'Unavailable';
+        showSetupNotice(`PhishLens backend returned HTTP ${response.status}.`);
+        return;
+      }
+
+      renderSummary(await response.json());
+    } catch (err) {
+      connectionState.textContent = 'Offline';
+      showSetupNotice(`Could not reach the PhishLens backend at ${settings.apiBaseUrl}.`);
+    }
+  }
+
+  // "More info" hands off to the installed desktop application via the
+  // phishlens:// scheme it registers with the operating system. If the app is
+  // not installed the browser cannot open the scheme, so an explicit web
+  // console fallback is always offered rather than guessing with a timer.
+  document.getElementById('btn-more-info').addEventListener('click', async () => {
+    openUrl(`${PHISHLENS_CONFIG.DESKTOP_APP_SCHEME}dashboard`);
   });
 
-  btnDashboard.addEventListener('click', () => {
-    window.open(DASHBOARD_URL, '_blank');
+  document.getElementById('btn-web-console').addEventListener('click', async () => {
+    const settings = await readSettings();
+    openUrl(settings.dashboardUrl);
   });
+
+  document.getElementById('btn-settings').addEventListener('click', openOptions);
+  document.getElementById('btn-open-settings').addEventListener('click', openOptions);
+
+  loadSummary();
 });

@@ -201,6 +201,7 @@ app.use([
     '/api/analyze',
     '/api/ingest/email',
     '/api/cases',
+    '/api/summary',
     '/api/graph',
     '/api/vips',
     '/api/audit',
@@ -594,6 +595,59 @@ app.get('/api/cases', (req, res) => {
     }
 
     res.json({ success: true, count: allCases.length, cases: allCases });
+});
+
+/**
+ * Compact verdict counts for the browser extension popup. The popup is a thin
+ * client: it shows only these totals and then hands off to the desktop app or
+ * dashboard for the full investigation view, so it never needs full case data.
+ */
+app.get('/api/summary', (req, res) => {
+    let allCases = caseManager.getAllCases();
+
+    if (req.user) {
+        if (req.user.role === 'EMPLOYEE') {
+            allCases = allCases.filter(c =>
+                (c.message?.recipient || '').toLowerCase().includes(req.user.email.toLowerCase()) ||
+                (c.message?.sender || '').toLowerCase().includes(req.user.email.toLowerCase())
+            );
+        } else if (req.user.organization_id) {
+            allCases = allCases.filter(c => !c.organization_id || c.organization_id === req.user.organization_id);
+        }
+    }
+
+    const counts = { high_risk: 0, suspicious: 0, safe: 0, unknown: 0 };
+    allCases.forEach(c => {
+        const verdict = (c.detection?.verdict || 'UNKNOWN').toLowerCase();
+        if (counts[verdict] === undefined) counts.unknown += 1;
+        else counts[verdict] += 1;
+    });
+
+    const quarantined = allCases.filter(c => c.mailbox?.status === 'QUARANTINED').length;
+    const awaitingReview = allCases.filter(c => c.review?.status === 'PENDING_ADMIN' || c.review?.status === 'UNDER_REVIEW').length;
+
+    const latest = allCases
+        .slice()
+        .sort((a, b) => new Date(b.timestamps?.ingested_at || 0) - new Date(a.timestamps?.ingested_at || 0))
+        .slice(0, 5)
+        .map(c => ({
+            case_id: c.case_id,
+            subject: c.message?.subject || '(No Subject)',
+            sender: c.message?.sender || '',
+            verdict: c.detection?.verdict || 'UNKNOWN',
+            threat_confidence: c.confidence?.threat || 0,
+            ingested_at: c.timestamps?.ingested_at || null
+        }));
+
+    res.json({
+        success: true,
+        counts,
+        total: allCases.length,
+        quarantined,
+        awaiting_review: awaitingReview,
+        recent: latest,
+        generated_at: new Date().toISOString()
+    });
 });
 
 app.get('/api/cases/:id', (req, res) => {

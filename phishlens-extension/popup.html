@@ -12,46 +12,51 @@
         <div class="icon-shield">🛡️</div>
         <div>
           <h2>PhishLens</h2>
-          <span class="sub">Threat Protection Shield</span>
+          <span class="sub" id="connection-state">Connecting…</span>
         </div>
       </div>
-      <div class="status-indicator"></div>
+      <button id="btn-settings" class="icon-btn" title="Settings">⚙</button>
     </header>
 
-    <div class="action-card">
-      <button id="btn-scan" class="btn-primary">⚡ Scan Current Email</button>
+    <!-- Connection problem / setup needed -->
+    <div id="setup-notice" class="notice hidden">
+      <div id="setup-message">PhishLens backend is not reachable.</div>
+      <button id="btn-open-settings" class="btn-secondary full">Open settings</button>
     </div>
 
-    <div id="loading" class="loading hidden">
-      <div class="spinner"></div>
-      <span>Analyzing headers & threat intelligence...</span>
-    </div>
-
-    <div id="result-card" class="result-card hidden">
-      <div class="verdict-header">
-        <span id="badge-verdict" class="badge">SAFE</span>
-        <span id="risk-score" class="risk-score">0% Risk</span>
+    <!-- Compact summary: the popup deliberately shows only headline counts. -->
+    <div id="summary" class="hidden">
+      <div class="counts">
+        <div class="count-row high">
+          <span class="count-label">High risk</span>
+          <span class="count-value" id="count-high">0</span>
+        </div>
+        <div class="count-row suspicious">
+          <span class="count-label">Suspicious</span>
+          <span class="count-value" id="count-suspicious">0</span>
+        </div>
+        <div class="count-row safe">
+          <span class="count-label">Legitimate</span>
+          <span class="count-value" id="count-safe">0</span>
+        </div>
       </div>
 
-      <div class="info-row">
-        <strong>Sender:</strong> <span id="txt-sender">-</span>
-      </div>
-      <div class="info-row">
-        <strong>Subject:</strong> <span id="txt-subject">-</span>
+      <div class="meta-row">
+        <span>Quarantined <strong id="count-quarantined">0</strong></span>
+        <span>Awaiting review <strong id="count-review">0</strong></span>
       </div>
 
-      <!-- Why is this dangerous? Section -->
-      <div class="why-section">
-        <h4>Why is this dangerous?</h4>
-        <ul id="why-list" class="why-list">
-          <li>No threat anomalies detected. Email appears safe.</li>
+      <div class="recent-section">
+        <div class="section-title">Recent detections</div>
+        <ul id="recent-list" class="recent-list">
+          <li class="empty">No messages analyzed yet.</li>
         </ul>
       </div>
+    </div>
 
-      <div class="action-buttons">
-        <button id="btn-report" class="btn-secondary">🚨 Report to SOC</button>
-        <button id="btn-dashboard" class="btn-secondary">📊 Open SOC Console</button>
-      </div>
+    <div class="footer">
+      <button id="btn-more-info" class="btn-primary full">More info →</button>
+      <button id="btn-web-console" class="link-btn">Desktop app not installed? Open web console</button>
     </div>
   </div>
   <script src="config.js"></script>

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>PhishLens — Console unavailable</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #0a0a0f;
+      color: #f8fafc;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .card {
+      max-width: 620px;
+      padding: 32px;
+      background-color: #131b2e;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+    }
+    h1 { margin: 0 0 6px 0; font-size: 1.3rem; }
+    p { color: #94a3b8; font-size: 0.86rem; line-height: 1.6; }
+    code {
+      display: block;
+      background-color: #0d1322;
+      border: 1px solid #1e293b;
+      border-radius: 5px;
+      padding: 10px 12px;
+      margin: 6px 0 14px 0;
+      color: #38bdf8;
+      font-size: 0.8rem;
+    }
+    .reason { color: #f59e0b; font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>PhishLens console is not reachable</h1>
+    <p class="reason" id="reason"></p>
+    <p>
+      The desktop application is a shell around the PhishLens SOC console. It needs
+      the PhishLens backend and dashboard running before it can display anything.
+      From the repository root:
+    </p>
+    <code>start-all.bat</code>
+    <p>Or start each service directly:</p>
+    <code>cd phishlens-backend &amp;&amp; node server.js</code>
+    <code>cd phishlens-dashboard &amp;&amp; npx vite --port 3005</code>
+    <p>Close and reopen PhishLens once those are running.</p>
+  </div>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const reason = params.get('reason');
+    const dashboard = params.get('dashboard');
+    document.getElementById('reason').textContent = reason
+      ? `Could not load ${dashboard || 'the console'} (${reason}).`
+      : '';
+  </script>
+</body>
+</html>

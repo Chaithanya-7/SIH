@@ -86,11 +86,39 @@ export default function Dashboard() {
     }
   };
 
+  const [deepLinkCaseId, setDeepLinkCaseId] = useState(null);
+
   useEffect(() => {
     loadData();
     const interval = setInterval(loadData, 4000);
     return () => clearInterval(interval);
   }, []);
+
+  // When running inside the installed PhishLens desktop application, a
+  // phishlens:// deep link (e.g. the browser extension's "More info" button)
+  // arrives here and selects what the analyst asked to see.
+  useEffect(() => {
+    if (!window.phishlens?.onNavigate) return undefined;
+    return window.phishlens.onNavigate(target => {
+      if (target?.route === 'case' && target.caseId) {
+        setActiveNav('investigations');
+        setDeepLinkCaseId(target.caseId);
+      } else {
+        setActiveNav('overview');
+      }
+    });
+  }, []);
+
+  // The deep link can arrive before the case list has loaded, so resolve it
+  // against cases as soon as they are available.
+  useEffect(() => {
+    if (!deepLinkCaseId) return;
+    const match = cases.find(c => c.case_id === deepLinkCaseId);
+    if (match) {
+      setSelectedCase(match);
+      setDeepLinkCaseId(null);
+    }
+  }, [cases, deepLinkCaseId]);
 
   const totalThreats = cases.length;
   const highRiskCount = cases.filter(c => c.detection?.verdict === 'HIGH_RISK').length;
