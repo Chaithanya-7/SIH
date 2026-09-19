@@ -15,7 +15,7 @@ const ThreatObject = require('../models/ThreatObject');
 
 async function runGmailTestSuite() {
     console.log('='.repeat(75));
-    console.log('🧪 SECUREMAIL AI — GOOGLE AUTH + ORG + GMAIL INGESTION TEST SUITE (GMAIL-A to GMAIL-L)');
+    console.log('🧪 PHISHLENS — GOOGLE AUTH + ORG + GMAIL INGESTION TEST SUITE (GMAIL-A to GMAIL-L)');
     console.log('='.repeat(75));
 
     const results = {};
@@ -39,7 +39,7 @@ async function runGmailTestSuite() {
 
         results['GMAIL-A'] = {
             status: passA ? 'PASS' : 'FAIL',
-            details: `Google ID verified -> SecureMail Session Token: ${sessionToken.substring(0, 15)}... | User ID: ${retrievedUser ? retrievedUser.id : 'N/A'}`
+            details: `Google ID verified -> PhishLens Session Token: ${sessionToken.substring(0, 15)}... | User ID: ${retrievedUser ? retrievedUser.id : 'N/A'}`
         };
     } catch (err) {
         results['GMAIL-A'] = { status: 'FAIL', details: err.message };
@@ -228,7 +228,7 @@ async function runGmailTestSuite() {
     // GMAIL-G: Pub/Sub Webhook Security
     // ------------------------------------------------------------------
     try {
-        const validSecret = process.env.PUBSUB_SECRET || 'securemail_pubsub_secret_2026';
+        const validSecret = process.env.PUBSUB_SECRET || 'phishlens_pubsub_secret_2026';
         const { user: testUserG } = userManager.findOrCreateFromGoogleProfile({ email: 'webhook@acme.com', googleAccountId: 'g-webhook', name: 'Webhook User' });
 
         mailboxConnectionManager.saveConnection({

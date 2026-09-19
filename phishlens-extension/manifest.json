@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "SecureMail AI — Threat Shield",
+  "name": "PhishLens — Threat Shield",
   "version": "1.0.0",
   "description": "Real-time AI email threat detection, executive spoof guard & forensic intelligence",
   "permissions": [
@@ -12,7 +12,7 @@
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "SecureMail AI Shield"
+    "default_title": "PhishLens Shield"
   },
   "background": {
     "service_worker": "background.js"

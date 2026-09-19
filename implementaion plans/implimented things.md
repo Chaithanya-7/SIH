@@ -69,3 +69,15 @@ This file tracks completed implementation work. It is updated as each verified i
 ### Known verification limitation
 
 - The repository does not currently have installed Node dependencies. The dashboard build cannot run until dependencies are installed (`tsc` and `smtp-server` were unavailable locally).
+
+## 2026-09-19 — Checkpoint push and project rename
+
+- Verified and committed the 2026-09-17 security/ingestion/NLP/attachment work that had never been committed or pushed (`git log` showed only the original "Initial commit"). Re-ran `node --check` on every changed backend file and `npm run build` on the dashboard before committing; both passed. Pushed to `origin/main` on `https://github.com/mdyounus-git/PhishLens.git` (first push — the remote branch did not exist yet).
+- Renamed the placeholder `my-product-backend` / `my-product-dashboard` / `my-product-extension` directories to `phishlens-backend` / `phishlens-dashboard` / `phishlens-extension` via `git mv`, and updated every reference: `start-all.bat` paths, both `package.json` names, both `package-lock.json` names, the dashboard `<title>`, and the extension's `manifest.json`, `config.js` (`SECUREMAIL_CONFIG` → `PHISHLENS_CONFIG`), `background.js`, `popup.js`, and `popup.html`.
+- Rebranded remaining "SecureMail" strings in the backend `scratch/` dev test scripts (log labels only; these scripts are not part of the runtime pipeline).
+- Removed the stale "Sublime Dashboard: http://localhost:3000" line from `start-all.bat` — no `sublime-platform` service exists in this repository, so the line was misleading.
+- Re-verified after the rename: backend boots cleanly on a test port (loads persisted case/remediation/graph state, SMTP/IMAP correctly report disabled), and the dashboard `npm run build` still succeeds.
+
+### Next architectural gap (not yet started)
+
+- `DETECTION_PROVIDER` is still hardcoded to `sublime` with no local Sublime service in this repository — every ingestion path still calls out to an external, unconfigured detection dependency for MQL/rule matching (`mqlBridge.js` only normalizes a Sublime response; it does not run its own rules). This is the single largest remaining gap against the master plan's Phase 3 (Detection Engine): a native, source-cited MQL/rule engine (MITRE ATT&CK, APWG, CISA, OWASP, abuse.ch/OpenPhish/PhishTank-seeded rules per the compact plan) is not yet implemented, so the platform has no working detection path without an external Sublime instance.

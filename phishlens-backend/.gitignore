@@ -1,8 +1,6 @@
 node_modules/
 .env
 data/*.json
-!data/cases.json
-!data/remediation_actions.json
 data/*.sqlite
 *.log
 npm-debug.log*

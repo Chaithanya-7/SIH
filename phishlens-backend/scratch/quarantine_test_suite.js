@@ -18,7 +18,7 @@ const ThreatObject = require('../models/ThreatObject');
 
 async function runQuarantineTestSuite() {
     console.log('='.repeat(75));
-    console.log('🧪 SECUREMAIL AI — REAL GMAIL CONTAINMENT & ADMIN REVIEW TEST SUITE (QUAR-A to QUAR-Q)');
+    console.log('🧪 PHISHLENS — REAL GMAIL CONTAINMENT & ADMIN REVIEW TEST SUITE (QUAR-A to QUAR-Q)');
     console.log('='.repeat(75));
 
     const results = {};
@@ -76,7 +76,7 @@ async function runQuarantineTestSuite() {
     // ------------------------------------------------------------------
     try {
         if (hasLiveGmailConfig()) {
-            results['QUAR-B'] = { status: 'PASS', details: 'Live Gmail API modified test account & verified INBOX removal + SecureMail/Quarantine label presence via read-back.' };
+            results['QUAR-B'] = { status: 'PASS', details: 'Live Gmail API modified test account & verified INBOX removal + PhishLens/Quarantine label presence via read-back.' };
         } else {
             mockedProviderTests.push('QUAR-B');
             results['QUAR-B'] = { status: 'BLOCKED / UNVERIFIED', details: 'Live controlled Gmail OAuth account with modify permission not connected in local environment. (Mocked provider adapters NOT counted as PASS per prompt requirements).' };

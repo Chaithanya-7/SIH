@@ -10,8 +10,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnReport = document.getElementById('btn-report');
   const btnDashboard = document.getElementById('btn-dashboard');
 
-  const API_BASE = typeof SECUREMAIL_CONFIG !== 'undefined' ? SECUREMAIL_CONFIG.API_BASE_URL : 'http://localhost:3001';
-  const DASHBOARD_URL = typeof SECUREMAIL_CONFIG !== 'undefined' ? SECUREMAIL_CONFIG.DASHBOARD_URL : 'http://localhost:3005';
+  const API_BASE = typeof PHISHLENS_CONFIG !== 'undefined' ? PHISHLENS_CONFIG.API_BASE_URL : 'http://localhost:3001';
+  const DASHBOARD_URL = typeof PHISHLENS_CONFIG !== 'undefined' ? PHISHLENS_CONFIG.DASHBOARD_URL : 'http://localhost:3005';
 
   btnScan.addEventListener('click', () => {
     alert('ℹ️ Live Gmail integration not configured. Chrome Extension active scanning will be enabled in the upcoming Google/Gmail integration milestone.');

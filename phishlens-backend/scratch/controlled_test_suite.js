@@ -15,7 +15,7 @@ const config = require('../config');
 
 async function runTestSuite() {
     console.log('='.repeat(70));
-    console.log('🧪 SECUREMAIL AI — CONTROLLED STABILIZATION TEST SUITE (A–J)');
+    console.log('🧪 PHISHLENS — CONTROLLED STABILIZATION TEST SUITE (A–J)');
     console.log('='.repeat(70));
 
     const results = {};
