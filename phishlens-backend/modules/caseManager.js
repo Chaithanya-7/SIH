@@ -55,9 +55,24 @@ class CaseManager {
         }
 
         console.log(`[CaseManager] Saving case ${threatObject.case_id} to persistent store...`);
-        this.cases.set(threatObject.case_id, threatObject);
+        this.cases.set(threatObject.case_id, this.forStorage(threatObject));
         this.persistToDisk();
         return threatObject;
+    }
+
+    /**
+     * Cases are kept as findings, not as copies of people's mail. The raw
+     * message and the external provider's raw model are working data for the
+     * pipeline only: retaining them would store full message bodies
+     * indefinitely and grow this file without bound. The compact
+     * learning_features list is kept instead, so an analyst decision made later
+     * can still teach the adaptive model without any body text being stored.
+     */
+    forStorage(threatObject) {
+        const stored = { ...threatObject };
+        delete stored._raw_email_string;
+        delete stored._raw_data_model;
+        return stored;
     }
 
     getCase(caseId) {

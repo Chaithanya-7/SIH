@@ -9,6 +9,8 @@ class ConfidenceEngine {
         if (type === 'MQL_URL') return 'URL_RISK';
         if (type === 'MQL_ATT') return 'ATTACHMENT_RISK';
         if (type === 'MQL_BEC') return 'BEC_COMPOSITE';
+        if (type.startsWith('BEHAVIOUR_')) return 'BEHAVIOURAL';
+        if (type === 'LEARNED_PATTERN_MATCH') return 'LEARNED_PATTERN';
         return type || 'GENERAL';
     }
 
@@ -26,7 +28,15 @@ class ConfidenceEngine {
             grouped.get(family).push({ evidence, value });
         });
 
-        const caps = { AUTHENTICATION: 0.30, LANGUAGE: 0.25, CAMPAIGN: 0.25, IDENTITY: 0.25, INFRASTRUCTURE: 0.25, URL_RISK: 0.20, ATTACHMENT_RISK: 0.20, BEC_COMPOSITE: 0.35, GENERAL: 0.20 };
+        // LEARNED_PATTERN is capped deliberately low. What the system has taught
+        // itself may corroborate a case or tip a borderline one, but it must
+        // never be able to drive a HIGH_RISK verdict on its own: the
+        // deterministic, source-cited rules stay the primary authority.
+        const caps = {
+            AUTHENTICATION: 0.30, LANGUAGE: 0.25, CAMPAIGN: 0.25, IDENTITY: 0.25,
+            INFRASTRUCTURE: 0.25, URL_RISK: 0.20, ATTACHMENT_RISK: 0.20,
+            BEC_COMPOSITE: 0.35, BEHAVIOURAL: 0.25, LEARNED_PATTERN: 0.15, GENERAL: 0.20
+        };
         const contributions = [];
         let threatScore = 0;
         grouped.forEach((items, family) => {

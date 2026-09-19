@@ -17,6 +17,8 @@ const attachmentAnalyzer = require('./modules/attachmentAnalyzer');
 const iocExtractor = require('./modules/iocExtractor');
 const nlpAnalyzer = require('./modules/nlpAnalyzer');
 const ruleEngine = require('./modules/ruleEngine');
+const behavioralAnalyzer = require('./modules/behavioralAnalyzer');
+const adaptiveLearning = require('./modules/adaptiveLearning');
 const infraEnricher = require('./modules/infraEnricher');
 const evidenceFusion = require('./modules/evidenceFusion');
 const confidenceEngine = require('./modules/confidenceEngine');
@@ -136,48 +138,79 @@ async function processPipeline(emailContent, source = 'MANUAL_API', clientMessag
             description: `Email automatically ingested from ${source} (SHA-256: ${threatObject.message.raw_hash})`
         });
 
+        // ===== PREPROCESSING: per-message facts the detection layer reasons over =====
+
         // 4. Independent SPF/DKIM/DMARC authentication analysis
         threatObject = await authAnalyzer.analyze(threatObject, parsedEmail, emailContent);
 
-        // 5. Header Forensics & Trust-Aware SMTP Relay Reconstruction
-        threatObject = await forensicEngine.analyzeHeaders(threatObject);
-
-        // 6. Safe attachment metadata and hash analysis (no execution)
+        // 5. Safe attachment metadata and hash analysis (no execution)
         threatObject = attachmentAnalyzer.analyze(threatObject, parsedEmail);
 
-        // 7. IOC Extraction (IPs, Domains, URLs, Hashes)
+        // 6. IOC Extraction (IPs, Domains, URLs, Hashes)
         threatObject = iocExtractor.extract(threatObject, parsedEmail);
 
-        // 8. Explainable NLP / social-engineering signal analysis
+        // ===== DETECTION LAYER: MQL + NLP =====
+        // Initial threat determination from the message itself, before any
+        // enrichment that depends on the network or on stored history.
+
+        // 7. Explainable NLP / social-engineering signal analysis
         threatObject = nlpAnalyzer.analyze(threatObject, parsedEmail);
 
-        // 9. Native MQL / detection-rule engine (headers, auth, URLs, attachments, NLP signals)
+        // 8. Native MQL / detection-rule engine
         threatObject = ruleEngine.evaluate(threatObject, parsedEmail);
 
-        // 10. Infrastructure & Geolocation Enrichment
-        threatObject = await infraEnricher.enrich(threatObject);
+        // ===== FOUR ANALYSIS BRANCHES =====
+        // Execution order is dictated by real data dependencies, not by
+        // preference: the forensic branch selects the origin IP that both the
+        // behavioural and infrastructure branches reason about, and campaign
+        // correlation needs the enriched indicators the infrastructure branch
+        // produces. The two branches that are genuinely independent of each
+        // other are run concurrently.
 
-        // 11. Persistent Knowledge Graph & Cross-Case Campaign Correlation (SQLite)
+        // Branch 1 - Forensic engine: trust-aware SMTP relay reconstruction
+        threatObject = await forensicEngine.analyzeHeaders(threatObject);
+
+        // Branch 2 - Behavioural analysis  ]  mutually independent,
+        // Branch 3 - IOC + infrastructure  ]  so run concurrently
+        const [behavioralResult, infraResult] = await Promise.all([
+            Promise.resolve(behavioralAnalyzer.analyze(threatObject, parsedEmail)),
+            infraEnricher.enrich(threatObject)
+        ]);
+        threatObject = infraResult || behavioralResult || threatObject;
+
+        // Branch 4 - Campaign correlation across cases (persistent SQLite graph)
         threatObject = await campaignGraph.processThreatObject(threatObject);
 
-        // 12. Evidence Fusion Engine (Normalizes all findings into EvidenceObject[])
+        // ===== CONVERGENCE: fusion, scoring, decision =====
+
+        // 9. Adaptive scoring against characteristics learned from confirmed mail
+        threatObject = adaptiveLearning.score(threatObject, parsedEmail);
+
+        // 10. Evidence Fusion Engine (Normalizes all findings into EvidenceObject[])
         threatObject = evidenceFusion.fuse(threatObject);
 
-        // 13. Executive Protection Guard (VIP Target Context)
+        // 11. Executive Protection Guard (VIP Target Context)
         threatObject = executiveGuard.evaluateTarget(threatObject);
 
-        // 14. 3-Tier Confidence Calculation Engine (also determines the final verdict)
+        // 12. 3-Tier Confidence Calculation Engine (also determines the final verdict)
         threatObject = confidenceEngine.calculate(threatObject);
 
-        // 15. Contextual Policy Engine Evaluation
+        // 13. Contextual Policy Engine Evaluation
         const policyDecision = policyEngine.evaluate(threatObject);
 
-        // 16. Active Disruption & Real Remediation Lifecycle Execution
+        // 14. Active Disruption & Real Remediation Lifecycle Execution
         threatObject = await remediationEngine.executePolicyDecision(threatObject, policyDecision);
 
-        // 17. Persistent Case Storage & Deduplication Binding
+        // 15. Persistent Case Storage & Deduplication Binding
         threatObject = caseManager.saveCase(threatObject);
         dedupStore.bindCaseId(messageKey, threatObject.case_id);
+
+        // 16. Post-verdict learning. The behavioural baseline records what this
+        //     sender looks like, and a corroborated high-risk verdict teaches the
+        //     adaptive model the characteristics that made this message malicious
+        //     so later messages sharing them are recognised.
+        behavioralAnalyzer.recordObservation(threatObject, parsedEmail);
+        adaptiveLearning.learnFromDetection(threatObject, parsedEmail);
 
         console.log(`🎉 AUTOMATED PIPELINE COMPLETE! Case ID: ${threatObject.case_id} | Verdict: ${threatObject.detection.verdict} | Threat Confidence: ${threatObject.confidence.threat} | Remediation: ${threatObject.remediation.status}`);
 
@@ -202,6 +235,7 @@ app.use([
     '/api/ingest/email',
     '/api/cases',
     '/api/summary',
+    '/api/learning',
     '/api/graph',
     '/api/vips',
     '/api/audit',
@@ -391,6 +425,20 @@ app.get('/api/auth/gmail/scope-status', (req, res) => {
     });
 });
 
+/**
+ * Records an analyst's verdict as a training label.
+ *
+ * A confirmed threat is the strongest label the system can get, and a release
+ * is the correction that stops a false positive recurring. Both are learned
+ * immediately, so the next message sharing those characteristics is recognised
+ * without waiting for any retraining cycle.
+ */
+function recordAnalystDecision(caseId, label, source) {
+    const reviewedCase = caseManager.getCase(caseId);
+    if (!reviewedCase) return null;
+    return adaptiveLearning.learn(reviewedCase, null, label, source);
+}
+
 // ==================== ADMIN QUARANTINE QUEUE & REVIEW ENDPOINTS ====================
 app.get('/api/admin/quarantine', requireRole('ADMIN'), (req, res) => {
     try {
@@ -434,10 +482,16 @@ app.post('/api/admin/quarantine/:caseId/release', requireRole('ADMIN'), async (r
         }
 
         const result = await remediationEngine.releaseCase(caseId, req.user, decisionReason, note);
-        res.json({ success: true, ...result });
+        res.json({ success: true, ...result, learning: recordAnalystDecision(caseId, 'benign', 'ANALYST_RELEASED') });
     } catch (e) {
+        // Whether the mailbox could be reached is an operational matter; the
+        // analyst's judgement that this message was legitimate is a fact about
+        // the message either way, and is the single most valuable correction
+        // the system can receive. Losing it because an OAuth token was missing
+        // would mean the same false positive recurs forever.
+        const learned = recordAnalystDecision(req.params.caseId, 'benign', 'ANALYST_RELEASED');
         const statusCode = e.message.includes('Insufficient permissions') || e.message.includes('Access denied') ? 403 : 400;
-        res.status(statusCode).json({ success: false, error: e.message });
+        res.status(statusCode).json({ success: false, error: e.message, learning: learned });
     }
 });
 
@@ -447,10 +501,11 @@ app.post('/api/admin/quarantine/:caseId/confirm-threat', requireRole('ADMIN'), a
         const { decisionReason, note } = req.body;
 
         const result = await remediationEngine.confirmThreat(caseId, req.user, decisionReason || 'CONFIRMED_THREAT', note);
-        res.json({ success: true, ...result });
+        res.json({ success: true, ...result, learning: recordAnalystDecision(caseId, 'malicious', 'ANALYST_CONFIRMED') });
     } catch (e) {
+        const learned = recordAnalystDecision(req.params.caseId, 'malicious', 'ANALYST_CONFIRMED');
         const statusCode = e.message.includes('Insufficient permissions') || e.message.includes('Access denied') ? 403 : 400;
-        res.status(statusCode).json({ success: false, error: e.message });
+        res.status(statusCode).json({ success: false, error: e.message, learning: learned });
     }
 });
 
@@ -647,6 +702,20 @@ app.get('/api/summary', (req, res) => {
         awaiting_review: awaitingReview,
         recent: latest,
         generated_at: new Date().toISOString()
+    });
+});
+
+/**
+ * What the system has taught itself. Exposed so the adaptive layer can be
+ * inspected and audited rather than taken on trust: which characteristics it
+ * associates with malicious mail, how strongly, and from how many examples.
+ */
+app.get('/api/learning', (req, res) => {
+    res.json({
+        success: true,
+        adaptive: adaptiveLearning.getStats(),
+        top_learned_indicators: adaptiveLearning.getTopIndicators(25),
+        behavioral: behavioralAnalyzer.getStats()
     });
 });
 

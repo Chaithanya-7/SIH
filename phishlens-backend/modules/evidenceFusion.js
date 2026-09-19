@@ -6,7 +6,6 @@ class EvidenceFusion {
 
         const evidenceList = [];
         const auth = threatObject.forensics?.authentication || {};
-        const rawDataModel = threatObject._raw_data_model || {};
         const originIp = threatObject.infrastructure?.origin_ip || threatObject.infrastructure?.origin?.origin_ip || 'N/A';
 
         // 1. Authentication Anomaly Evidence
@@ -150,6 +149,38 @@ class EvidenceFusion {
                 provenance: { source_type: 'MQL_RULE', source_reference: rule.id }
             }));
         });
+
+        // 8. Behavioural evidence: how this message compares to what this
+        //    deployment has actually observed from this sender before.
+        (threatObject.behavioral?.signals || []).forEach(signal => {
+            evidenceList.push(new EvidenceObject({
+                evidence_type: `BEHAVIOUR_${signal.type}`,
+                source: 'PHISHLENS_BEHAVIOURAL_BASELINE',
+                finding: signal.type.replace(/_/g, ' '),
+                severity: signal.severity,
+                confidence: signal.confidence,
+                explanation: `${signal.explanation} ${threatObject.behavioral.limitation}`,
+                provenance: { source_type: 'OBSERVED_SENDER_HISTORY', source_reference: threatObject.message?.sender || 'sender' }
+            }));
+        });
+
+        // 9. Adaptive evidence: characteristics this installation has learned
+        //    from mail previously confirmed malicious or legitimate. Reported as
+        //    one corroborating signal with its strongest contributing
+        //    characteristics named, never as a standalone verdict.
+        const adaptive = threatObject.adaptive;
+        if (adaptive?.status === 'SCORED' && adaptive.score >= 0.65 && adaptive.contributions.length > 0) {
+            const top = adaptive.contributions.slice(0, 4).map(c => c.characteristic).join(', ');
+            evidenceList.push(new EvidenceObject({
+                evidence_type: 'LEARNED_PATTERN_MATCH',
+                source: 'PHISHLENS_ADAPTIVE_LEARNING',
+                finding: `Message shares ${adaptive.matched_characteristics} characteristic(s) with previously confirmed malicious mail`,
+                severity: adaptive.score >= 0.85 ? 'HIGH' : 'MEDIUM',
+                confidence: adaptive.score,
+                explanation: `Strongest learned characteristics present: ${top}. Learned from ${adaptive.learned_from.malicious} confirmed malicious and ${adaptive.learned_from.legitimate} confirmed legitimate message(s) on this system. ${adaptive.limitation}`,
+                provenance: { source_type: 'LOCAL_ADAPTIVE_MODEL', source_reference: adaptive.engine }
+            }));
+        }
 
         threatObject.evidence = evidenceList;
         return threatObject;

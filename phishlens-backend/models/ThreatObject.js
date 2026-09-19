@@ -78,6 +78,24 @@ class ThreatObject {
             limitation: 'No language analysis has been performed.'
         };
         this.attachments = data.attachments || [];
+        this.behavioral = data.behavioral || {
+            status: 'NOT_ANALYZED',
+            engine: null,
+            known_sender: false,
+            messages_seen_from_sender: 0,
+            signals: [],
+            limitation: 'No behavioural comparison has been performed.'
+        };
+        this.adaptive = data.adaptive || {
+            status: 'NOT_SCORED',
+            engine: null,
+            learned_from: { malicious: 0, legitimate: 0 },
+            score: 0,
+            contributions: [],
+            limitation: 'No adaptive scoring has been performed.'
+        };
+        /** Compact characteristics captured for later learning; never message body text. */
+        this.learning_features = data.learning_features || [];
         this.forensics = {
             authentication: data.forensics?.authentication || { spf: 'unknown', dkim: 'unknown', dmarc: 'unknown' },
             smtp_relay: data.forensics?.smtp_relay || []
