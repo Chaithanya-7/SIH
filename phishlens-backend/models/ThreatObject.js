@@ -18,11 +18,13 @@ class ThreatObject {
         // 1. Detection Verdict (SAFE, SUSPICIOUS, HIGH_RISK)
         this.detection = {
             verdict: data.detection?.verdict || 'UNKNOWN',
-            provider: data.detection?.provider || 'sublime',
-            verification_status: data.detection?.verification_status || (data.detection?.provider === 'DEVELOPMENT_FALLBACK' ? 'DEVELOPMENT / NOT SUBLIME VERIFIED' : 'SUBLIME_MQL_VERIFIED'),
+            provider: data.detection?.provider || 'PHISHLENS_NATIVE_MQL',
+            verification_status: data.detection?.verification_status || 'PENDING_NATIVE_ANALYSIS',
             is_dev_fallback: data.detection?.is_dev_fallback || false,
             matched_rules: data.detection?.matched_rules || [],
-            signals: data.detection?.signals || []
+            signals: data.detection?.signals || [],
+            rule_engine: data.detection?.rule_engine || null,
+            external_provider_result: data.detection?.external_provider_result || { attempted: false, provider: null, status: 'NOT_CONFIGURED' }
         };
 
         // 2. Mailbox Status (INBOX, CONTAINMENT_REQUESTED, QUARANTINED, RELEASE_REQUESTED, RELEASED, ACTION_FAILED, UNKNOWN)

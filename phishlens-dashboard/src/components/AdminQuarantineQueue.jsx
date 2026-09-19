@@ -212,7 +212,6 @@ export default function AdminQuarantineQueue({ currentUser, currentOrg, onRefres
                 const isReleased = c.mailbox?.status === 'RELEASED';
                 const isConfirmed = c.review?.status === 'CONFIRMED_THREAT';
                 const isFailed = c.mailbox?.status === 'ACTION_FAILED';
-                const isDevFallback = c.detection?.is_dev_fallback || c.detection?.verification_status?.includes('DEVELOPMENT');
 
                 return (
                   <tr key={c.case_id} style={{ borderBottom: '1px solid #1e293b' }}>
@@ -243,8 +242,8 @@ export default function AdminQuarantineQueue({ currentUser, currentOrg, onRefres
                       </span>
                     </td>
                     <td style={{ padding: '10px 14px' }}>
-                      <span style={{ color: isDevFallback ? '#f59e0b' : c.provider_action?.status === 'PROVIDER_CONFIRMED' ? '#10b981' : '#64748b', fontSize: '0.7rem' }}>
-                        {isDevFallback ? 'NOT SUBLIME VERIFIED' : (c.provider_action?.status || 'NOT_REQUESTED')}
+                      <span style={{ color: c.provider_action?.status === 'PROVIDER_CONFIRMED' ? '#10b981' : '#64748b', fontSize: '0.7rem' }}>
+                        {c.provider_action?.status || 'NOT_REQUESTED'}
                       </span>
                     </td>
                     <td style={{ padding: '10px 14px', textAlign: 'right' }}>

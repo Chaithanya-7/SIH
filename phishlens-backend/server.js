@@ -9,11 +9,14 @@ const detectionAdapter = require('./adapters/detectionAdapter');
 const mailIngestionAdapter = require('./adapters/mailIngestionAdapter');
 
 // P0 & P1 Modules Pipeline
+const emailParser = require('./modules/emailParser');
 const mqlBridge = require('./modules/mqlBridge');
+const authAnalyzer = require('./modules/authAnalyzer');
 const forensicEngine = require('./modules/forensicEngine');
 const attachmentAnalyzer = require('./modules/attachmentAnalyzer');
 const iocExtractor = require('./modules/iocExtractor');
 const nlpAnalyzer = require('./modules/nlpAnalyzer');
+const ruleEngine = require('./modules/ruleEngine');
 const infraEnricher = require('./modules/infraEnricher');
 const evidenceFusion = require('./modules/evidenceFusion');
 const confidenceEngine = require('./modules/confidenceEngine');
@@ -114,11 +117,16 @@ async function processPipeline(emailContent, source = 'MANUAL_API', clientMessag
             }
         }
 
-        // 1. Detection Layer via Adapter (Sublime/MQL)
+        // 1. Independent MIME parsing (headers, body, attachments) - owned entirely by
+        //    PhishLens, no external service required.
+        const parsedEmail = await emailParser.parse(emailContent);
+
+        // 2. Optional supplementary external provider (never a hard dependency - see
+        //    adapters/detectionAdapter.js). Defaults to skipped (DETECTION_PROVIDER=native).
         const detectionResult = await detectionAdapter.analyze(encodedMessage);
 
-        // 2. Bridge & Canonical ThreatObject Initialization
-        let threatObject = mqlBridge.normalize(detectionResult, emailContent);
+        // 3. Canonical ThreatObject Initialization from PhishLens' own parsed email
+        let threatObject = mqlBridge.normalize(parsedEmail, detectionResult, emailContent);
 
         // Audit ingestion
         auditLogger.log({
@@ -128,40 +136,46 @@ async function processPipeline(emailContent, source = 'MANUAL_API', clientMessag
             description: `Email automatically ingested from ${source} (SHA-256: ${threatObject.message.raw_hash})`
         });
 
-        // 3. Header Forensics & Trust-Aware SMTP Relay Reconstruction
+        // 4. Independent SPF/DKIM/DMARC authentication analysis
+        threatObject = await authAnalyzer.analyze(threatObject, parsedEmail, emailContent);
+
+        // 5. Header Forensics & Trust-Aware SMTP Relay Reconstruction
         threatObject = await forensicEngine.analyzeHeaders(threatObject);
 
-        // 4. Safe attachment metadata and hash analysis (no execution)
-        threatObject = attachmentAnalyzer.analyze(threatObject);
+        // 6. Safe attachment metadata and hash analysis (no execution)
+        threatObject = attachmentAnalyzer.analyze(threatObject, parsedEmail);
 
-        // 5. IOC Extraction (IPs, Domains, URLs, Hashes)
-        threatObject = iocExtractor.extract(threatObject);
+        // 7. IOC Extraction (IPs, Domains, URLs, Hashes)
+        threatObject = iocExtractor.extract(threatObject, parsedEmail);
 
-        // 6. Explainable NLP / social-engineering signal analysis
-        threatObject = nlpAnalyzer.analyze(threatObject);
+        // 8. Explainable NLP / social-engineering signal analysis
+        threatObject = nlpAnalyzer.analyze(threatObject, parsedEmail);
 
-        // 6. Infrastructure & Geolocation Enrichment
+        // 9. Native MQL / detection-rule engine (headers, auth, URLs, attachments, NLP signals)
+        threatObject = ruleEngine.evaluate(threatObject, parsedEmail);
+
+        // 10. Infrastructure & Geolocation Enrichment
         threatObject = await infraEnricher.enrich(threatObject);
 
-        // 7. Persistent Knowledge Graph & Cross-Case Campaign Correlation (SQLite)
+        // 11. Persistent Knowledge Graph & Cross-Case Campaign Correlation (SQLite)
         threatObject = await campaignGraph.processThreatObject(threatObject);
 
-        // 8. Evidence Fusion Engine (Normalizes all findings into EvidenceObject[])
+        // 12. Evidence Fusion Engine (Normalizes all findings into EvidenceObject[])
         threatObject = evidenceFusion.fuse(threatObject);
 
-        // 9. Executive Protection Guard (VIP Target Context)
+        // 13. Executive Protection Guard (VIP Target Context)
         threatObject = executiveGuard.evaluateTarget(threatObject);
 
-        // 10. 3-Tier Confidence Calculation Engine
+        // 14. 3-Tier Confidence Calculation Engine (also determines the final verdict)
         threatObject = confidenceEngine.calculate(threatObject);
 
-        // 11. Contextual Policy Engine Evaluation
+        // 15. Contextual Policy Engine Evaluation
         const policyDecision = policyEngine.evaluate(threatObject);
 
-        // 12. Active Disruption & Real Remediation Lifecycle Execution
+        // 16. Active Disruption & Real Remediation Lifecycle Execution
         threatObject = await remediationEngine.executePolicyDecision(threatObject, policyDecision);
 
-        // 13. Persistent Case Storage & Deduplication Binding
+        // 17. Persistent Case Storage & Deduplication Binding
         threatObject = caseManager.saveCase(threatObject);
         dedupStore.bindCaseId(messageKey, threatObject.case_id);
 
@@ -510,31 +524,34 @@ app.post('/api/webhooks/gmail', async (req, res) => {
 
 // ==================== HEALTH & METRICS ====================
 app.get('/api/health', async (req, res) => {
-    let detectionStatus = 'UNAVAILABLE';
-    try {
-        const probeRes = await axios.get(`${config.detection.endpoint}/v1/health`, { timeout: 2500 });
-        if (probeRes.status === 200) {
-            detectionStatus = 'READY';
+    // The native MQL/NLP/forensics detection path requires no external service
+    // and is therefore always ready. An external provider, if configured, is
+    // separately probed as optional supplementary enrichment.
+    const nativeDetectionStatus = 'READY';
+    let externalProviderStatus = 'NOT_CONFIGURED';
+
+    if (config.detection.provider === 'sublime') {
+        try {
+            const probeRes = await axios.get(`${config.detection.endpoint}/v1/health`, { timeout: 2500 });
+            externalProviderStatus = probeRes.status === 200 ? 'READY' : 'UNAVAILABLE';
+        } catch (e) {
+            externalProviderStatus = 'UNAVAILABLE';
         }
-    } catch (e) {
-        detectionStatus = process.env.DEV_DETECTION_FALLBACK === 'true' ? 'UNAVAILABLE (DEV FALLBACK ACTIVE)' : 'UNAVAILABLE';
     }
 
-    const overallStatus = detectionStatus === 'READY' ? 'OPERATIONAL' : 'DEGRADED';
-
     res.json({
-        status: overallStatus,
+        status: 'OPERATIONAL',
         services: {
             backend: 'READY',
-            detection: detectionStatus,
+            nativeDetection: nativeDetectionStatus,
+            externalDetectionProvider: externalProviderStatus,
             database: 'READY',
             ingestion: 'ACTIVE',
             remediation: (process.env.REMEDIATION_MODE || 'simulation').toUpperCase()
         },
         dedupMetrics: dedupStore.getStats(),
         mailboxProvider: process.env.MAILBOX_PROVIDER || 'gmail',
-        detectionProvider: config.detection.provider,
-        devDetectionFallback: process.env.DEV_DETECTION_FALLBACK === 'true'
+        detectionProvider: config.detection.provider
     });
 });
 

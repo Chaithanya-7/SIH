@@ -135,6 +135,22 @@ class EvidenceFusion {
             });
         }
 
+        // 7. Native MQL Rule Engine Evidence (modules/ruleEngine.js). Each rule cites
+        //    its own public source; that source is carried through into the evidence
+        //    explanation so an analyst can audit why a rule exists, not just that it fired.
+        const matchedRules = threatObject.detection?.matched_rules || [];
+        matchedRules.forEach(rule => {
+            evidenceList.push(new EvidenceObject({
+                evidence_type: `MQL_${rule.category}`,
+                source: 'PHISHLENS_MQL_ENGINE',
+                finding: rule.name,
+                severity: rule.severity,
+                confidence: rule.confidence,
+                explanation: `${rule.matched_because} (Rule ${rule.id}; source: ${rule.source})`,
+                provenance: { source_type: 'MQL_RULE', source_reference: rule.id }
+            }));
+        });
+
         threatObject.evidence = evidenceList;
         return threatObject;
     }

@@ -18,7 +18,12 @@ class AttachmentAnalyzer {
         return match ? decodeURIComponent(match[1].trim()).replace(/[\\/:*?"<>|]/g, '_').slice(0, 255) : 'unnamed-attachment';
     }
 
-    analyze(threatObject) {
+    extensionOf(fileName) {
+        return (fileName.match(/\.([a-z0-9]{1,12})$/i)?.[1] || '').toLowerCase();
+    }
+
+    /** Fallback hand-rolled boundary parser, used only if parsedEmail (mailparser) was not supplied. */
+    analyzeFromRawString(threatObject) {
         const raw = threatObject._raw_email_string || '';
         const topHeaders = this.parseHeaders(raw.split(/\r?\n\r?\n/, 1)[0] || '');
         const boundaryMatch = /boundary=(?:"([^"]+)"|([^;\s]+))/i.exec(topHeaders['content-type'] || '');
@@ -42,10 +47,9 @@ class AttachmentAnalyzer {
             const isBase64 = /base64/i.test(headers['content-transfer-encoding'] || '');
             const bytes = isBase64 ? Buffer.from(encodedBody.replace(/\s/g, ''), 'base64') : Buffer.from(encodedBody, 'utf8');
             const fileName = this.filename(headers);
-            const extension = (fileName.match(/\.([a-z0-9]{1,12})$/i)?.[1] || '').toLowerCase();
             attachments.push({
                 file_name: fileName,
-                extension: extension || null,
+                extension: this.extensionOf(fileName) || null,
                 mime_type: (headers['content-type'] || 'application/octet-stream').split(';')[0].trim().toLowerCase(),
                 size_bytes: bytes.length,
                 sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
@@ -56,6 +60,28 @@ class AttachmentAnalyzer {
         }
 
         threatObject.attachments = attachments;
+        return threatObject;
+    }
+
+    analyze(threatObject, parsedEmail) {
+        if (!parsedEmail) {
+            return this.analyzeFromRawString(threatObject);
+        }
+
+        threatObject.attachments = (parsedEmail.attachments || []).map(a => {
+            const fileName = (a.filename || 'unnamed-attachment').replace(/[\\/:*?"<>|]/g, '_').slice(0, 255);
+            return {
+                file_name: fileName,
+                extension: this.extensionOf(fileName) || null,
+                mime_type: a.contentType,
+                size_bytes: a.size || a.content.length,
+                sha256: crypto.createHash('sha256').update(a.content).digest('hex'),
+                content_transfer_encoding: a.contentTransferEncoding,
+                analysis_status: 'METADATA_ONLY',
+                limitation: 'The attachment was not opened or executed; only MIME metadata and a content hash were analyzed.'
+            };
+        });
+
         return threatObject;
     }
 }

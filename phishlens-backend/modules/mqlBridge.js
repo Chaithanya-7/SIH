@@ -1,91 +1,80 @@
 const ThreatObject = require('../models/ThreatObject');
 const crypto = require('crypto');
 
+/**
+ * Builds the canonical PhishLens ThreatObject.
+ *
+ * The message identity fields (sender/recipient/subject/date/message-id) come
+ * from PhishLens' own independent MIME parsing (emailParser.js), not from an
+ * external detection provider's response - the pipeline must produce a
+ * correct, populated ThreatObject even when no external provider is
+ * configured or reachable. If an optional external provider (e.g. Sublime)
+ * was called and returned a result, that result is recorded as informational
+ * `external_provider_result` metadata for analyst comparison, but it does not
+ * replace or gate PhishLens' own parsing.
+ */
 class MQLBridge {
-    normalize(detectionResult, rawEmailString) {
-        console.log('[MQLBridge] Normalizing raw detection data into canonical PhishLens ThreatObject...');
+    normalize(parsedEmail, detectionResult, rawEmailString) {
+        console.log('[MQLBridge] Building canonical PhishLens ThreatObject from independently parsed email...');
 
-        const rawData = (detectionResult && detectionResult.rawResponse) ? detectionResult.rawResponse : (detectionResult || {});
-        const dataModel = rawData.data_model || {};
-        const preview = rawData.preview || {};
-
-        // Explicit Fallback & Provider Verification Check
-        const isDevFallback = !!(detectionResult.isDevFallback || rawData.is_dev_fallback);
-        const providerName = isDevFallback ? 'DEVELOPMENT_FALLBACK' : 'sublime';
-        const verificationStatus = isDevFallback ? 'DEVELOPMENT / NOT SUBLIME VERIFIED' : 'SUBLIME_MQL_VERIFIED';
-
-        // Compute SHA-256 hash of raw email for integrity & evidence provenance
         const rawHash = crypto.createHash('sha256').update(rawEmailString || '').digest('hex');
 
-        // Extract Sender
-        const senderEmail = dataModel.sender?.email?.email || preview.sender_email_address || 'unknown@domain.com';
-        const senderName = dataModel.sender?.display_name || preview.sender_display_name || '';
+        const senderEmail = parsedEmail.from?.address || 'unknown@domain.com';
+        const senderName = parsedEmail.from?.name || '';
         const formattedSender = senderName ? `${senderName} <${senderEmail}>` : senderEmail;
+        const recipients = parsedEmail.to && parsedEmail.to.length ? parsedEmail.to.join(', ') : '';
 
-        // Extract Recipients
-        const recipients = preview.recipients || (dataModel.recipients?.to || []).map(r => r.email?.email).filter(Boolean);
+        const externalProvider = this.summarizeExternalProvider(detectionResult);
 
-        // Extract Subject
-        const subject = dataModel.subject?.subject || preview.subject || '(No Subject)';
-
-        // Extract Authentication Results from Hop 0 if available
-        const hops = dataModel.headers?.hops || [];
-        const firstHopAuth = hops[0]?.authentication_results || {};
-        const auth = {
-            spf: firstHopAuth.spf || 'unknown',
-            dkim: firstHopAuth.dkim || 'unknown',
-            dmarc: firstHopAuth.dmarc || 'unknown'
-        };
-
-        // Extract Matched Rules & Signals when provided
-        const rawMatchedRules = rawData.matched_rules || rawData.flagged_rules || [];
-        const matchedRules = Array.isArray(rawMatchedRules) 
-            ? rawMatchedRules.map(r => typeof r === 'string' ? r : (r.name || r.rule_name || r.id || JSON.stringify(r)))
-            : [];
-
-        const rawSignals = rawData.signals || rawData.tags || [];
-        const signals = Array.isArray(rawSignals) ? [...rawSignals] : [];
-
-        if (auth.spf === 'fail' && !signals.includes('spf_fail')) signals.push('spf_fail');
-        if (auth.dkim === 'fail' && !signals.includes('dkim_fail')) signals.push('dkim_fail');
-        if (auth.dmarc === 'fail' && !signals.includes('dmarc_fail')) signals.push('dmarc_fail');
-
-        const rawVerdict = (rawData.status || rawData.verdict || '').toUpperCase();
-        let verdict = 'SAFE';
-        if (rawVerdict === 'FLAGGED' || rawVerdict === 'MALICIOUS' || rawVerdict === 'HIGH_RISK') {
-            verdict = 'HIGH_RISK';
-        } else if (rawVerdict === 'SUSPICIOUS' || matchedRules.length > 0 || signals.length > 0) {
-            verdict = 'SUSPICIOUS';
-        } else if (rawVerdict) {
-            verdict = rawVerdict;
-        }
-
-        // Instantiate canonical PhishLens ThreatObject
         const threatObject = new ThreatObject({
             message: {
                 sender: formattedSender,
-                recipient: Array.isArray(recipients) ? recipients.join(', ') : recipients,
-                subject: subject,
+                recipient: recipients,
+                subject: parsedEmail.subject || '(No Subject)',
                 raw_hash: rawHash,
-                delivered_at: rawData.created_at || new Date().toISOString()
+                delivered_at: parsedEmail.date || new Date().toISOString()
             },
             detection: {
-                verdict: verdict,
-                provider: providerName,
-                verification_status: verificationStatus,
-                is_dev_fallback: isDevFallback,
-                matched_rules: matchedRules,
-                signals: signals
+                verdict: 'UNKNOWN',
+                provider: 'PHISHLENS_NATIVE_MQL',
+                verification_status: 'PENDING_NATIVE_ANALYSIS',
+                is_dev_fallback: false,
+                matched_rules: [],
+                signals: [],
+                external_provider_result: externalProvider
             },
             forensics: {
-                authentication: auth,
+                authentication: { spf: 'unknown', dkim: 'unknown', dmarc: 'unknown' },
                 smtp_relay: []
             },
-            _raw_data_model: dataModel,
+            _raw_data_model: (detectionResult && detectionResult.rawResponse && detectionResult.rawResponse.data_model) || {},
             _raw_email_string: rawEmailString
         });
 
         return threatObject;
+    }
+
+    /** External providers (e.g. Sublime), when configured, are informational only - see adapters/detectionAdapter.js. */
+    summarizeExternalProvider(detectionResult) {
+        if (!detectionResult) {
+            return { attempted: false, provider: null, status: 'NOT_CONFIGURED' };
+        }
+
+        const rawData = detectionResult.rawResponse || {};
+        const rawMatchedRules = rawData.matched_rules || rawData.flagged_rules || [];
+        const matchedRules = Array.isArray(rawMatchedRules)
+            ? rawMatchedRules.map(r => typeof r === 'string' ? r : (r.name || r.rule_name || r.id || JSON.stringify(r)))
+            : [];
+
+        return {
+            attempted: true,
+            provider: detectionResult.isDevFallback ? 'DEVELOPMENT_FALLBACK' : 'sublime',
+            status: detectionResult.success ? 'RESPONDED' : 'UNAVAILABLE',
+            verification_status: detectionResult.verificationStatus || null,
+            claimed_verdict: rawData.status || rawData.verdict || null,
+            claimed_matched_rules: matchedRules,
+            note: 'Informational cross-check only. PhishLens\' own scored verdict and evidence never depend on this external provider.'
+        };
     }
 }
 

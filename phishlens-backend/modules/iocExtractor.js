@@ -1,8 +1,7 @@
 class IOCExtractor {
-    extract(threatObject) {
+    extract(threatObject, parsedEmail) {
         console.log('[IOCExtractor] Extracting IOCs (IPs, domains, URLs, hashes)...');
 
-        const rawDataModel = threatObject._raw_data_model || {};
         const ips = new Set();
         const domains = new Set();
         const urls = new Set();
@@ -30,11 +29,13 @@ class IOCExtractor {
         const recipientMatch = recipientEmail.match(/@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
         if (recipientMatch) domains.add(recipientMatch[1].toLowerCase());
 
-        // 3. Extract URLs & Body Links
-        const plainBody = rawDataModel.body?.plain?.raw || threatObject._raw_email_string || '';
+        // 3. Extract URLs & Body Links (text + HTML body, not headers)
+        const bodyText = parsedEmail
+            ? `${parsedEmail.textBody || ''}\n${parsedEmail.htmlBody || ''}`
+            : (threatObject._raw_email_string || '');
         const urlRegex = /(https?:\/\/[^\s<>"']+)/gi;
         let match;
-        while ((match = urlRegex.exec(plainBody)) !== null) {
+        while ((match = urlRegex.exec(bodyText)) !== null) {
             const cleanUrl = match[1].replace(/[.,;)]+$/, '');
             urls.add(cleanUrl);
             try {
