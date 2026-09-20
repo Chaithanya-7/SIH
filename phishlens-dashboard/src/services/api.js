@@ -97,6 +97,28 @@ export const api = {
     const res = await axios.get(`${API_BASE}/audit`);
     return res.data;
   },
+
+  // Ingestion coverage, adaptive learning and threat-intelligence state
+  getIngestionCoverage: async () => {
+    const res = await axios.get(`${API_BASE}/ingestion`);
+    return res.data;
+  },
+  getLearningState: async () => {
+    const res = await axios.get(`${API_BASE}/learning`);
+    return res.data;
+  },
+  getThreatIntelligence: async () => {
+    const res = await axios.get(`${API_BASE}/threat-intelligence`);
+    return res.data;
+  },
+  syncThreatIntelligence: async () => {
+    const res = await axios.post(`${API_BASE}/threat-intelligence/sync`);
+    return res.data;
+  },
+  getDetectionConfig: async () => {
+    const res = await axios.get(`${API_BASE}/detection-config`);
+    return res.data;
+  },
   getRemediationActions: async () => {
     const res = await axios.get(`${API_BASE}/remediate/actions`);
     return res.data;

@@ -25,6 +25,9 @@ export default function CaseInvestigationView({ selectedCase, onOpenReport }) {
   const campaign = selectedCase.campaign || {};
   const detection = selectedCase.detection || {};
   const nlp = selectedCase.nlp || { status: 'NOT_ANALYZED', signals: [], score: 0 };
+  const behavioral = selectedCase.behavioral || { status: 'NOT_ANALYZED', signals: [] };
+  const adaptive = selectedCase.adaptive || { status: 'NOT_SCORED', contributions: [] };
+  const threatIntel = selectedCase.threat_intelligence || { status: 'NOT_ANALYZED', matches: [], domain_ages: [] };
   const verdict = detection.verdict || 'UNKNOWN';
 
   let verdictBg = 'rgba(100, 116, 139, 0.12)';
@@ -107,6 +110,8 @@ export default function CaseInvestigationView({ selectedCase, onOpenReport }) {
           { id: 'detection', label: 'Detection' },
           { id: 'authentication', label: 'Authentication' },
           { id: 'nlp', label: `Language Analysis (${nlp.signals.length})` },
+          { id: 'behaviour', label: `Behaviour (${behavioral.signals?.length || 0})` },
+          { id: 'threatintel', label: `Threat Intel (${threatIntel.matches?.length || 0})` },
           { id: 'infrastructure', label: 'Infrastructure' },
           { id: 'evidence', label: `Evidence (${evidence.length})` },
           { id: 'iocs', label: 'IOCs' },
@@ -233,6 +238,112 @@ export default function CaseInvestigationView({ selectedCase, onOpenReport }) {
         </div>
       )}
 
+      {/* BEHAVIOURAL SECTION — how this message compares to what was seen before */}
+      {activeSection === 'behaviour' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ backgroundColor: '#0d1322', borderRadius: '6px', border: '1px solid #1e293b', padding: '12px', fontSize: '0.75rem', color: '#94a3b8' }}>
+            <div><strong>Sender previously seen:</strong> <span style={{ color: behavioral.known_sender ? '#10b981' : '#f59e0b', fontWeight: 600 }}>{behavioral.known_sender ? 'Yes' : 'No — first contact'}</span></div>
+            <div style={{ marginTop: '4px' }}><strong>Messages seen from this sender:</strong> {behavioral.messages_seen_from_sender ?? 0}</div>
+            <div style={{ marginTop: '6px', fontStyle: 'italic', color: '#64748b' }}>{behavioral.limitation}</div>
+          </div>
+
+          {(behavioral.signals || []).length === 0 ? (
+            <div style={{ color: '#64748b', fontSize: '0.78rem', fontStyle: 'italic' }}>
+              No behavioural deviation was identified against observed sender history.
+            </div>
+          ) : behavioral.signals.map((signal, idx) => (
+            <div key={`${signal.type}-${idx}`} style={{ backgroundColor: '#0d1322', borderRadius: '6px', border: '1px solid #1e293b', padding: '10px 12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
+                <span style={{ color: '#f8fafc', fontSize: '0.8rem', fontWeight: 600 }}>{signal.type.replace(/_/g, ' ')}</span>
+                <span style={{ color: signal.severity === 'HIGH' ? '#ef4444' : signal.severity === 'MEDIUM' ? '#f59e0b' : '#94a3b8', fontSize: '0.68rem' }}>
+                  {signal.severity} • {Math.round(signal.confidence * 100)}%
+                </span>
+              </div>
+              <div style={{ fontSize: '0.73rem', color: '#94a3b8', marginTop: '4px', lineHeight: 1.5 }}>{signal.explanation}</div>
+            </div>
+          ))}
+
+          {/* What the system learned, and why it scored this message that way */}
+          <div style={{ backgroundColor: '#0d1322', borderRadius: '6px', border: '1px solid #1e293b', padding: '12px' }}>
+            <h4 style={{ margin: '0 0 6px 0', fontSize: '0.8rem', color: '#f8fafc', fontWeight: 600 }}>Learned-pattern match</h4>
+            {adaptive.status !== 'SCORED' ? (
+              <div style={{ fontSize: '0.73rem', color: '#64748b', fontStyle: 'italic' }}>
+                {adaptive.limitation || 'Adaptive learning has not scored this message.'}
+              </div>
+            ) : (
+              <>
+                <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                  Similarity to previously confirmed mail: <strong style={{ color: '#f8fafc' }}>{Math.round(adaptive.score * 100)}%</strong>
+                  {' '}across {adaptive.matched_characteristics} characteristic(s), learned from {adaptive.learned_from.malicious} malicious
+                  and {adaptive.learned_from.legitimate} legitimate example(s).
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginTop: '8px' }}>
+                  {(adaptive.contributions || []).slice(0, 8).map(c => (
+                    <div key={c.characteristic} style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', fontSize: '0.7rem', color: '#94a3b8' }}>
+                      <span className="font-mono" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.characteristic}</span>
+                      <span style={{ whiteSpace: 'nowrap', color: c.weight > 0 ? '#ef4444' : '#10b981' }}>
+                        {c.weight > 0 ? '+' : ''}{c.weight} ({c.seen_in_malicious}M / {c.seen_in_legitimate}L)
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize: '0.69rem', color: '#64748b', marginTop: '8px', fontStyle: 'italic' }}>{adaptive.limitation}</div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* THREAT INTELLIGENCE SECTION */}
+      {activeSection === 'threatintel' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ backgroundColor: '#0d1322', borderRadius: '6px', border: '1px solid #1e293b', padding: '12px', fontSize: '0.75rem', color: '#94a3b8' }}>
+            <div><strong>Feed state:</strong> {threatIntel.feed_state?.synced ? `synced ${threatIntel.feed_state.age_hours}h ago` : 'no feed data'}</div>
+            {threatIntel.feed_state?.indicator_totals && (
+              <div style={{ marginTop: '4px' }}>
+                <strong>Indicators held locally:</strong>{' '}
+                {threatIntel.feed_state.indicator_totals.urls} URLs, {threatIntel.feed_state.indicator_totals.domains} domains,{' '}
+                {threatIntel.feed_state.indicator_totals.ips} IPs, {threatIntel.feed_state.indicator_totals.netblocks} netblocks
+              </div>
+            )}
+            <div style={{ marginTop: '6px', fontStyle: 'italic', color: '#64748b' }}>{threatIntel.limitation}</div>
+          </div>
+
+          <div style={{ backgroundColor: '#0d1322', borderRadius: '6px', border: '1px solid #1e293b', padding: '12px' }}>
+            <h4 style={{ margin: '0 0 8px 0', fontSize: '0.8rem', color: '#f8fafc', fontWeight: 600 }}>Indicator matches</h4>
+            {(threatIntel.matches || []).length === 0 ? (
+              <div style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic' }}>
+                No indicator from this message matched a known-bad list. That means nothing is known about them, not that they are safe.
+              </div>
+            ) : threatIntel.matches.map((match, idx) => (
+              <div key={idx} style={{ backgroundColor: '#131b2e', borderRadius: '4px', padding: '8px 10px', marginBottom: '5px', borderLeft: '3px solid #ef4444' }}>
+                <div style={{ fontSize: '0.74rem', color: '#f8fafc', fontWeight: 600 }}>
+                  {match.indicator_type} — {match.matched.replace(/_/g, ' ').toLowerCase()}
+                </div>
+                <div className="font-mono" style={{ fontSize: '0.7rem', color: '#ef4444', marginTop: '2px', wordBreak: 'break-all' }}>{match.indicator}</div>
+                <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '2px' }}>Source feed: {match.feed}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ backgroundColor: '#0d1322', borderRadius: '6px', border: '1px solid #1e293b', padding: '12px' }}>
+            <h4 style={{ margin: '0 0 8px 0', fontSize: '0.8rem', color: '#f8fafc', fontWeight: 600 }}>Domain registration age</h4>
+            {(threatIntel.domain_ages || []).length === 0 ? (
+              <div style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic' }}>No domain age data was resolved for this message.</div>
+            ) : threatIntel.domain_ages.map(entry => (
+              <div key={entry.domain} style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', fontSize: '0.73rem', color: '#94a3b8', padding: '4px 0' }}>
+                <span className="font-mono" style={{ color: '#f8fafc' }}>
+                  {entry.domain}{entry.is_sender_domain ? ' (sender)' : ''}
+                </span>
+                <span style={{ color: entry.age_days !== null && entry.age_days <= 30 ? '#ef4444' : '#94a3b8', whiteSpace: 'nowrap' }}>
+                  {entry.status === 'AVAILABLE' ? `${entry.age_days} days old` : `unavailable${entry.reason ? ` — ${entry.reason}` : ''}`}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* INFRASTRUCTURE SECTION */}
       {activeSection === 'infrastructure' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -325,12 +436,59 @@ export default function CaseInvestigationView({ selectedCase, onOpenReport }) {
 
       {/* CAMPAIGN SECTION */}
       {activeSection === 'campaign' && (
-        <div style={{ backgroundColor: '#0d1322', borderRadius: '6px', border: '1px solid #1e293b', padding: '14px', fontSize: '0.75rem', color: '#94a3b8', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <div><strong>Campaign ID:</strong> <span className="font-mono" style={{ color: '#8b5cf6', fontWeight: 700 }}>{campaign.campaign_id || 'UNASSOCIATED'}</span></div>
-          <div><strong>Association Status:</strong> {campaignAssoc.status || 'UNASSOCIATED'} ({Math.round((campaignAssoc.confidence || 0) * 100)}%)</div>
-          <div><strong>Correlated Cases:</strong> {(campaignAssoc.related_cases || []).join(', ') || 'None'}</div>
-          <div><strong>Attacker Attribution:</strong> <span style={{ color: '#ec4899', fontWeight: 600 }}>INSUFFICIENT EVIDENCE</span></div>
-          <div style={{ fontSize: '0.7rem', color: '#64748b', fontStyle: 'italic', marginTop: '4px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ backgroundColor: '#0d1322', borderRadius: '6px', border: '1px solid #1e293b', padding: '14px', fontSize: '0.75rem', color: '#94a3b8', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div><strong>Campaign ID:</strong> <span className="font-mono" style={{ color: '#8b5cf6', fontWeight: 700 }}>{campaign.campaign_id || 'UNASSOCIATED'}</span></div>
+            <div><strong>Association Status:</strong> {campaignAssoc.status || 'UNASSOCIATED'} ({Math.round((campaignAssoc.confidence || 0) * 100)}%)</div>
+            <div><strong>Correlated Cases:</strong> {(campaignAssoc.related_cases || []).join(', ') || 'None'}</div>
+            <div><strong>Attacker Attribution:</strong> <span style={{ color: '#ec4899', fontWeight: 600 }}>INSUFFICIENT EVIDENCE</span></div>
+          </div>
+
+          {(campaignAssoc.factors || []).length > 0 && (
+            <div style={{ backgroundColor: '#0d1322', borderRadius: '6px', border: '1px solid #1e293b', padding: '12px' }}>
+              <h4 style={{ margin: '0 0 8px 0', fontSize: '0.8rem', color: '#f8fafc', fontWeight: 600 }}>Why these cases are linked</h4>
+              {campaignAssoc.factors.map((factor, idx) => (
+                <div key={idx} style={{ backgroundColor: '#131b2e', borderRadius: '4px', padding: '8px 10px', marginBottom: '5px', borderLeft: '3px solid #8b5cf6' }}>
+                  <div style={{ fontSize: '0.74rem', color: '#f8fafc', fontWeight: 600 }}>{factor.factor.replace(/_/g, ' ')}</div>
+                  <div style={{ fontSize: '0.71rem', color: '#94a3b8', marginTop: '2px' }}>{factor.evidence}</div>
+                </div>
+              ))}
+              {(campaignAssoc.scoring || []).length > 0 && (
+                <div style={{ fontSize: '0.69rem', color: '#64748b', marginTop: '6px' }}>
+                  Scoring by family: {campaignAssoc.scoring.map(s => `${s.family} ${s.contribution}`).join(' · ')}
+                  {' '}— the strongest factor in each family counts in full, further ones at reducing weight.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Deliberately not linked. An analyst asking why two similar-looking
+              cases were not grouped deserves the reason. */}
+          {(campaignAssoc.suppressed_factors || []).length > 0 && (
+            <div style={{ backgroundColor: '#0d1322', borderRadius: '6px', border: '1px solid #334155', padding: '12px' }}>
+              <h4 style={{ margin: '0 0 8px 0', fontSize: '0.8rem', color: '#f8fafc', fontWeight: 600 }}>Links deliberately not made</h4>
+              {campaignAssoc.suppressed_factors.map((s, idx) => (
+                <div key={idx} style={{ fontSize: '0.72rem', color: '#94a3b8', padding: '4px 0', borderBottom: idx < campaignAssoc.suppressed_factors.length - 1 ? '1px solid #1e293b' : 'none' }}>
+                  <span className="font-mono" style={{ color: '#cbd5e1' }}>{s.indicator}</span> — {s.reason}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {(campaignAssoc.semantic_matches || []).length > 0 && (
+            <div style={{ backgroundColor: '#0d1322', borderRadius: '6px', border: '1px solid #1e293b', padding: '12px' }}>
+              <h4 style={{ margin: '0 0 8px 0', fontSize: '0.8rem', color: '#f8fafc', fontWeight: 600 }}>Messages reusing the same wording</h4>
+              {campaignAssoc.semantic_matches.map(match => (
+                <div key={match.case_id} style={{ fontSize: '0.72rem', color: '#94a3b8', padding: '5px 0' }}>
+                  <span className="font-mono" style={{ color: '#3b82f6' }}>{match.case_id}</span>
+                  {' '}<strong style={{ color: '#f8fafc' }}>{Math.round(match.similarity * 100)}%</strong> similar — “{match.subject}”
+                  <div style={{ color: '#64748b', fontSize: '0.68rem' }}>Shared terms: {match.shared_terms.join(', ')}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={{ fontSize: '0.7rem', color: '#64748b', fontStyle: 'italic', lineHeight: 1.5 }}>
             {campaignAssoc.limitation || 'Campaign association supports pattern analysis but does not establish actor identity.'}
           </div>
         </div>

@@ -201,6 +201,29 @@ The original audit flagged this as a real defect: "A Google/Microsoft/Cloudflare
 
 65 tests passing.
 
+## 2026-09-20 — Phase 8: surfacing the intelligence the backend already had
+
+Several capabilities were producing good data that no analyst could see. The dashboard now exposes them, each with its limitations stated alongside, per the plan's explainability requirement that no score appears without its evidence.
+
+- **Mail Coverage view (new nav section)** — renders the ingestion registry: whether live mail is being monitored at all, every entry path with its real status, per-source ingested counts and failures, enable hints for unwatched paths, and Gmail readiness with exactly which settings are missing. The headline states plainly when only manual submission paths are active.
+- **Intelligence State view (new nav section)** — what the system has taught itself and what it is matching against: learned-from counts, the strongest learned indicators with their malicious/legitimate evidence counts, behavioural baseline totals, recent learning events (including label corrections), and every threat feed with its status, indicator count and licence. When adaptive learning is below its training threshold it says so rather than showing a meaningless score.
+- **Case investigation gained two tabs** — *Behaviour* (sender history, behavioural signals with explanations, and the learned-pattern match with its contributing characteristics) and *Threat Intel* (feed state, indicator matches with their source feed, and RDAP domain registration ages).
+- **Campaign tab rebuilt** — now shows why cases are linked, the per-family scoring, messages reusing the same wording with the actual shared terms, and **links deliberately not made** with the reason, so an analyst asking why two similar cases were not grouped gets an answer.
+
+### Verified in a real browser against live data
+
+Not just compiled: backend and dashboard were run, four messages seeded through the pipeline, and each view checked in the browser.
+
+- Mail Coverage showed `Monitoring live mail`, the SMTP gateway listening on 2531, IMAP switched off with its enable hint, Gmail not configured with the exact missing variables, and REST API correctly crediting 4 ingested messages.
+- Intelligence State showed all five feeds SYNCED with live counts (13,342 URLs among them) and adaptive learning honestly reporting "not yet contributing to scoring" at 1 malicious / 0 legitimate.
+- Threat Intel tab showed a real RDAP result (gmail.com, 11,360 days old) and correctly reported `.example` and an IP literal as unavailable with reasons.
+- Campaign tab showed the semantic link at 92% similarity with the shared terms listed.
+- A suspected verdict-badge mismatch in the threat queue was checked against the API rather than assumed: all four badges matched their true verdicts. No bug.
+
+**Inconsistency found and fixed while reviewing the rendered output**: the Gmail enable hint named `GOOGLE_REDIRECT_URI`, but the variable the adapter actually reads is `GMAIL_REDIRECT_URI`. An operator following that hint would have set a variable nothing reads.
+
+65 tests passing.
+
 ### Next architectural gap (not yet started)
 
 - `DETECTION_PROVIDER` is still hardcoded to `sublime` with no local Sublime service in this repository — every ingestion path still calls out to an external, unconfigured detection dependency for MQL/rule matching (`mqlBridge.js` only normalizes a Sublime response; it does not run its own rules). This is the single largest remaining gap against the master plan's Phase 3 (Detection Engine): a native, source-cited MQL/rule engine (MITRE ATT&CK, APWG, CISA, OWASP, abuse.ch/OpenPhish/PhishTank-seeded rules per the compact plan) is not yet implemented, so the platform has no working detection path without an external Sublime instance.

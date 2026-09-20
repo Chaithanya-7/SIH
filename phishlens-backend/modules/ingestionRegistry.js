@@ -58,7 +58,7 @@ class IngestionRegistry {
                 name: 'Gmail API (OAuth + Pub/Sub push)',
                 transport: 'GMAIL_API',
                 description: 'Receives Gmail push notifications and pulls new messages through the Gmail history API.',
-                enable_hint: 'Configure GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and GOOGLE_REDIRECT_URI, then connect a mailbox through the dashboard.',
+                enable_hint: 'Configure GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and GMAIL_REDIRECT_URI, then connect a mailbox through the dashboard.',
                 expects_heartbeat: false
             },
             {

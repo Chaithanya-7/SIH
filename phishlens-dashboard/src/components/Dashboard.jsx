@@ -11,7 +11,9 @@ import AuditTimeline from './AuditTimeline';
 import ForensicReportModal from './ForensicReportModal';
 import AuthModal from './AuthModal';
 import AdminQuarantineQueue from './AdminQuarantineQueue';
-import { User, Building, Mail, Lock } from 'lucide-react';
+import IngestionCoverageView from './IngestionCoverageView';
+import IntelligenceStateView from './IntelligenceStateView';
+import { User, Building, Mail, Lock, Inbox, Brain } from 'lucide-react';
 
 export default function Dashboard() {
   const [activeNav, setActiveNav] = useState('investigations');
@@ -129,6 +131,8 @@ export default function Dashboard() {
   const navItems = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
     { id: 'investigations', label: 'Investigations', icon: ShieldAlert },
+    { id: 'coverage', label: 'Mail Coverage', icon: Inbox },
+    { id: 'intelligence', label: 'Intelligence State', icon: Brain },
     { id: 'quarantine', label: 'Quarantine Queue', icon: Lock },
     { id: 'campaigns', label: 'Campaigns', icon: Network },
     { id: 'graph', label: 'Intelligence Graph', icon: Network },
@@ -303,6 +307,20 @@ export default function Dashboard() {
             <div className="desktop-grid animate-fade-in" style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '20px' }}>
               <ThreatFeed cases={cases} selectedCase={selectedCase} onSelectCase={setSelectedCase} />
               <CaseInvestigationView selectedCase={selectedCase} onOpenReport={() => setIsReportModalOpen(true)} />
+            </div>
+          )}
+
+          {/* MAIL COVERAGE NAV */}
+          {activeNav === 'coverage' && (
+            <div className="animate-fade-in">
+              <IngestionCoverageView />
+            </div>
+          )}
+
+          {/* INTELLIGENCE STATE NAV */}
+          {activeNav === 'intelligence' && (
+            <div className="animate-fade-in">
+              <IntelligenceStateView />
             </div>
           )}
 
