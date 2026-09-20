@@ -53,10 +53,23 @@ function publishExtension({ sourceDir, targetDir, apiBaseUrl, apiKey, log = () =
         throw new Error(`No extension found at ${source}.`);
     }
 
-    // In place where that is possible, which keeps a source checkout to one
-    // folder rather than two that can drift apart.
+    // In place where that is possible, which keeps things to one folder rather
+    // than two that can drift apart.
     if (isWritable(source)) {
         writeProvisioned(source, apiBaseUrl, apiKey);
+
+        // An earlier version always copied, so upgrading leaves that copy
+        // behind - stale, unreferenced, and holding a live API key. Nobody goes
+        // looking for it, so it is removed here rather than left to be found.
+        if (fs.existsSync(fallback)) {
+            try {
+                fs.rmSync(fallback, { recursive: true, force: true });
+                log(`[Extension] Removed a stale configured copy at ${fallback}`);
+            } catch (e) {
+                log(`[Extension] Could not remove the stale copy at ${fallback}: ${e.message}`);
+            }
+        }
+
         log(`[Extension] Configured in place at ${source}`);
         return source;
     }
