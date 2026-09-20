@@ -8,6 +8,7 @@ import EvidenceGraphView from './EvidenceGraphView';
 import ExecutiveView from './ExecutiveView';
 import RemediationTimeline from './RemediationTimeline';
 import ResponsePosture from './ResponsePosture';
+import MailboxConnections from './MailboxConnections';
 import AuditTimeline from './AuditTimeline';
 import ForensicReportModal from './ForensicReportModal';
 import AuthModal from './AuthModal';
@@ -147,6 +148,7 @@ export default function Dashboard() {
 
   const navItems = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+    { id: 'connections', label: 'Mailboxes', icon: Inbox },
     { id: 'investigations', label: 'Investigations', icon: ShieldAlert },
     { id: 'coverage', label: 'Mail Coverage', icon: Inbox },
     { id: 'intelligence', label: 'Intelligence State', icon: Brain },
@@ -327,6 +329,12 @@ export default function Dashboard() {
           {activeNav === 'executive' && (
             <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <ExecutiveView vips={vips} cases={cases} />
+            </div>
+          )}
+
+          {activeNav === 'connections' && (
+            <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <MailboxConnections />
             </div>
           )}
 

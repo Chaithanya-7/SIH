@@ -1476,3 +1476,83 @@ file, a question that otherwise took an afternoon.
 | Start menu shortcut | present |
 | Backend supervised | up in ~4s |
 | `phishlens://dashboard` | opens the app, no duplicate instance |
+
+## 2026-09-20 — Connecting a real mailbox, and three things that did not work
+
+Feedback from using the installed application. Four concrete faults, one of
+which made a whole feature unusable.
+
+### The map showed the world more than once
+
+`worldCopyJump` was on and the tile layer had `noWrap={false}`, so panning east
+ran into a second and third copy of the globe — the same country twice, and a
+marker apparently in several places at once. `worldCopyJump` made it worse by
+teleporting the view between copies mid-drag, which is what read as a glitch.
+
+Now: `noWrap`, `maxBounds` on the world with full viscosity, `worldCopyJump`
+off. The world exists once and the map stops at its edge.
+
+Zoom was capped at Leaflet's default. OpenStreetMap publishes tiles to zoom 19,
+which resolves individual streets and buildings, so both the map and the tile
+layer now ask for 19. Asking for more would stretch the last real tile and
+invent detail that is not there.
+
+### A dot on a map that would not say what happened there
+
+The marker popup reported an IP, an ASN and "seen in 4 cases" — a count, where
+the question a dot provokes is *what arrived from there*.
+
+Each point now carries the messages themselves: subject, sender, verdict,
+confidence, when it arrived, and the single strongest finding. Capped at ten per
+marker, because a popup is for orientation rather than for reading a mailbox,
+with the remainder pointing at Investigations.
+
+### The forensic report could never be downloaded
+
+The button was an ordinary `<a href>` to `/api/reports/pdf/:id`. A plain link
+carries no Authorization header, so every download hit the API unauthenticated
+and came back **401** — into a new tab that showed nothing, so the failure was
+silent.
+
+Verified both ways: the same URL returns 401 as a link and a 14 KB PDF when the
+key is sent. It now fetches with the session credential and hands the browser a
+blob to save, and a failure is shown rather than swallowed.
+
+### Connecting a mailbox without a Google Cloud project
+
+The remaining blocker on live mail was that Gmail ingestion needed the operator
+to register an OAuth application. That is real administrative work, and it left
+the product unable to examine anything until it was done.
+
+IMAP with an app password reaches the same mail and takes about a minute to set
+up, so that is now the default path, configurable from the console rather than
+from environment variables.
+
+- **Credentials are proved before they are stored.** A saved connection that
+  silently fails to log in is worse than none, because the coverage view then
+  claims a mailbox is watched while nothing is read.
+- **Provider errors are translated.** "Invalid credentials (Failure)" tells
+  somebody with two-step verification nothing; the response now explains that
+  Google wants an App Password and where to create one. Verified against real
+  Gmail IMAP with a deliberately wrong password.
+- **The password is encrypted at rest.** It has to be replayable to poll, so it
+  cannot be hashed. `secretStore` uses AES-256-GCM with an owner-only key, and
+  states its own limit: it protects against backups, synced folders and someone
+  reading the data directory, not against code already running as this user.
+  Worth noting the existing `tokens.json` still holds OAuth tokens in plain
+  text.
+- Only new mail is read, tracked by the highest UID seen, so a restart does not
+  re-analyse a mailbox from the beginning.
+
+### Checked and found clean
+
+No synthetic data in any displayed metric — every count on the Overview comes
+from real cases. One genuine exception remains: the sign-in modal offers a
+"Demo Identity" that mints a fake Google account id. It is left in place for
+now because it may be the only way into the web console, and removing it blindly
+would risk locking the operator out. It should not ship to anyone.
+
+**212 backend tests.** One of them failed on this work and was right to: the
+hardening suite flagged a `typeof timer.unref === 'function'` guard, the same
+shape that once let a missing method hide silently. Node's timers always carry
+`unref`, so the guard is gone rather than the test weakened.

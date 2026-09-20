@@ -158,6 +158,23 @@ export const api = {
     const res = await axios.post(`${API_BASE}/remediate/rollback`, { actionId, reason });
     return res.data;
   },
+  getConnections: async () => {
+    const res = await axios.get(`${API_BASE}/connections`);
+    return res.data;
+  },
+  testConnection: async (payload) => {
+    const res = await axios.post(`${API_BASE}/connections/test`, payload);
+    return res.data;
+  },
+  addConnection: async (payload) => {
+    const res = await axios.post(`${API_BASE}/connections`, payload);
+    return res.data;
+  },
+  removeConnection: async (id) => {
+    const res = await axios.delete(`${API_BASE}/connections/${id}`);
+    return res.data;
+  },
+
   getRemediationPosture: async () => {
     const res = await axios.get(`${API_BASE}/remediation/posture`);
     return res.data;
@@ -199,6 +216,30 @@ export const api = {
     return res.data;
   },
   getReportPdfUrl: (caseId) => `${API_BASE}/reports/pdf/${caseId}`,
+
+  /**
+   * Fetches the forensic report and hands the browser a file to save.
+   *
+   * The button used to be an ordinary link to the endpoint, which cannot work:
+   * a plain <a href> carries no Authorization header, so every download hit the
+   * API unauthenticated and came back 401. The failure was silent - a new tab
+   * that showed nothing. Verified: the same URL returns 401 as a link and a
+   * 14 KB PDF when the key is sent.
+   */
+  downloadReportPdf: async (caseId) => {
+    const response = await axios.get(`${API_BASE}/reports/pdf/${caseId}`, { responseType: 'blob' });
+    const blobUrl = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = `PhishLens_Report_${caseId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    // Released on the next tick so the download has taken the reference.
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    return true;
+  },
+
 
   // Admin Quarantine Queue & Scope APIs
   getScopeStatus: async () => {

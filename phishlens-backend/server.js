@@ -15,6 +15,7 @@ const authAnalyzer = require('./modules/authAnalyzer');
 const arcAnalyzer = require('./modules/arcAnalyzer');
 const textDeception = require('./modules/textDeception');
 const threadIntegrity = require('./modules/threadIntegrity');
+const mailConnections = require('./modules/mailConnections');
 const qrAnalyzer = require('./modules/qrAnalyzer');
 const forensicEngine = require('./modules/forensicEngine');
 const attachmentAnalyzer = require('./modules/attachmentAnalyzer');
@@ -316,6 +317,8 @@ async function processPipeline(emailContent, source = 'MANUAL_API', clientMessag
 // Start Real-Time Mail Ingestion Layer
 mailIngestionAdapter.startIngestion(processPipeline);
 gmailIngestionAdapter.setPipelineHandler(processPipeline);
+// Mailboxes connected through the console start watching again on restart.
+mailConnections.setPipeline(processPipeline);
 
 /**
  * Everything under /api requires authentication unless it is named below.
@@ -1021,6 +1024,28 @@ app.get('/api/overview', (req, res) => {
             const existing = pointsByKey.get(key);
             const rank = { LOW: 0, MEDIUM: 1, HIGH: 2 };
 
+            // The messages themselves, not just their identifiers.
+            //
+            // A marker that says "seen in 4 cases" answers nothing an analyst
+            // wants to know. The question a dot on a map provokes is "what
+            // arrived from there", and that needs the subject, who sent it and
+            // what was decided - carried here so clicking a marker can answer
+            // it without a second request.
+            const message = {
+                case_id: caseItem.case_id,
+                subject: caseItem.message?.subject || '(no subject)',
+                sender: caseItem.message?.sender || '(unknown sender)',
+                recipient: caseItem.message?.recipient || '',
+                verdict: caseItem.detection?.verdict || 'UNKNOWN',
+                confidence: caseItem.confidence?.threat ?? null,
+                received_at: caseItem.timestamps?.ingested_at || null,
+                // The single clearest reason, so the popup can say why rather
+                // than only what.
+                top_finding: (caseItem.evidence || [])
+                    .slice()
+                    .sort((a, b) => (b.signal_strength || 0) - (a.signal_strength || 0))[0]?.finding || null
+            };
+
             if (!existing) {
                 pointsByKey.set(key, {
                     ip: point.ip,
@@ -1034,11 +1059,16 @@ app.get('/api/overview', (req, res) => {
                     role: point.role,
                     severity,
                     observations: 1,
-                    case_ids: [caseItem.case_id]
+                    case_ids: [caseItem.case_id],
+                    messages: [message]
                 });
             } else {
                 existing.observations += 1;
                 if (existing.case_ids.length < 25) existing.case_ids.push(caseItem.case_id);
+                // Capped: a marker popup is for orientation, not for reading an
+                // entire mailbox. The full set stays one click away in the case
+                // list.
+                if (existing.messages.length < 10) existing.messages.push(message);
                 if (rank[severity] > rank[existing.severity]) existing.severity = severity;
             }
         });
@@ -1230,6 +1260,67 @@ app.post('/api/remediate/override', requireRole('ADMIN'), async (req, res) => {
         res.json({ success: true, result });
     } catch (e) {
         res.status(400).json({ success: false, error: e.message });
+    }
+});
+
+// ==================== CONNECTED MAILBOXES ====================
+
+/**
+ * Connecting a mailbox over IMAP with an app password.
+ *
+ * The Gmail API route needs the operator to register an OAuth application,
+ * which leaves the product unusable until that administrative work is done. An
+ * app password takes a minute to create and reaches the same mail.
+ */
+app.get('/api/connections', requireRole('ADMIN'), (req, res) => {
+    res.json({
+        success: true,
+        providers: mailConnections.providers(),
+        ...mailConnections.coverage()
+    });
+});
+
+app.post('/api/connections', requireRole('ADMIN'), async (req, res) => {
+    try {
+        const connection = await mailConnections.add(req.body || {});
+        auditLogger.log({
+            org_id: req.user.organization_id, user_id: req.user.id,
+            event_type: 'MAILBOX_CONNECTED', source: `ADMIN:${req.user.email}`,
+            description: `Connected mailbox ${connection.email} over IMAP (${connection.host}).`
+        });
+        res.json({ success: true, connection });
+    } catch (e) {
+        // The hint carries the provider-specific guidance, because "password
+        // rejected" tells somebody with two-step verification nothing about
+        // what to do next.
+        res.status(400).json({ success: false, error: e.message, hint: e.hint || null });
+    }
+});
+
+/** Checks credentials without storing anything. */
+app.post('/api/connections/test', requireRole('ADMIN'), async (req, res) => {
+    const { email, password, host, port, folder, provider } = req.body || {};
+    const preset = require('./modules/mailConnections').PROVIDERS[provider] || {};
+    const result = await mailConnections.test({
+        email, password,
+        host: host || preset.host,
+        port: Number(port || preset.port || 993),
+        folder: folder || 'INBOX'
+    });
+    res.json({ success: result.ok, ...result });
+});
+
+app.delete('/api/connections/:id', requireRole('ADMIN'), (req, res) => {
+    try {
+        const result = mailConnections.remove(req.params.id);
+        auditLogger.log({
+            org_id: req.user.organization_id, user_id: req.user.id,
+            event_type: 'MAILBOX_DISCONNECTED', source: `ADMIN:${req.user.email}`,
+            description: `Disconnected mailbox ${result.removed}.`
+        });
+        res.json({ success: true, ...result });
+    } catch (e) {
+        res.status(404).json({ success: false, error: e.message });
     }
 });
 

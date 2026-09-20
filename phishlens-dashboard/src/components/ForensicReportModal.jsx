@@ -1,11 +1,29 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { FileText, Download, X } from 'lucide-react';
 import { api } from '../services/api';
 
 export default function ForensicReportModal({ selectedCase, onClose }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
   if (!selectedCase) return null;
 
-  const pdfUrl = api.getReportPdfUrl(selectedCase.case_id);
+  // Fetched with the session key and saved as a file, rather than linked to.
+  // A plain link cannot send the key, so the old button always produced a 401
+  // in a blank tab.
+  const handleDownload = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.downloadReportPdf(selectedCase.case_id);
+    } catch (e) {
+      setError(e.response?.status === 401
+        ? 'The console is not signed in, so the report could not be fetched.'
+        : `The report could not be generated: ${e.response?.data?.error || e.message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
@@ -30,18 +48,21 @@ export default function ForensicReportModal({ selectedCase, onClose }) {
           <div><strong>Evidence Objects Count:</strong> {selectedCase.evidence?.length || 0}</div>
         </div>
 
+        {error && (
+          <div style={{ color: 'var(--danger)', fontSize: '0.75rem', marginBottom: '10px' }}>{error}</div>
+        )}
+
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
           <button onClick={onClose} style={{ backgroundColor: 'var(--bg-panel)', color: 'var(--text-muted)', border: '1px solid var(--border)', borderRadius: '4px', padding: '8px 14px', fontSize: '0.78rem', cursor: 'pointer' }}>
             Close
           </button>
-          <a
-            href={pdfUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ backgroundColor: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '4px', padding: '8px 14px', fontSize: '0.78rem', fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          <button
+            onClick={handleDownload}
+            disabled={busy}
+            style={{ backgroundColor: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '4px', padding: '8px 14px', fontSize: '0.78rem', fontWeight: 600, cursor: busy ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
           >
-            <Download size={14} /> Download Forensic PDF Report
-          </a>
+            <Download size={14} /> {busy ? 'Preparing report…' : 'Download forensic report (PDF)'}
+          </button>
         </div>
       </div>
     </div>
