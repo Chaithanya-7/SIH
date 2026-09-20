@@ -69,7 +69,14 @@ const BASEMAPS = [
         attribution: 'Imagery &copy; Esri, Maxar, Earthstar Geographics',
         // Esri serves this one row-before-column, which is why the template
         // above reads {z}/{y}/{x} rather than the usual order.
-        maxZoom: 19,
+        //
+        // 20, measured rather than taken from documentation. Requesting tiles
+        // over Manhattan: 18, 19 and 20 return real photography of 13-19KB,
+        // while 21, 22 and 23 all return an identical 2,521-byte placeholder.
+        // The level this was set to before threw away the closest real imagery
+        // there is - which is the level where individual cars and houses
+        // become visible.
+        maxZoom: 20,
         // Photography carries no writing. On its own this showed rooftops and
         // coastlines with no way to tell which city you were looking at, which
         // is useless for the question the panel exists to answer. Esri publish
@@ -79,12 +86,12 @@ const BASEMAPS = [
             {
                 id: 'transport',
                 url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',
-                maxZoom: 19
+                maxZoom: 20
             },
             {
                 id: 'places',
                 url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
-                maxZoom: 19
+                maxZoom: 20
             }
         ]
     },
@@ -224,6 +231,12 @@ export default function GlobalThreatMap({ points = [], coverage }) {
 
             <div style={{ height: '620px', width: '100%' }}>
                 <MapContainer
+                    // Tiles appear rather than fade in.
+                    //
+                    // The fade runs an opacity transition on every tile as it
+                    // arrives; across a screenful, during a pan, that is a lot
+                    // of compositing for an effect nobody is looking at.
+                    fadeAnimation={false}
                     // Markers drawn onto one canvas rather than as an SVG node
                     // each. With a few hundred addresses the DOM approach spends
                     // its time in layout rather than drawing.
@@ -234,7 +247,11 @@ export default function GlobalThreatMap({ points = [], coverage }) {
                     // Deep enough for individual streets and buildings. OpenStreetMap
                     // publishes tiles to zoom 19; asking for more only stretches the
                     // last real tile and invents detail that is not there.
-                    maxZoom={19}
+                    // One level beyond the deepest real imagery. Leaflet
+                    // scales the last genuine tile to fill it, which is a
+                    // slightly soft picture of something real rather than a
+                    // request for a tile that does not exist.
+                    maxZoom={21}
                     scrollWheelZoom
                     // The world is not repeated sideways.
                     //
@@ -266,8 +283,13 @@ export default function GlobalThreatMap({ points = [], coverage }) {
                         // stretches the last real tile and invents detail that is
                         // not there; maxNativeZoom lets the map keep zooming while
                         // reusing the deepest tile that actually exists.
-                        maxZoom={19}
+                        maxZoom={21}
                         maxNativeZoom={basemap.maxZoom}
+                        // On a high-density display Leaflet fetches the next
+                        // zoom level's tiles and draws them at half size, so a
+                        // screen with more pixels than CSS points gets an image
+                        // matched to it rather than one stretched to fit.
+                        detectRetina
                         // Tiles stop at the edge of the world rather than repeating.
                         noWrap
                         bounds={[[-85, -180], [85, 180]]}
@@ -276,10 +298,14 @@ export default function GlobalThreatMap({ points = [], coverage }) {
                         // crossed and then throw them away on arrival.
                         updateWhenIdle
                         updateWhenZooming={false}
-                        // Two screens' worth of tiles are kept around the edge,
-                        // so panning back over ground already covered costs
-                        // nothing.
-                        keepBuffer={4}
+                        // One ring of tiles beyond the viewport, not two.
+                        //
+                        // A buffer of 4 keeps roughly five times the visible
+                        // tiles alive as image elements. Every one of them is
+                        // laid out and composited on each frame, which is paid
+                        // continuously while panning in exchange for avoiding a
+                        // refetch that the browser cache mostly covers anyway.
+                        keepBuffer={2}
                     />
 
                     {/*
@@ -293,13 +319,14 @@ export default function GlobalThreatMap({ points = [], coverage }) {
                         <TileLayer
                             key={`${basemap.id}-${overlay.id}`}
                             url={overlay.url}
-                            maxZoom={19}
+                            maxZoom={21}
                             maxNativeZoom={overlay.maxZoom}
+                            detectRetina
                             noWrap
                             bounds={[[-85, -180], [85, 180]]}
                             updateWhenIdle
                             updateWhenZooming={false}
-                            keepBuffer={4}
+                            keepBuffer={2}
                         />
                     ))}
                     {ordered.map(point => {
