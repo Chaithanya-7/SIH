@@ -31,34 +31,59 @@ const ingestionRegistry = require('./ingestionRegistry');
  * because "password rejected" on an account with two-step verification is a
  * confusing way to learn you needed a different kind of password.
  */
+/**
+ * Which folders each provider exposes, and what to call them.
+ *
+ * Polling watches one folder per connection. INBOX alone is not the whole
+ * story: a phishing message that a provider filed as spam, and that somebody
+ * then rescues, never appears in the inbox and so would never be examined.
+ * Naming the folders here lets that be an explicit choice rather than a silent
+ * gap - the same account can be connected twice, once per folder.
+ */
 const PROVIDERS = {
     gmail: {
         label: 'Gmail / Google Workspace',
         host: 'imap.gmail.com',
         port: 993,
         requiresAppPassword: true,
-        guidance: 'Google does not accept your normal password over IMAP. Turn on 2-Step Verification, then create an App Password at myaccount.google.com/apppasswords and paste the 16-character value here.'
+        guidance: 'Google does not accept your normal password over IMAP. Turn on 2-Step Verification, then create an App Password at myaccount.google.com/apppasswords and paste the 16-character value here.',
+        folders: [
+            { path: 'INBOX', label: 'Inbox' },
+            { path: '[Gmail]/Spam', label: 'Spam' },
+            { path: '[Gmail]/All Mail', label: 'All Mail (everything, including already-read)' }
+        ]
     },
     outlook: {
         label: 'Outlook / Microsoft 365',
         host: 'outlook.office365.com',
         port: 993,
         requiresAppPassword: true,
-        guidance: 'Microsoft accounts with multi-factor authentication need an app password rather than your normal one. Create it in your account security settings.'
+        guidance: 'Microsoft accounts with multi-factor authentication need an app password rather than your normal one. Create it in your account security settings.',
+        folders: [
+            { path: 'INBOX', label: 'Inbox' },
+            { path: 'Junk Email', label: 'Junk Email' }
+        ]
     },
     yahoo: {
         label: 'Yahoo Mail',
         host: 'imap.mail.yahoo.com',
         port: 993,
         requiresAppPassword: true,
-        guidance: 'Yahoo requires an app password generated in Account Security.'
+        guidance: 'Yahoo requires an app password generated in Account Security.',
+        folders: [
+            { path: 'INBOX', label: 'Inbox' },
+            { path: 'Bulk Mail', label: 'Bulk Mail (spam)' }
+        ]
     },
     custom: {
         label: 'Other IMAP server',
         host: '',
         port: 993,
         requiresAppPassword: false,
-        guidance: 'Enter the IMAP host your provider documents, usually something like imap.example.com on port 993.'
+        guidance: 'Enter the IMAP host your provider documents, usually something like imap.example.com on port 993.',
+        folders: [
+            { path: 'INBOX', label: 'Inbox' }
+        ]
     }
 };
 
@@ -97,7 +122,8 @@ class MailConnections {
             host: p.host,
             port: p.port,
             requires_app_password: p.requiresAppPassword,
-            guidance: p.guidance
+            guidance: p.guidance,
+            folders: p.folders || [{ path: 'INBOX', label: 'Inbox' }]
         }));
     }
 
@@ -249,6 +275,10 @@ class MailConnections {
         this.stopWatching(id);
         this.connections.delete(id);
         this.save();
+        // Published again after the delete: stopWatching runs while this
+        // connection is still in the map, so on its own it would report the
+        // last removed mailbox as failing rather than as gone.
+        this.publishCoverage();
         return { removed: connection.email };
     }
 
@@ -256,6 +286,9 @@ class MailConnections {
         this.onMail = onMail;
         // Anything stored from a previous run starts watching again.
         this.connections.forEach(c => this.startWatching(c.id));
+        // Stated even when there is nothing to watch, so the coverage page
+        // reports a deliberate "nothing connected" rather than a default.
+        this.publishCoverage();
     }
 
     startWatching(id) {
@@ -273,14 +306,52 @@ class MailConnections {
         // in this codebase once already.
         const timer = setInterval(poll, 30000).unref();
         this.pollers.set(id, timer);
+        this.publishCoverage();
 
-        console.log(`[MailConnections] Watching ${connection.email} on ${connection.host}.`);
+        console.log(`[MailConnections] Watching ${connection.email} on ${connection.host} (${connection.folder}).`);
     }
 
     stopWatching(id) {
         const timer = this.pollers.get(id);
         if (timer) clearInterval(timer);
         this.pollers.delete(id);
+        this.publishCoverage();
+    }
+
+    /**
+     * Report what is actually being watched to the coverage registry.
+     *
+     * The registry decides a path's status from setState, not from heartbeats,
+     * and nothing here ever called it - so connecting a mailbox through the
+     * console left the coverage page still reporting the IMAP path as DISABLED
+     * and no live mail being monitored. That page exists precisely to answer
+     * "could a message reach somebody without being examined", and it was
+     * answering it wrongly in the one direction that matters: claiming less
+     * coverage than there was, which trains people to ignore it.
+     */
+    publishCoverage() {
+        const watching = this.pollers.size;
+        const failing = Array.from(this.connections.values()).filter(c => c.last_error).length;
+
+        let status;
+        if (watching > 0) status = 'ACTIVE';
+        else if (this.connections.size > 0) status = 'FAILED';
+        else status = 'DISABLED';
+
+        const detail = this.connections.size === 0
+            ? 'No mailbox is connected. Connect one on the Mailboxes page.'
+            : `${watching} of ${this.connections.size} connected mailbox(es) being polled${failing ? `, ${failing} failing` : ''}.`;
+
+        try {
+            ingestionRegistry.setState('imap_poller', {
+                configured: this.connections.size > 0,
+                enabled: watching > 0,
+                status,
+                detail
+            });
+        } catch (e) {
+            console.error(`[MailConnections] Could not publish coverage: ${e.message}`);
+        }
     }
 
     /**

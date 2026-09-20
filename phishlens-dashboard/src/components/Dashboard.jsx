@@ -338,7 +338,7 @@ export default function Dashboard() {
           {/* OVERVIEW NAV */}
           {activeNav === 'overview' && (
             <div className="animate-fade-in">
-              <OperationsOverview cases={cases} onOpenCase={openCase} />
+              <OperationsOverview cases={cases} onOpenCase={openCase} onNavigate={setActiveNav} />
             </div>
           )}
 

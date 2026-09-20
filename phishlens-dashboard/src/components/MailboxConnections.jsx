@@ -14,7 +14,7 @@ import { api } from '../services/api';
 export default function MailboxConnections() {
     const [state, setState] = useState(null);
     const [adding, setAdding] = useState(false);
-    const [form, setForm] = useState({ provider: 'gmail', email: '', password: '', host: '', port: 993 });
+    const [form, setForm] = useState({ provider: 'gmail', email: '', password: '', host: '', port: 993, folder: 'INBOX' });
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState(null);
     const [hint, setHint] = useState(null);
@@ -45,7 +45,8 @@ export default function MailboxConnections() {
             const payload = {
                 ...form,
                 host: form.provider === 'custom' ? form.host : provider?.host,
-                port: Number(form.port) || 993
+                port: Number(form.port) || 993,
+                folder: form.folder || 'INBOX'
             };
             if (testOnly) {
                 const result = await api.testConnection(payload);
@@ -58,7 +59,7 @@ export default function MailboxConnections() {
             } else {
                 const result = await api.addConnection(payload);
                 setSuccess(`${result.connection.email} is connected. New mail will be checked every 30 seconds.`);
-                setForm({ provider: 'gmail', email: '', password: '', host: '', port: 993 });
+                setForm({ provider: 'gmail', email: '', password: '', host: '', port: 993, folder: 'INBOX' });
                 setAdding(false);
                 load();
             }
@@ -98,6 +99,16 @@ export default function MailboxConnections() {
                     under Response.
                 </p>
 
+                <div style={{
+                    background: 'var(--bg-surface)', borderRadius: '6px', padding: '12px 14px',
+                    marginBottom: '16px', fontSize: '0.77rem', color: 'var(--text-muted)', lineHeight: 1.6
+                }}>
+                    <strong style={{ color: 'var(--text-secondary)' }}>What gets checked:</strong> new mail
+                    arriving in the folder you choose, looked at every 30 seconds. Mail that was already
+                    in the folder before you connected is not re-examined, and each connection watches one
+                    folder — so to cover both, connect the account twice, once for Inbox and once for Spam.
+                </div>
+
                 {state.mailboxes.length === 0 ? (
                     <div style={{ fontSize: '0.82rem', color: 'var(--text-dim)', padding: '14px', background: 'var(--bg-surface)', borderRadius: '6px' }}>
                         No mailbox is connected yet, so no live mail is being checked.
@@ -110,7 +121,7 @@ export default function MailboxConnections() {
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ fontWeight: 600, fontSize: '0.87rem', color: 'var(--text-primary)' }}>{m.email}</div>
                                     <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                                        {m.provider_label} · {m.messages_seen} message{m.messages_seen === 1 ? '' : 's'} checked
+                                        {m.provider_label} · {m.folder || 'INBOX'} · {m.messages_seen} message{m.messages_seen === 1 ? '' : 's'} checked
                                         {m.last_checked_at ? ` · last looked ${new Date(m.last_checked_at).toLocaleTimeString()}` : ''}
                                     </div>
                                     {m.last_error && (
@@ -155,7 +166,12 @@ export default function MailboxConnections() {
                             <span style={label}>Where is this account?</span>
                             <select
                                 value={form.provider}
-                                onChange={e => setForm({ ...form, provider: e.target.value })}
+                                onChange={e => {
+                                    // Folder names are provider-specific, so keeping the old one
+                                    // would silently ask Gmail to open "Junk Email".
+                                    const next = state.providers.find(p => p.id === e.target.value);
+                                    setForm({ ...form, provider: e.target.value, folder: next?.folders?.[0]?.path || 'INBOX' });
+                                }}
                                 style={field}
                             >
                                 {state.providers.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
@@ -165,6 +181,24 @@ export default function MailboxConnections() {
                         {provider?.guidance && (
                             <div style={{ background: 'var(--tint-accent)', borderRadius: '6px', padding: '11px 13px', fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.55 }}>
                                 {provider.guidance}
+                            </div>
+                        )}
+
+                        {provider?.folders?.length > 1 && (
+                            <div>
+                                <span style={label}>Which folder should be watched?</span>
+                                <select
+                                    value={form.folder}
+                                    onChange={e => setForm({ ...form, folder: e.target.value })}
+                                    style={field}
+                                >
+                                    {provider.folders.map(f => <option key={f.path} value={f.path}>{f.label}</option>)}
+                                </select>
+                                <small style={{ fontSize: '0.71rem', color: 'var(--text-dim)', display: 'block', marginTop: '5px', lineHeight: 1.5 }}>
+                                    One folder is watched per connection. Spam is worth adding as a second
+                                    connection for the same account: a phishing message your provider filed
+                                    as spam never reaches the inbox, so it would otherwise never be examined.
+                                </small>
                             </div>
                         )}
 

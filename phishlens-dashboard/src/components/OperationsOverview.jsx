@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import { api } from '../services/api';
 import GlobalThreatMap from './GlobalThreatMap';
+import { Inbox } from 'lucide-react';
 
 /**
  * The operations overview: what arrived, how it was judged, where it came from
@@ -177,14 +178,25 @@ function EveryEmail({ cases, onOpenCase }) {
     );
 }
 
-export default function OperationsOverview({ cases = [], onOpenCase }) {
+export default function OperationsOverview({ cases = [], onOpenCase, onNavigate }) {
     const [data, setData] = useState(null);
     const [error, setError] = useState(null);
+    const [mailboxCount, setMailboxCount] = useState(null);
 
     const load = async () => {
         try {
             setData(await api.getOverview());
             setError(null);
+            // Whether any live mail is being read at all. Asked here because
+            // this is the page somebody lands on, and "0 emails examined" and
+            // "nothing is connected" are very different problems wearing the
+            // same face.
+            try {
+                const connections = await api.getConnections();
+                setMailboxCount((connections.mailboxes || []).length);
+            } catch (e) {
+                setMailboxCount(null);
+            }
         } catch (e) {
             setError(e.response?.data?.error || e.message);
         }
@@ -212,6 +224,35 @@ export default function OperationsOverview({ cases = [], onOpenCase }) {
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {mailboxCount === 0 && (
+                <div style={{
+                    background: 'var(--tint-warning)', border: '1px solid var(--warning)',
+                    borderRadius: '8px', padding: '16px 18px',
+                    display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap'
+                }}>
+                    <Inbox size={22} style={{ color: 'var(--warning)', flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: '240px' }}>
+                        <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                            No mail is being watched yet
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '3px', lineHeight: 1.55 }}>
+                            Connect your Gmail (or any other mailbox) and PhishLens will examine new
+                            messages as they arrive. Until then it only sees emails you hand it yourself.
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => onNavigate && onNavigate('connections')}
+                        style={{
+                            background: 'var(--accent)', color: 'var(--text-on-accent)', border: 'none',
+                            borderRadius: '6px', padding: '10px 17px', fontSize: '0.83rem',
+                            fontWeight: 600, cursor: 'pointer', flexShrink: 0
+                        }}
+                    >
+                        Connect Gmail
+                    </button>
+                </div>
+            )}
+
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                 <StatCard label="Emails examined" value={counts.total} tone="accent" />
                 <StatCard label="Dangerous" value={counts.high_risk} tone="danger" />

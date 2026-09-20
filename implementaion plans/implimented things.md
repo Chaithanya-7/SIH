@@ -1712,3 +1712,86 @@ The useful lesson is about the shape of the mistake rather than the mistake. I
 had flagged this item twice as "left undone, risky to touch" without once
 checking whether it ran. An unverified caveat repeated is worse than an open
 question, because it reads as a finding.
+
+## 2026-09-20 — Connecting Gmail: findable, and honest about what it covers
+
+Reported after using the installed build: no option to connect a Gmail account,
+and a fair question behind it — how is every way mail enters the system actually
+being tracked?
+
+### The option existed and could not be found
+
+Driving the live window over the DevTools Protocol showed the screen was there
+and working: a **Mailboxes** entry in the sidebar, a **Connect a mailbox**
+button, and `/api/connections` answering 200 with the Gmail provider and its
+app-password guidance. Nothing was broken. It simply could not be found.
+
+Two reasons, both mine. The entry is called "Mailboxes", which is what the
+feature *is* rather than what somebody is looking for — they are looking for
+Gmail. And the Overview, which is where the console opens, said nothing about
+it: it reported "0 emails examined" and moved on to charts, which is the same
+face an empty deployment wears when everything is connected and simply quiet.
+
+The Overview now says so directly when nothing is connected — *No mail is being
+watched yet* — with a **Connect Gmail** button that goes straight there.
+"0 emails examined" and "nothing is connected" are very different problems and
+should not look alike.
+
+### The coverage page would have lied about it
+
+This is the part worth keeping. `ingestionRegistry` decides a path's status from
+`setState`, and `mailConnections` only ever sent a heartbeat — it never called
+`setState` at all. So connecting a mailbox through the console left the coverage
+page still reporting `imap_poller: DISABLED` and `monitoring_live_mail: false`.
+
+That page exists to answer exactly one question: could a message reach somebody
+without being examined. It was answering it wrongly, and in the direction that
+does the most damage — understating coverage trains people to stop believing the
+page. Its `enable_hint` was also still naming `IMAP_ENABLED`, `IMAP_USER` and
+`IMAP_HOST`, environment variables that are no longer how any of this works,
+which is worse than no hint at all.
+
+`publishCoverage()` now reports what is really being polled: ACTIVE when mail is
+being read, FAILED when a mailbox is connected but nothing is watching it, and
+DISABLED only when nothing is connected. The hint names the Mailboxes page.
+
+My own fix arrived with an ordering defect, caught by writing the test properly:
+`remove()` calls `stopWatching()` while the connection is still in the map, so
+publishing only from there reported the last removed mailbox as *failing* rather
+than as gone. It publishes again after the delete. The test drives `remove()`
+itself rather than re-enacting its steps, because a test that re-enacts them
+passes either way — verified by reverting the fix and watching it fail, then
+restoring it and watching it pass.
+
+### Spam was a silent gap
+
+Polling watched `INBOX` and only `INBOX`. A phishing message that Google filed
+as spam — and that somebody then rescues, which is how filtered phishing
+actually reaches people — never appears in the inbox, so it would never have
+been examined, and nothing said so.
+
+Each provider now names its folders: Gmail's Spam and All Mail, Outlook's Junk
+Email, Yahoo's Bulk Mail. One folder is watched per connection, so covering both
+means connecting the account twice, and the page says that in those words rather
+than leaving it to be discovered. Changing provider resets the folder, because
+otherwise the console would quietly ask Gmail to open "Junk Email".
+
+### What is actually watched, stated plainly
+
+Six ways in, all listed on the coverage page whether or not they are switched
+on: the SMTP gateway, IMAP polling of connected mailboxes, the Gmail push API,
+the authenticated REST endpoint, the webhook, and file upload. Of these, only
+connected mailboxes read mail on their own. What that covers is new mail
+arriving in a chosen folder, checked every thirty seconds — not mail that was
+already there when the mailbox was connected, and not folders nobody chose.
+
+**217 backend tests, 217 passing** — five new ones covering exactly the states
+above, including the one my own fix got wrong.
+
+### A measurement note
+
+Twice in this session I read a screen as broken when it was not: a Reports page
+that looked blank, and this connect banner that looked absent. Both were
+screenshots and text reads taken before React had finished painting; reading the
+DOM afterwards showed both fully populated. Worth remembering that a single
+early read is not evidence of absence.

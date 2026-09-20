@@ -49,7 +49,7 @@ class IngestionRegistry {
                 name: 'IMAP mailbox poller',
                 transport: 'IMAP',
                 description: 'Polls an IMAP mailbox for newly delivered messages.',
-                enable_hint: 'Set IMAP_ENABLED=true with IMAP_USER, IMAP_PASSWORD and IMAP_HOST.',
+                enable_hint: 'Connect a mailbox on the Mailboxes page. Gmail, Outlook and Yahoo need an app password rather than your normal one.',
                 expects_heartbeat: true,
                 heartbeat_seconds: 60
             },
