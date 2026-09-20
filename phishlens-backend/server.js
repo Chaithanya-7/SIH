@@ -186,7 +186,7 @@ async function processPipeline(emailContent, source = 'MANUAL_API', clientMessag
         ]);
 
         // Branch 4 - Campaign correlation across cases (persistent SQLite graph)
-        threatObject = await campaignGraph.processThreatObject(threatObject);
+        threatObject = await campaignGraph.processThreatObject(threatObject, parsedEmail);
 
         // ===== CONVERGENCE: fusion, scoring, decision =====
 

@@ -180,6 +180,27 @@ The tool does **not** yet continuously monitor a live mailbox. The ingestion ada
 
 Gmail ingestion remains unverified because it requires the operator's own Google Cloud OAuth client and a Pub/Sub push subscription, neither of which can be created or tested from here. The code path exists and the preflight now says exactly what is missing. Remediation also still defaults to `simulation`, so actions are not performed against a real mailbox until both OAuth and `REMEDIATION_MODE=live` are configured.
 
+## 2026-09-20 — Phase 5: campaign correlation that does not invent campaigns
+
+The original audit flagged this as a real defect: "A Google/Microsoft/Cloudflare/shared-hosting IP/domain/ASN can therefore create false campaign links." A campaign view that merges unrelated incidents is worse than none, because an analyst acts on the grouping.
+
+- **`modules/correlationGuard.js`** — decides whether an indicator may link cases at all. The distinction that matters is specificity:
+  - *High specificity* (attachment hash, exact URL, exact sender address) is attacker-chosen, so sharing one is meaningful even across hundreds of messages.
+  - *Low specificity* (ASN, provider mail IP, freemail sender domain, multi-tenant hosting domain) is shared by unrelated parties by design and proves nothing alone.
+  - Suppressed both by a list of well-known providers **and** by prevalence: any low-specificity indicator appearing across 8+ cases in this deployment is infrastructure, whatever it is called. Prevalence is deliberately **not** applied to high-specificity indicators, because suppressing a widely reused phishing URL would break exactly the mass-campaign case correlation exists to catch. Both directions are tested.
+  - Provider sending infrastructure is identified by reusing the forensic engine's existing `CLIENT_IP_OBSCURED_BY_PROVIDER` conclusion rather than guessing again.
+- **Grouped scoring instead of summing.** One attacker host observed as an IP, a domain and a URL was previously worth 0.75 as though it were three independent proofs. Factors are now grouped into families (PAYLOAD, CONTENT, IDENTITY, INFRASTRUCTURE, TARGETING); the strongest in each counts in full and the rest at progressively halved weight. Independent families still accumulate normally.
+- **Suppressed links are reported, not hidden.** `campaign_association.suppressed_factors` records each link that was deliberately not made and why, so an analyst asking why two similar-looking cases were not grouped gets an answer.
+- **`modules/semanticCorrelation.js` — the missing Phase 5 capability.** Infrastructure correlation misses a campaign that rotates senders, domains and hosts between sends, which is what a competent operator does. What tends not to change is the lure written once and reused. Similarity is Jaccard overlap over the token characteristics already captured for adaptive learning, so it needs no extra storage and no retained message bodies, and the shared terms that produced a link are reported. Weight scales with similarity, since near-identical wording is far more specific than partial overlap.
+  - Ordering bug found and fixed while wiring: it originally read `threatObject.learning_features`, which is not populated until after correlation runs, so it would never have matched anything. It now tokenises the current message directly and compares against the stored features of past cases using the same tokeniser.
+
+### Verified end to end
+
+- **Two unrelated phishing emails, both sent from gmail.com** → `UNASSOCIATED`, confidence 0, no related cases, with the suppression explained: *"gmail.com is a consumer mail provider used by unrelated senders."* Previously these would have been merged into one fabricated campaign.
+- **One campaign reusing a lure across rotated sender, domain, IP and URL** → correctly linked at 100% wording similarity with the shared terms listed. Before this change these two shared no correlatable indicator at all and would have been entirely unlinked.
+
+65 tests passing.
+
 ### Next architectural gap (not yet started)
 
 - `DETECTION_PROVIDER` is still hardcoded to `sublime` with no local Sublime service in this repository — every ingestion path still calls out to an external, unconfigured detection dependency for MQL/rule matching (`mqlBridge.js` only normalizes a Sublime response; it does not run its own rules). This is the single largest remaining gap against the master plan's Phase 3 (Detection Engine): a native, source-cited MQL/rule engine (MITRE ATT&CK, APWG, CISA, OWASP, abuse.ch/OpenPhish/PhishTank-seeded rules per the compact plan) is not yet implemented, so the platform has no working detection path without an external Sublime instance.

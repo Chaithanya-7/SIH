@@ -3,6 +3,8 @@ const path = require('path');
 const GraphNode = require('../models/GraphNode');
 const GraphEdge = require('../models/GraphEdge');
 const ipUtils = require('../utils/ipUtils');
+const correlationGuard = require('./correlationGuard');
+const semanticCorrelation = require('./semanticCorrelation');
 
 class CampaignGraph {
     constructor() {
@@ -54,7 +56,7 @@ class CampaignGraph {
         });
     }
 
-    async processThreatObject(threatObject) {
+    async processThreatObject(threatObject, parsedEmail) {
         console.log(`[CampaignGraph] Processing persistent graph & cross-case correlation for Case ${threatObject.case_id}...`);
 
         const caseId = threatObject.case_id;
@@ -152,8 +154,9 @@ class CampaignGraph {
 
         // ==================== CROSS-CASE AUTOMATIC CORRELATION ====================
         const correlationFactors = [];
+        /** Links that were deliberately not made, kept so the absence is explainable. */
+        const suppressedFactors = [];
         const relatedCaseSet = new Set();
-        let totalWeight = 0.0;
 
         // A. Shared Payload Hash (Weight: +0.30 - Very Strong Evidence)
         for (const h of hashes) {
@@ -174,14 +177,20 @@ class CampaignGraph {
         if (isRoutableIp) {
             const sharedIpCases = await this.findCasesSharingNode(`ip:${originIp}`, caseId);
             if (sharedIpCases.length > 0) {
-                sharedIpCases.forEach(c => relatedCaseSet.add(c));
-                correlationFactors.push({
-                    factor: 'SHARED_IP',
-                    status: 'SUPPORTED',
-                    weight: 0.25,
-                    evidence: `Probable origin IP ${originIp} appears in cases: ${sharedIpCases.join(', ')}`
+                const verdict = correlationGuard.evaluateIndicator({
+                    type: 'IP', value: originIp, sharedCaseCount: sharedIpCases.length, threatObject
                 });
-                totalWeight += 0.25;
+                if (verdict.allowed) {
+                    sharedIpCases.forEach(c => relatedCaseSet.add(c));
+                    correlationFactors.push({
+                        factor: 'SHARED_IP',
+                        status: 'SUPPORTED',
+                        weight: 0.25,
+                        evidence: `Probable origin IP ${originIp} appears in cases: ${sharedIpCases.join(', ')}`
+                    });
+                } else {
+                    suppressedFactors.push({ factor: 'SHARED_IP', indicator: originIp, reason: verdict.reason });
+                }
             }
         }
 
@@ -189,14 +198,20 @@ class CampaignGraph {
         for (const dom of infraDomains) {
             const sharedDomCases = await this.findCasesSharingNode(`domain:${dom.toLowerCase()}`, caseId);
             if (sharedDomCases.length > 0) {
-                sharedDomCases.forEach(c => relatedCaseSet.add(c));
-                correlationFactors.push({
-                    factor: 'SHARED_DOMAIN_INFRASTRUCTURE',
-                    status: 'SUPPORTED',
-                    weight: 0.25,
-                    evidence: `Domain ${dom} is shared with cases: ${sharedDomCases.join(', ')}`
+                const verdict = correlationGuard.evaluateIndicator({
+                    type: 'DOMAIN', value: dom, sharedCaseCount: sharedDomCases.length, threatObject
                 });
-                totalWeight += 0.25;
+                if (verdict.allowed) {
+                    sharedDomCases.forEach(c => relatedCaseSet.add(c));
+                    correlationFactors.push({
+                        factor: 'SHARED_DOMAIN_INFRASTRUCTURE',
+                        status: 'SUPPORTED',
+                        weight: 0.25,
+                        evidence: `Domain ${dom} is shared with cases: ${sharedDomCases.join(', ')}`
+                    });
+                } else {
+                    suppressedFactors.push({ factor: 'SHARED_DOMAIN_INFRASTRUCTURE', indicator: dom, reason: verdict.reason });
+                }
             }
         }
 
@@ -249,18 +264,41 @@ class CampaignGraph {
         if (asn && relatedCaseSet.size > 0) {
             const sharedAsnCases = await this.findCasesSharingNode(`asn:${asn}`, caseId);
             if (sharedAsnCases.length > 0) {
-                correlationFactors.push({
-                    factor: 'SHARED_ASN_PROVIDER',
-                    status: 'SUPPORTED',
-                    weight: 0.05,
-                    evidence: `ASN ${asn} shared across correlated threat cluster`
+                const verdict = correlationGuard.evaluateIndicator({
+                    type: 'ASN', value: asn, sharedCaseCount: sharedAsnCases.length, threatObject
                 });
-                totalWeight += 0.05;
+                if (verdict.allowed) {
+                    correlationFactors.push({
+                        factor: 'SHARED_ASN_PROVIDER',
+                        status: 'SUPPORTED',
+                        weight: 0.05,
+                        evidence: `ASN ${asn} shared across correlated threat cluster`
+                    });
+                } else {
+                    suppressedFactors.push({ factor: 'SHARED_ASN_PROVIDER', indicator: asn, reason: verdict.reason });
+                }
             }
         }
 
-        // Calculate Bounded Evidence-Derived Campaign Confidence
-        const finalConfidence = parseFloat(Math.min(0.95, Math.max(0.0, totalWeight)).toFixed(2));
+        // H. Shared wording. Catches a campaign that rotates its senders, domains
+        //    and hosts between sends but reuses the lure it wrote once.
+        const semantic = semanticCorrelation.findSimilarCases(threatObject, parsedEmail);
+        semantic.matches.forEach(match => {
+            relatedCaseSet.add(match.case_id);
+            correlationFactors.push({
+                factor: 'SEMANTIC_SIMILARITY',
+                status: 'SUPPORTED',
+                // Near-identical wording is far more specific than partial
+                // overlap, which ordinary business correspondence produces.
+                weight: match.similarity >= 0.9 ? 0.30 : match.similarity >= 0.8 ? 0.25 : 0.15,
+                evidence: `Message wording is ${Math.round(match.similarity * 100)}% similar to case ${match.case_id} (shared terms: ${match.shared_terms.join(', ')})`
+            });
+        });
+
+        // Grouped rather than summed: one attacker host seen as an IP, a domain
+        // and a URL is a single observation, not three independent proofs.
+        const scored = correlationGuard.scoreFactors(correlationFactors);
+        const finalConfidence = scored.confidence;
         const relatedCases = Array.from(relatedCaseSet);
 
         let campaignStatus = 'UNASSOCIATED';
@@ -274,7 +312,12 @@ class CampaignGraph {
             status: campaignStatus,
             related_cases: relatedCases,
             factors: correlationFactors,
-            limitation: 'Shared infrastructure supports campaign association but does not establish actor identity.'
+            scoring: scored.breakdown,
+            // Shown rather than hidden: an analyst asking why two obviously
+            // similar cases were not linked deserves the reason.
+            suppressed_factors: suppressedFactors,
+            semantic_matches: semantic.matches,
+            limitation: 'Shared infrastructure supports campaign association but does not establish actor identity. Indicators shared by unrelated parties, such as consumer mail providers and multi-tenant hosting, are deliberately excluded from correlation.'
         };
 
         threatObject.confidence.campaign_association = finalConfidence;
