@@ -238,6 +238,60 @@ The report was a thin technical dump. It omitted NLP findings, MQL rule matches,
 
 72 tests passing, 0 npm vulnerabilities.
 
+## 2026-09-20 — Theme system, real executive protection, tamper-evident ledger, and Phase 11
+
+### Architecture diagram audit
+
+Checked the technical-approach diagram against the code. Everything shown exists **except** two items, both now addressed:
+
+- **"Tamper-Evident Ledger"** was a plain JSON array, no hashing, capped at 500 entries via `pop()`.
+- **"Executive Guard / VIP impersonation"** was four hardcoded names matched with substring tests.
+
+### UI: light and dark themes
+
+- Semantic theme tokens with dark (default) and light variants; **800 hardcoded colours across 19 files** replaced with tokens so a colour is never defined twice and the themes cannot drift.
+- Status colours are not inverted between themes — a red that reads on near-black is washed out on white, so each theme carries its own ramp chosen for contrast.
+- Follows the OS preference until the analyst chooses, then their choice wins and persists. Applied to `<html>` so scrollbars, form controls and Leaflet follow; map tiles are filtered per theme.
+- Verified in a browser in both themes including the dense investigation view.
+
+### Tamper-evident audit ledger
+
+- Each entry carries a SHA-256 over its contents plus the previous entry's hash, so altering, deleting or inserting a record breaks every hash after it.
+- Entries are now appended chronologically (a chain must run in the direction it was written) and overflow is **archived** rather than discarded — the old behaviour destroyed the earliest history and would have severed the chain.
+- Integrity is returned with `/api/audit`, so a broken chain is never read as a trustworthy log. Honest about scope: this detects tampering, it does not prevent it; the limitation and latest hash are exposed for external anchoring.
+- 8 tests attempt real tampering — modify, delete, forge, reload — all detected.
+
+### Real executive protection
+
+- Operator-managed directory of protected people and organisation domains, API-managed, validated and audit-logged. With none configured it reports `NO_DIRECTORY_CONFIGURED` rather than implying protection.
+- Detects display-name impersonation (whole-token name matching, so a job title inside an unrelated address cannot trip it and a shared surname does not identify anyone), lookalike organisation domains by edit distance scaled to domain length, reply redirection while impersonating, and repeat targeting.
+- **Wiring corrected**: executive evaluation now runs *before* evidence fusion, so its findings become evidence through the same path as every other signal. New EXECUTIVE scoring family.
+- Verified end to end: a CEO-fraud message impersonating a configured CFO from a `cornpany.example` lookalike was caught on all three signals at HIGH_RISK 0.99.
+
+### Phase 11 — measured, then optimised
+
+Measurement first, per the plan. Two benchmarks added under `scratch/`.
+
+**Local CPU is not the bottleneck**: ~1.08 ms per message end to end, ~926 messages/second on one core. MIME parsing is 73% of that; every other stage is under 0.05 ms.
+
+**Network latency dominates wall-clock time**:
+
+| Stage | Cold | Cached |
+|---|---|---|
+| RDAP domain age | 2125 ms | 0.2 ms |
+| Reverse DNS PTR | 171 ms | — |
+| DMARC DNS TXT | 69 ms | — |
+| DKIM verification | 5.8 ms | — |
+
+Two real problems found by measuring rather than guessing:
+
+1. **DKIM verification and the DMARC lookup ran sequentially** despite being independent. Parallelised: `authAnalyzer.analyze()` median fell from ~102 ms to ~28 ms.
+2. **Stored cases grew with the square of campaign size.** Semantic correlation wrote one factor *and* one evidence item per related case, so 50 similar messages produced 27 evidence items and 49 KB per case. In a 1,000-message campaign this would be crippling. Factors are now capped at the strongest 5 while `related_cases` stays complete and the remainder is recorded as `additional_similar_cases`. Storage fell from **49 KB to 27 KB per case** and evidence items from 27 to 7, with no scoring change since only the strongest per family counts in full.
+
+Other measurements: API latency mean ~150 ms p95 ~180 ms (warm, dominated by lookups for unseen sender domains); memory 105 MB RSS after 50 cases; SQLite graph 100 KB.
+
+90 tests passing.
+
 ### Next architectural gap (not yet started)
 
 - `DETECTION_PROVIDER` is still hardcoded to `sublime` with no local Sublime service in this repository — every ingestion path still calls out to an external, unconfigured detection dependency for MQL/rule matching (`mqlBridge.js` only normalizes a Sublime response; it does not run its own rules). This is the single largest remaining gap against the master plan's Phase 3 (Detection Engine): a native, source-cited MQL/rule engine (MITRE ATT&CK, APWG, CISA, OWASP, abuse.ch/OpenPhish/PhishTank-seeded rules per the compact plan) is not yet implemented, so the platform has no working detection path without an external Sublime instance.

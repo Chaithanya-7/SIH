@@ -283,8 +283,16 @@ class CampaignGraph {
         // H. Shared wording. Catches a campaign that rotates its senders, domains
         //    and hosts between sends but reuses the lure it wrote once.
         const semantic = semanticCorrelation.findSimilarCases(threatObject, parsedEmail);
-        semantic.matches.forEach(match => {
-            relatedCaseSet.add(match.case_id);
+
+        // Every related case is recorded as an id, but only the strongest few
+        // become factors. In a mass campaign a message can resemble hundreds of
+        // others, and writing one factor and one evidence item for each grows
+        // storage with the square of the campaign size while adding nothing to
+        // the score, since only the strongest in a family is counted in full.
+        const SEMANTIC_FACTOR_LIMIT = 5;
+        semantic.matches.forEach(match => relatedCaseSet.add(match.case_id));
+
+        semantic.matches.slice(0, SEMANTIC_FACTOR_LIMIT).forEach(match => {
             correlationFactors.push({
                 factor: 'SEMANTIC_SIMILARITY',
                 status: 'SUPPORTED',
@@ -294,6 +302,8 @@ class CampaignGraph {
                 evidence: `Message wording is ${Math.round(match.similarity * 100)}% similar to case ${match.case_id} (shared terms: ${match.shared_terms.join(', ')})`
             });
         });
+
+        const undisclosedSimilar = Math.max(0, semantic.matches.length - SEMANTIC_FACTOR_LIMIT);
 
         // Grouped rather than summed: one attacker host seen as an IP, a domain
         // and a URL is a single observation, not three independent proofs.
@@ -316,7 +326,8 @@ class CampaignGraph {
             // Shown rather than hidden: an analyst asking why two obviously
             // similar cases were not linked deserves the reason.
             suppressed_factors: suppressedFactors,
-            semantic_matches: semantic.matches,
+            semantic_matches: semantic.matches.slice(0, 5),
+            additional_similar_cases: undisclosedSimilar,
             limitation: 'Shared infrastructure supports campaign association but does not establish actor identity. Indicators shared by unrelated parties, such as consumer mail providers and multi-tenant hosting, are deliberately excluded from correlation.'
         };
 
