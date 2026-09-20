@@ -10,6 +10,12 @@ contextBridge.exposeInMainWorld('phishlens', {
     /** Backend URL and the local API key, so the console authenticates itself. */
     getConfig: () => ipcRenderer.invoke('phishlens:get-config'),
 
+    /**
+     * The folder to load into the browser, already carrying this install's
+     * address and key, so loading it needs no configuration.
+     */
+    getExtensionPath: () => ipcRenderer.invoke('phishlens:get-extension-path'),
+
     getBackendStatus: () => ipcRenderer.invoke('phishlens:get-backend-status'),
     restartBackend: () => ipcRenderer.invoke('phishlens:restart-backend'),
 

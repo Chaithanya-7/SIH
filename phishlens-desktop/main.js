@@ -1,4 +1,5 @@
 const { app, BrowserWindow, shell, ipcMain } = require('electron');
+const publishExtension = require('./publishExtension');
 const path = require('path');
 const fs = require('fs');
 const BackendSupervisor = require('./backendSupervisor');
@@ -253,6 +254,10 @@ if (!gotSingleInstanceLock) {
         createWindow(deepLinkFromArgv(process.argv) || { route: 'dashboard' });
         await supervisor.start();
 
+        // Published after the backend starts, because the address and key it
+        // writes into the extension are the supervisor's.
+        publishConfiguredExtension();
+
         app.on('activate', () => {
             if (BrowserWindow.getAllWindows().length === 0) createWindow({ route: 'dashboard' });
         });
@@ -269,6 +274,39 @@ app.on('before-quit', () => supervisor.stop());
 process.on('exit', () => supervisor.stop());
 process.on('SIGINT', () => { supervisor.stop(); app.quit(); });
 process.on('SIGTERM', () => { supervisor.stop(); app.quit(); });
+
+/**
+ * The extension folder somebody should load, with the key already in it.
+ *
+ * Republished on every start so it always matches the running backend. A
+ * failure here is reported and stepped over: the extension can still be loaded
+ * from the bundled copy and configured by hand, which is what happened before
+ * this existed.
+ */
+let publishedExtensionPath = null;
+
+function publishConfiguredExtension() {
+    const bundled = app.isPackaged
+        ? path.join(process.resourcesPath, 'phishlens-extension')
+        : path.join(__dirname, '..', 'phishlens-extension');
+
+    try {
+        publishedExtensionPath = publishExtension({
+            sourceDir: bundled,
+            // The resources directory is read-only in a packaged install, which
+            // is why this is written beside the application's own data.
+            targetDir: path.join(app.getPath('userData'), 'browser-extension'),
+            apiBaseUrl: supervisor.baseUrl,
+            apiKey: supervisor.apiKey,
+            log: message => supervisor.record(message)
+        });
+    } catch (e) {
+        publishedExtensionPath = null;
+        supervisor.record(`[Extension] Could not publish a configured copy: ${e.message}`);
+    }
+}
+
+ipcMain.handle('phishlens:get-extension-path', () => publishedExtensionPath);
 
 ipcMain.handle('phishlens:get-config', () => ({
     backendUrl: supervisor.baseUrl,
