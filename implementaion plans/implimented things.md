@@ -292,6 +292,36 @@ Other measurements: API latency mean ~150 ms p95 ~180 ms (warm, dominated by loo
 
 90 tests passing.
 
+## 2026-09-20 — SIEM operations overview, global threat map, and Phase 12 validation
+
+### Operations overview rebuilt as a SIEM console
+
+- Headline counts, 24-hour activity by verdict, ingestion-path breakdown, and a detections-by-rule table showing which rules are actually firing. Every figure derives from stored cases; an empty deployment says so rather than rendering an impressive-looking chart of nothing.
+
+### Global threat map
+
+- Every geolocated address the deployment has observed, on a pannable, zoomable world map, coloured by the severity of the worst case it appeared in (green / amber / red).
+- Marker size reflects how often an address has been seen; severity is carried by colour alone so the two dimensions cannot be confused. Lower severities draw first so high-risk markers are never hidden beneath them.
+- Each marker names the address, city, country, ASN, ISP, the role it played and how many cases it appeared in.
+
+### Geolocation reworked
+
+- **Fixes an audit finding**: lookups went to ip-api.com over plain HTTP, so addresses seen in the operator's mail crossed the network in clear text and the response driving the map could be modified in transit. Now HTTPS to a free, key-less endpoint.
+- Results cache to disk rather than memory only, so a restart no longer re-queries every address ever seen.
+- **Every public address in a message is now located, not just the selected origin** — a relay chain often crosses several networks and an analyst needs the whole path. Bounded per message, run concurrently.
+- Reserved ranges are reported as unlocatable rather than given a guessed point.
+- Verified with real routable addresses resolving to Brisbane, Moscow, San Francisco and San Jose with correct ASNs, rendering as severity-coloured markers in both themes.
+
+### Phase 12 — final validation
+
+The plan requires proving the whole chain, not the individual links. Added a validation test that drives `EMAIL → INGESTION → FORENSICS → NLP → MQL → IOC → THREAT INTELLIGENCE → GEOLOCATION → CAMPAIGN → RISK → EXPLANATION → MITIGATION → REPORT → DASHBOARD` in one pass against isolated state, asserting each stage actually contributed so a silently failing stage cannot pass as success.
+
+A single crafted message exercising every capability produced **11 matched rules, 25 evidence items and a 0.99 score**, with the CFO impersonation, the `cornpany.example` lookalike, the known-bad URL, the newly-registered sender domain and the executable attachment all detected, the audit chain verifying, the raw message correctly not retained, and the generated PDF containing the verdict, the rules, the impersonated executive, the attachment and its limitations. A paired test confirms ordinary business correspondence passes the same pipeline as SAFE with no language signals.
+
+Network-dependent stages are injected in the validation so it runs deterministically offline; each has its own tests and was verified live against real services separately.
+
+**92 tests passing, 0 npm vulnerabilities, dashboard builds clean.**
+
 ### Next architectural gap (not yet started)
 
 - `DETECTION_PROVIDER` is still hardcoded to `sublime` with no local Sublime service in this repository — every ingestion path still calls out to an external, unconfigured detection dependency for MQL/rule matching (`mqlBridge.js` only normalizes a Sublime response; it does not run its own rules). This is the single largest remaining gap against the master plan's Phase 3 (Detection Engine): a native, source-cited MQL/rule engine (MITRE ATT&CK, APWG, CISA, OWASP, abuse.ch/OpenPhish/PhishTank-seeded rules per the compact plan) is not yet implemented, so the platform has no working detection path without an external Sublime instance.
