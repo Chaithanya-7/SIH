@@ -194,7 +194,7 @@ if (!gotSingleInstanceLock) {
             return;
         }
 
-        if (app.isDefaultProtocolClient(PROTOCOL)) return;
+        if (app.isDefaultProtocolClient(PROTOCOL)) return true;
 
         app.removeAsDefaultProtocolClient(PROTOCOL);
         app.setAsDefaultProtocolClient(PROTOCOL);
@@ -203,12 +203,52 @@ if (!gotSingleInstanceLock) {
             // Reported rather than passed over: deep links will go somewhere
             // else, and the person needs to know that rather than discover it
             // by clicking a button that does nothing.
-            console.warn(`[PhishLens] Could not claim the ${PROTOCOL}:// scheme; another application still holds it. Deep links from the extension will not reach this app.`);
+            console.warn(`[PhishLens] Could not claim the ${PROTOCOL}:// scheme. Deep links from the extension will not reach this app.`);
+            return false;
         }
+        return true;
+    }
+
+    /**
+     * Keeps asserting the claim over the first few seconds of a launch.
+     *
+     * A single call at app-ready is enough on every ordinary launch - the
+     * scheme registers within a second, measured. It is not enough on the one
+     * launch the installer performs itself: after a fresh install the scheme
+     * was still unregistered, while running the very same binary by hand
+     * registered it immediately.
+     *
+     * What the installer does differently was not established, and guessing at
+     * NSIS internals to find out would be the wrong way round. What matters is
+     * that the failure falls exactly where it hurts - a person installs, clicks
+     * "More info" in the extension, and nothing happens - and that a claim
+     * which is already ours costs a single registry read. So it is asserted
+     * repeatedly for a short while and then left alone.
+     *
+     * Stops as soon as it succeeds, and says so once if it never does.
+     */
+    function ensureProtocolClaimed() {
+        if (claimProtocol()) return;
+
+        let attempts = 0;
+        const timer = setInterval(() => {
+            attempts++;
+            if (claimProtocol()) {
+                clearInterval(timer);
+                return;
+            }
+            if (attempts >= 10) {
+                clearInterval(timer);
+                console.warn(`[PhishLens] Could not register the ${PROTOCOL}:// scheme after ${attempts} attempts. Deep links from the browser extension will not open this application.`);
+            }
+        }, 1000);
+
+        // Never hold the process open for this.
+        if (typeof timer.unref === 'function') timer.unref();
     }
 
     app.whenReady().then(async () => {
-        claimProtocol();
+        ensureProtocolClaimed();
 
         createWindow(deepLinkFromArgv(process.argv) || { route: 'dashboard' });
         await supervisor.start();

@@ -65,6 +65,9 @@
     "win": {
       "target": "nsis"
     },
+    "nsis": {
+      "//": "build/installer.nsh is picked up automatically. An explicit 'include' is resolved relative to the build resources directory, so naming the path here made electron-builder look for build/build/installer.nsh and silently skip it."
+    },
     "linux": {
       "target": "AppImage",
       "category": "Utility"

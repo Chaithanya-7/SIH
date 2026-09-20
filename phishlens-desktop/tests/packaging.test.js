@@ -126,3 +126,67 @@ test('the QR decoder ships and the QR generator does not', { skip }, () => {
     assert.ok(!fs.existsSync(path.join(modules, 'qrcode')),
         'qrcode only generates fixtures for the test suite');
 });
+
+/**
+ * Reference data the backend cannot work correctly without.
+ *
+ * The Public Suffix List is not a dependency npm knows about - it is a data
+ * file in the backend tree - so nothing in the packaging would notice it going
+ * missing. Without it, registrable-domain extraction falls back to the last two
+ * labels, which is wrong for every multi-label suffix and for every free
+ * hosting platform: a phishing page on a fresh github.io subdomain would report
+ * GitHub's own registration date and look like an established domain. The
+ * failure is silent, which is exactly why it is asserted here.
+ */
+test('the Public Suffix List ships with the backend', { skip }, () => {
+    const list = path.join(PACKAGED, 'backend', 'reference', 'public_suffix_list.dat');
+    assert.ok(fs.existsSync(list), 'without it every domain-age and lookalike decision degrades silently');
+
+    const content = fs.readFileSync(list, 'utf8');
+    assert.match(content, /===BEGIN ICANN DOMAINS===/, 'it must be the real list, not a truncated download');
+
+    // The platforms that motivated adding it in the first place.
+    ['github.io', 'pages.dev', 'workers.dev', 'blogspot.com'].forEach(suffix =>
+        assert.ok(new RegExp(`^${suffix.replace('.', '\.')}$`, 'm').test(content),
+            `${suffix} must be present or subdomains of it resolve to the platform itself`));
+});
+
+test('the QR decoder and its image libraries are all present', { skip }, () => {
+    const modules = path.join(PACKAGED, 'backend', 'node_modules');
+    ['jsqr', 'jpeg-js', 'pngjs'].forEach(dependency =>
+        assert.ok(fs.existsSync(path.join(modules, dependency)),
+            `${dependency} is needed to read a QR code out of an attachment at runtime`));
+});
+
+/**
+ * The console must reference its assets relatively.
+ *
+ * Vite's default base is '/', which emits <script src="/assets/index-xxx.js">.
+ * Over HTTP that is correct. Loaded as a file:// URL - which is exactly how the
+ * packaged app opens the console - a leading slash resolves to the root of the
+ * filesystem and every asset 404s. The HTML itself still loads, so the window
+ * title is right and the body background applies, and the user gets a
+ * correctly-titled black window with nothing in it.
+ *
+ * This shipped, and it survived every earlier check because those confirmed the
+ * backend answered and that loadFile() resolved. Neither says anything about
+ * whether the page rendered. Measured with a headless Electron window: 0
+ * rendered characters before, 508 after.
+ */
+test('the packaged console references its assets relatively', { skip }, () => {
+    const indexPath = path.join(PACKAGED, 'dashboard', 'index.html');
+    const html = fs.readFileSync(indexPath, 'utf8');
+
+    const absolute = [...html.matchAll(/(?:src|href)="(\/[^"]*)"/g)].map(m => m[1]);
+    assert.deepStrictEqual(absolute, [],
+        'an absolute asset path resolves to the filesystem root under file:// and renders a blank window');
+
+    const referenced = [...html.matchAll(/(?:src|href)="(\.\/[^"]+)"/g)].map(m => m[1]);
+    assert.ok(referenced.length >= 2, 'the console should reference at least a script and a stylesheet');
+
+    // The referenced files must actually be there, not merely correctly spelt.
+    referenced.forEach(rel => {
+        const resolved = path.join(path.dirname(indexPath), rel.replace(/^\.\//, ''));
+        assert.ok(fs.existsSync(resolved), `${rel} is referenced but missing from the package`);
+    });
+});

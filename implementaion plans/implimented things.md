@@ -1299,3 +1299,97 @@ installation has observed, so a newly deployed system knows no conversations and
 these signals strengthen over time.
 
 **212 backend tests** (was 200).
+
+## 2026-09-20 — The installed app opened to a black screen
+
+Reported from a screenshot: the window opened, the title bar read "PhishLens —
+SOC Investigation Platform", and the content area was entirely black.
+
+### Cause
+
+`vite.config.js` set no `base`, so Vite defaulted to `/` and emitted
+
+    <script src="/assets/index-CaRNkRRp.js"></script>
+
+Served over HTTP that is correct, which is why `npm run dev` was never affected.
+The packaged app loads the console over `file://`, where a leading slash means
+the root of the filesystem — `C:/assets/…`. Every asset returned 404. The HTML
+itself loaded, so the window title was right and the body's
+`background-color: #0a0a0f` painted. A correctly-titled black rectangle.
+
+Fixed with `base: './'`.
+
+### Why it was not caught
+
+The earlier verification checked that the backend answered HTTP 200 and that the
+supervisor reported the console loaded. Both were true. `loadFile()` resolves
+whether or not the page renders — the check confirmed the plumbing and never the
+picture.
+
+Measured with a headless Electron window loading the real build from disk:
+
+| | rendered characters | root children |
+|---|---|---|
+| Absolute paths (shipped) | **0** | 0 |
+| Relative paths (fixed) | **508** | 1 |
+
+A packaging test now fails on any absolute asset path in the packaged console,
+and separately resolves every referenced file to confirm it is actually in the
+package rather than merely spelt correctly.
+
+### The protocol handler, and where the investigation stopped
+
+While fixing the above, `phishlens://` was found not to be registered after a
+fresh install. The investigation, all of it against `dist/win-unpacked` rather
+than by reinstalling:
+
+| Launch method | Result |
+|---|---|
+| Direct execution | registers in ~3s |
+| `ShellExecute` (what the installer uses) | ~1s |
+| Via a `.lnk` shortcut | ~1s |
+| With `--updated` (the upgrade path) | ~1s |
+| From the installed app, over a stale handler | ~1s |
+| From the installed app, over a bogus third path | ~1s |
+
+electron-builder's NSIS template launches the app with
+`StdUtils.ExecShellAsUser` on the Start Menu shortcut, passing `--updated` on
+upgrades. Every one of those was reproduced by hand and every one registered
+normally.
+
+**The cause was not established.** The app's claim is correct in every scenario
+that could be constructed; only the launch the installer performs itself fails.
+The most plausible remaining explanation is that the installer's elevation is
+not fully dropped, so the write lands in a different user's `HKCU` — but that
+was not proven, and it is recorded as a hypothesis rather than a finding.
+
+Two mitigations are in place. The app re-asserts the claim over the first ten
+seconds of every launch, stopping as soon as it succeeds. And
+`build/installer.nsh` registers the scheme from the installer, which also fixes
+a leftover noted earlier: because the app wrote the key at runtime, NSIS had
+nothing to remove and uninstalling left the scheme pointing at a deleted
+executable. **The installer-side registration has not been observed to run** and
+is carried as unverified.
+
+In practice the handler is correct from the first time a person opens the
+application themselves, which was confirmed on the installed build.
+
+### Installed state, verified
+
+| Check | Result |
+|---|---|
+| Console asset paths in the installed build | relative |
+| Console renders | 488 characters, real navigation |
+| Backend supervised | up in ~16s, child of the main process |
+| Protocol handler after a normal launch | points at the install directory |
+| QR hidden in an attachment | HIGH_RISK 0.77, decoded, 3 rules |
+| Invisible-character obfuscation | HIGH_RISK 0.77, 60 characters, 3 rules |
+| Fake "Re:" with no thread headers | SUSPICIOUS 0.40 |
+
+### On method
+
+Three install-and-uninstall cycles were spent on this before it became clear
+that every one of those experiments could have been run against
+`dist/win-unpacked` — the same packaged layout, no installer involved. Doing it
+that way took minutes instead of cycles, and the whole launch-method matrix
+above came from it.
