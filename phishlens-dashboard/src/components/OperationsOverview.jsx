@@ -255,6 +255,18 @@ export default function OperationsOverview({ cases = [], onOpenCase, onNavigate 
             )}
 
             {/*
+              * The map gets the whole width, not a column.
+              *
+              * Putting it in the narrower column made it smaller than it had
+              * been before the grid existed - a world map in a 500px box shows
+              * continents and nothing else, and the markers that matter end up
+              * on top of each other. It is the one panel here whose usefulness
+              * scales with its size, so it gets a row of its own and the other
+              * panels share the space below.
+              */}
+            <GlobalThreatMap points={points} coverage={coverage} />
+
+            {/*
               * Two columns, with the map given the height it needs.
               *
               * This was one tall stack, so the map sat between a list and a
@@ -347,8 +359,6 @@ export default function OperationsOverview({ cases = [], onOpenCase, onNavigate 
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', minWidth: 0 }}>
-                    <GlobalThreatMap points={points} coverage={coverage} />
-
                     <Panel title="Where messages entered" subtitle="Ingestion path breakdown">
                         {sources.length === 0 ? (
                             <div style={{ color: 'var(--text-dim)', fontSize: '0.78rem', fontStyle: 'italic', padding: '30px 0', textAlign: 'center' }}>

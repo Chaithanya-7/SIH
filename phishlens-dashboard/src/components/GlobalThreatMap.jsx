@@ -41,7 +41,31 @@ function when(value) {
     return date.toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
+/**
+ * The basemap, and why it is OpenStreetMap's own tiles.
+ *
+ * CARTO's basemaps were tried here first: muted, dark, and served at double
+ * resolution, which is exactly what this panel wants. They now render the words
+ * "API KEY REQUIRED" across every tile. That is a paid dependency, and this
+ * tool is not allowed one - so the map uses OpenStreetMap's own tile service,
+ * which needs no key and no account and asks only for attribution.
+ *
+ * The honest trade: OSM serves no double-resolution tile, so there is no @2x
+ * variant to request and labels are softer on a high-density screen than a paid
+ * basemap would be. That is the cost of the constraint.
+ *
+ * Their cartography is light, which glares inside a dark console. It is turned
+ * dark by a CSS filter on `.leaflet-tile` in theme.css, which already follows
+ * the theme - a second copy of that logic lived here briefly and was removed.
+ */
+const OSM_TILES = {
+    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; OpenStreetMap contributors'
+};
+
+
 export default function GlobalThreatMap({ points = [], coverage }) {
+
     const ordered = useMemo(() => {
         // Draw lower severities first so high-risk markers are never hidden beneath them.
         const rank = { LOW: 0, MEDIUM: 1, HIGH: 2 };
@@ -76,7 +100,7 @@ export default function GlobalThreatMap({ points = [], coverage }) {
                 </div>
             </div>
 
-            <div style={{ height: '460px', width: '100%' }}>
+            <div style={{ height: '620px', width: '100%' }}>
                 <MapContainer
                     center={[22, 12]}
                     zoom={2}
@@ -99,8 +123,10 @@ export default function GlobalThreatMap({ points = [], coverage }) {
                     style={{ height: '100%', width: '100%', backgroundColor: 'var(--bg-code)' }}
                 >
                     <TileLayer
-                        attribution='&copy; OpenStreetMap contributors'
-                        url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        attribution={OSM_TILES.attribution}
+                        url={OSM_TILES.url}
+                        // OpenStreetMap publishes to 19; asking for more only
+                        // stretches the last real tile and invents detail.
                         maxZoom={19}
                         // Tiles stop at the edge of the world rather than repeating.
                         noWrap

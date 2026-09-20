@@ -152,6 +152,14 @@ textarea::placeholder {
   filter: saturate(0.85) brightness(1.02);
 }
 
+/*
+ * A dark basemap made from light tiles, since no keyless service serves one.
+ *
+ * Order matters here and the previous order worked against itself: dimming to
+ * 0.7 *before* inverting turned dark pixels into light ones, so land and water
+ * both landed in the middle greys and the map came out washed out and flat.
+ * Inverting first, then dimming and lifting contrast, keeps them apart.
+ */
 :root[data-theme='dark'] .leaflet-tile {
-  filter: brightness(0.7) invert(1) contrast(0.9) hue-rotate(200deg) saturate(0.6);
+  filter: invert(1) hue-rotate(185deg) brightness(0.62) contrast(1.2) saturate(0.55);
 }
