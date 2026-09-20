@@ -228,7 +228,12 @@ class MailConnections {
                     if (err) {
                         return done({ ok: false, error: `Signed in, but the folder "${folder}" could not be opened: ${err.message}` });
                     }
-                    done({ ok: true, messages_in_folder: box.messages.total });
+                    // UIDNEXT is the UID the next arrival will be given, so one
+                    // below it is the newest message already here. Reported so a
+                    // new connection can start from now rather than from the
+                    // beginning of the mailbox.
+                    const highestUid = Math.max(0, (box.uidnext || 1) - 1);
+                    done({ ok: true, messages_in_folder: box.messages.total, highestUid });
                 });
             });
 
@@ -304,7 +309,13 @@ class MailConnections {
             password_hint: require('./secretStore').SecretStore.hint(password),
             added_at: new Date().toISOString(),
             messages_seen: 0,
-            last_uid: 0
+            // Start from the newest message already present.
+            //
+            // Starting at zero means the first poll asks for UID 1:* - the whole
+            // mailbox - so a real inbox would put years of mail through the
+            // pipeline at once, and it contradicts what the console promises:
+            // that mail already in the folder is not re-examined.
+            last_uid: probe.highestUid || 0
         };
 
         this.connections.set(connection.id, connection);
@@ -360,7 +371,13 @@ class MailConnections {
             password_hint: 'Signed in with Google',
             added_at: new Date().toISOString(),
             messages_seen: 0,
-            last_uid: 0
+            // Start from the newest message already present.
+            //
+            // Starting at zero means the first poll asks for UID 1:* - the whole
+            // mailbox - and a real inbox would put years of mail through the
+            // pipeline at once. It also contradicts what the console promises:
+            // that mail already in the folder is not re-examined.
+            last_uid: probe.highestUid || 0
         };
 
         this.connections.set(connection.id, connection);
@@ -479,6 +496,7 @@ class MailConnections {
 
             const imap = new Imap(this.imapConfig(connection, password, authMode));
             let handled = 0;
+            let highestHandled = connection.last_uid || 0;
 
             imap.once('ready', () => {
                 imap.openBox(connection.folder, true, (err) => {
@@ -499,6 +517,19 @@ class MailConnections {
 
                         const fetch = imap.fetch(fresh, { bodies: '', markSeen: false });
 
+                        // Every message's analysis, so the poll can wait for them.
+                        //
+                        // The fetch stream ends when the last body has been
+                        // delivered - it neither knows nor cares that handling a
+                        // message is asynchronous. Finalising on `end` alone
+                        // therefore ran while the analyses were still in flight:
+                        // `handled` was still zero, so the mailbox reported nothing
+                        // examined, and `last_uid` had not moved, so the very same
+                        // messages came back on the next pass and every pass after
+                        // it. The symptom is a connected mailbox that quietly never
+                        // monitors anything.
+                        const analyses = [];
+
                         fetch.on('message', (msg, seqno) => {
                             let raw = '';
                             let uid = null;
@@ -507,26 +538,38 @@ class MailConnections {
                                 stream.setEncoding('utf8');
                                 stream.on('data', chunk => { raw += chunk; });
                             });
-                            msg.once('end', async () => {
-                                try {
-                                    await this.onMail(raw, `IMAP:${connection.email}`, null, {
-                                        provider: 'IMAP',
-                                        provider_account: connection.email,
-                                        provider_message_id: String(uid),
-                                        uid,
-                                        folder: connection.folder,
-                                        mailbox_connection_id: connection.id
-                                    });
-                                    handled++;
-                                } catch (e) {
-                                    console.error(`[MailConnections] Analysis failed for a message in ${connection.email}: ${e.message}`);
-                                }
-                                if (uid && uid > (connection.last_uid || 0)) connection.last_uid = uid;
+                            msg.once('end', () => {
+                                analyses.push((async () => {
+                                    try {
+                                        await this.onMail(raw, `IMAP:${connection.email}`, null, {
+                                            provider: 'IMAP',
+                                            provider_account: connection.email,
+                                            provider_message_id: String(uid),
+                                            uid,
+                                            folder: connection.folder,
+                                            mailbox_connection_id: connection.id
+                                        });
+                                        handled++;
+                                    } catch (e) {
+                                        // Logged and stepped over. One message the
+                                        // pipeline chokes on must not wedge the
+                                        // mailbox behind it forever, which is what
+                                        // leaving the high-water mark unmoved would
+                                        // do.
+                                        console.error(`[MailConnections] Analysis failed for a message in ${connection.email}: ${e.message}`);
+                                    }
+                                    if (uid && uid > highestHandled) highestHandled = uid;
+                                })());
                             });
                         });
 
                         fetch.once('error', fetchErr => { imap.end(); reject(fetchErr); });
-                        fetch.once('end', () => {
+                        fetch.once('end', async () => {
+                            // Nothing is recorded until the work it describes has
+                            // actually finished.
+                            await Promise.all(analyses);
+
+                            if (highestHandled > (connection.last_uid || 0)) connection.last_uid = highestHandled;
                             connection.messages_seen = (connection.messages_seen || 0) + handled;
                             connection.last_checked_at = new Date().toISOString();
                             connection.last_error = null;

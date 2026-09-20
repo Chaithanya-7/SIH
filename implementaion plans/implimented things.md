@@ -1893,3 +1893,75 @@ impossible to follow. Uniqueness is per address *and* folder now.
 7636, verifier uniqueness, single-use and expiring state, the exact SASL XOAUTH2
 byte format, client-ID validation, the secret never appearing in a status
 response, and the two public-route rules above.
+
+## 2026-09-20 — The poller did not monitor anything
+
+Reported plainly: the tool cannot monitor incoming email. It was right, and the
+reason is one I should have found before shipping the feature twice.
+
+I had verified everything *around* the poller — that credentials are proved
+before storing, that folders are offered, that coverage is reported honestly,
+that the OAuth exchange is correct — and never once verified the thing it exists
+to do: a message arrives, and a case appears. Every check I ran was of the
+scaffolding.
+
+### The race
+
+`fetch.once('end')` fires when the IMAP fetch stream has delivered the last
+body. It neither knows nor cares that the per-message handler is asynchronous.
+The handler was:
+
+```js
+msg.once('end', async () => {
+    await this.onMail(raw, ...);
+    handled++;
+    if (uid > connection.last_uid) connection.last_uid = uid;
+});
+```
+
+So the poll finalised while every analysis was still in flight. At the moment
+`save()` ran, `handled` was **0** and `last_uid` had **not moved**. Three
+consequences, all of them exactly what was reported:
+
+- the mailbox reported `0 messages checked`, forever;
+- `last_uid` stayed where it was, so the next poll asked for the same messages,
+  and so did every poll after it;
+- deduplication then suppressed the repeat cases correctly, so the symptom was
+  silence rather than a flood — the worst possible presentation, because nothing
+  looked broken.
+
+Fixed by collecting each message's analysis into an array and awaiting all of
+them before anything is recorded. Nothing is written down until the work it
+describes has actually finished.
+
+A message the pipeline throws on is stepped over rather than retried: the
+high-water mark still advances past it. Leaving it unmoved would wedge the
+mailbox behind one bad message permanently, which is the same silence in a
+different costume.
+
+### Connecting meant re-reading the entire mailbox
+
+A new connection stored `last_uid: 0`, so its first poll asked for `UID 1:*` —
+every message in the folder. On a real inbox that is years of mail entering the
+pipeline at once, and it flatly contradicts what the console promises, which is
+that mail already in the folder is not re-examined.
+
+`test()` now reports the folder's `UIDNEXT`, and a new connection starts one
+below it: the newest message already present. Both paths had the bug; the
+app-password one and the Google sign-in one are fixed together.
+
+### How it was found, and how it should have been found
+
+Four tests drive the poller against a fake IMAP server that behaves like a real
+one in the way that matters — its fetch stream ends without waiting for the
+consumer. Three of the four failed against the shipped code. The first failed on
+`both messages must reach the pipeline`, having taken 3.6 seconds to discover
+that none had; after the fix it passes in 147ms, because the poll now waits for
+the work instead of racing past it.
+
+The lesson is not about async. It is that I tested every property of this
+feature except its purpose, and shipped it twice on the strength of that. A
+feature's own reason for existing is the first thing that needs a test, not the
+last.
+
+**232 backend tests, 232 passing.**
