@@ -25,6 +25,7 @@ const infraEnricher = require('./modules/infraEnricher');
 const threatIntelStore = require('./modules/threatIntelStore');
 const threatIntelEnricher = require('./modules/threatIntelEnricher');
 const rdapAdapter = require('./adapters/rdapAdapter');
+const geoIntelAdapter = require('./adapters/geoIntelAdapter');
 const evidenceFusion = require('./modules/evidenceFusion');
 const confidenceEngine = require('./modules/confidenceEngine');
 const caseManager = require('./modules/caseManager');
@@ -896,6 +897,121 @@ app.post('/api/detection-config/test', requireRole('ADMIN'), async (req, res) =>
     } catch (e) {
         res.status(500).json({ success: false, error: e.message });
     }
+});
+
+/**
+ * Aggregated view for the operations overview: every geolocated address across
+ * all cases, activity over time, and detection counts by rule.
+ *
+ * Severity travels with each point so the map can show where the serious
+ * traffic is coming from, rather than plotting every address identically.
+ */
+app.get('/api/overview', (req, res) => {
+    let cases = caseManager.getAllCases();
+
+    if (req.user?.role === 'EMPLOYEE') {
+        cases = cases.filter(c =>
+            (c.message?.recipient || '').toLowerCase().includes(req.user.email.toLowerCase()) ||
+            (c.message?.sender || '').toLowerCase().includes(req.user.email.toLowerCase()));
+    } else if (req.user?.organization_id) {
+        cases = cases.filter(c => !c.organization_id || c.organization_id === req.user.organization_id);
+    }
+
+    const severityOf = verdict => (verdict === 'HIGH_RISK' ? 'HIGH' : verdict === 'SUSPICIOUS' ? 'MEDIUM' : 'LOW');
+
+    // One marker per address per case, so repeated abuse of the same address is
+    // visible as weight on the map rather than collapsing into a single dot.
+    const pointsByKey = new Map();
+    cases.forEach(caseItem => {
+        const severity = severityOf(caseItem.detection?.verdict);
+        (caseItem.infrastructure?.geo_points || []).forEach(point => {
+            const key = point.ip;
+            const existing = pointsByKey.get(key);
+            const rank = { LOW: 0, MEDIUM: 1, HIGH: 2 };
+
+            if (!existing) {
+                pointsByKey.set(key, {
+                    ip: point.ip,
+                    latitude: point.latitude,
+                    longitude: point.longitude,
+                    city: point.city,
+                    country: point.country,
+                    country_code: point.country_code,
+                    asn: point.asn,
+                    isp: point.isp,
+                    role: point.role,
+                    severity,
+                    observations: 1,
+                    case_ids: [caseItem.case_id]
+                });
+            } else {
+                existing.observations += 1;
+                if (existing.case_ids.length < 25) existing.case_ids.push(caseItem.case_id);
+                if (rank[severity] > rank[existing.severity]) existing.severity = severity;
+            }
+        });
+    });
+
+    // Activity over the last 24 hours in 30-minute buckets, matching the range
+    // an analyst reviewing a shift would care about.
+    const bucketMs = 30 * 60 * 1000;
+    const now = Date.now();
+    const windowStart = now - 24 * 3600 * 1000;
+    const buckets = new Map();
+    for (let t = Math.floor(windowStart / bucketMs) * bucketMs; t <= now; t += bucketMs) {
+        buckets.set(t, { timestamp: new Date(t).toISOString(), total: 0, high_risk: 0, suspicious: 0, safe: 0 });
+    }
+    cases.forEach(caseItem => {
+        const at = new Date(caseItem.timestamps?.ingested_at || 0).getTime();
+        if (!Number.isFinite(at) || at < windowStart) return;
+        const key = Math.floor(at / bucketMs) * bucketMs;
+        const bucket = buckets.get(key);
+        if (!bucket) return;
+        bucket.total += 1;
+        const verdict = caseItem.detection?.verdict;
+        if (verdict === 'HIGH_RISK') bucket.high_risk += 1;
+        else if (verdict === 'SUSPICIOUS') bucket.suspicious += 1;
+        else bucket.safe += 1;
+    });
+
+    // Which rules are actually firing, which is what tells an analyst what kind
+    // of attack the organisation is receiving.
+    const ruleCounts = new Map();
+    cases.forEach(caseItem => {
+        (caseItem.detection?.matched_rules || []).forEach(rule => {
+            const existing = ruleCounts.get(rule.id) || { id: rule.id, name: rule.name, severity: rule.severity, events: 0 };
+            existing.events += 1;
+            ruleCounts.set(rule.id, existing);
+        });
+    });
+
+    const sourceCounts = ingestionRegistry.getCoverage().sources
+        .filter(s => s.messages_ingested > 0)
+        .map(s => ({ source: s.name, count: s.messages_ingested }));
+
+    res.json({
+        success: true,
+        counts: {
+            total: cases.length,
+            high_risk: cases.filter(c => c.detection?.verdict === 'HIGH_RISK').length,
+            suspicious: cases.filter(c => c.detection?.verdict === 'SUSPICIOUS').length,
+            safe: cases.filter(c => c.detection?.verdict === 'SAFE').length,
+            quarantined: cases.filter(c => c.mailbox?.status === 'QUARANTINED').length,
+            awaiting_review: cases.filter(c => c.review?.status === 'PENDING_ADMIN' || c.review?.status === 'UNDER_REVIEW').length,
+            campaigns: new Set(cases.map(c => c.campaign?.campaign_id).filter(Boolean)).size,
+            executive_incidents: cases.filter(c => c.executive_context?.is_impersonated || c.executive_context?.is_targeted).length
+        },
+        map_points: Array.from(pointsByKey.values()),
+        timeline: Array.from(buckets.values()),
+        rule_summary: Array.from(ruleCounts.values()).sort((a, b) => b.events - a.events),
+        ingestion_breakdown: sourceCounts,
+        geo_coverage: {
+            located_addresses: pointsByKey.size,
+            ...geoIntelAdapter.getStats(),
+            limitation: 'Locations describe observed sending infrastructure, not the physical location of any sender. Addresses in reserved ranges, and those a provider does not expose, cannot be placed.'
+        },
+        generated_at: new Date().toISOString()
+    });
 });
 
 app.get('/api/cases/:id', (req, res) => {

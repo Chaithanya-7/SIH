@@ -12,6 +12,7 @@ import ForensicReportModal from './ForensicReportModal';
 import AuthModal from './AuthModal';
 import AdminQuarantineQueue from './AdminQuarantineQueue';
 import IngestionCoverageView from './IngestionCoverageView';
+import OperationsOverview from './OperationsOverview';
 import IntelligenceStateView from './IntelligenceStateView';
 import ThemeToggle from './ThemeToggle';
 import { useTheme } from '../hooks/useTheme';
@@ -268,43 +269,8 @@ export default function Dashboard() {
         <div style={{ padding: '20px', flex: 1, overflowY: 'auto' }}>
           {/* OVERVIEW NAV */}
           {activeNav === 'overview' && (
-            <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div>
-                <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>Security Overview</h2>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                  Monitor active threats, campaigns and protected identities.
-                </div>
-              </div>
-
-              {/* Compact Metrics */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px' }}>
-                <div style={{ backgroundColor: 'var(--bg-surface)', borderRadius: '6px', border: '1px solid var(--border)', padding: '12px' }}>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>Total Cases</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>{totalThreats}</div>
-                </div>
-                <div style={{ backgroundColor: 'var(--bg-surface)', borderRadius: '6px', border: '1px solid var(--border)', padding: '12px' }}>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>High Risk</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--danger)', marginTop: '2px' }}>{highRiskCount}</div>
-                </div>
-                <div style={{ backgroundColor: 'var(--bg-surface)', borderRadius: '6px', border: '1px solid var(--border)', padding: '12px' }}>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>Active Campaigns</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--violet)', marginTop: '2px' }}>{activeCampaignsCount}</div>
-                </div>
-                <div style={{ backgroundColor: 'var(--bg-surface)', borderRadius: '6px', border: '1px solid var(--border)', padding: '12px' }}>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>VIP Threats</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--warning)', marginTop: '2px' }}>{vipAttacksCount}</div>
-                </div>
-                <div style={{ backgroundColor: 'var(--bg-surface)', borderRadius: '6px', border: '1px solid var(--border)', padding: '12px' }}>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>Response Actions</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--success)', marginTop: '2px' }}>{quarantinedCount}</div>
-                </div>
-              </div>
-
-              {/* Main 2-column view */}
-              <div className="desktop-grid" style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '20px' }}>
-                <ThreatFeed cases={cases} selectedCase={selectedCase} onSelectCase={setSelectedCase} />
-                <CaseInvestigationView selectedCase={selectedCase} onOpenReport={() => setIsReportModalOpen(true)} />
-              </div>
+            <div className="animate-fade-in">
+              <OperationsOverview />
             </div>
           )}
 

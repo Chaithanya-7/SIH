@@ -99,6 +99,10 @@ export const api = {
   },
 
   // Ingestion coverage, adaptive learning and threat-intelligence state
+  getOverview: async () => {
+    const res = await axios.get(`${API_BASE}/overview`);
+    return res.data;
+  },
   getIngestionCoverage: async () => {
     const res = await axios.get(`${API_BASE}/ingestion`);
     return res.data;
