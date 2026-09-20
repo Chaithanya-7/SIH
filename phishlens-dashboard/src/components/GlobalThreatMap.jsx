@@ -70,13 +70,20 @@ const BASEMAPS = [
         // Esri serves this one row-before-column, which is why the template
         // above reads {z}/{y}/{x} rather than the usual order.
         //
-        // 20, measured rather than taken from documentation. Requesting tiles
-        // over Manhattan: 18, 19 and 20 return real photography of 13-19KB,
-        // while 21, 22 and 23 all return an identical 2,521-byte placeholder.
-        // The level this was set to before threw away the closest real imagery
-        // there is - which is the level where individual cars and houses
-        // become visible.
-        maxZoom: 20,
+        // 19, which is the depth this imagery actually has everywhere.
+        //
+        // This was 20, from measuring one tile over Manhattan and taking it for
+        // the planet. Checked across Moscow, Novosibirsk, Karachi, Islamabad,
+        // Lagos, Sao Paulo, Sydney and Anchorage: 17, 18 and 19 return real
+        // photography in all of them, while 20 returns it only in Sydney and
+        // Anchorage. Everywhere else it answers with a 2,521-byte tile that
+        // reads "Map data not yet available" - which is precisely the message
+        // that appeared on zooming in.
+        //
+        // Stopping at 19 and letting Leaflet scale beyond it trades a little
+        // sharpness in the few cities that have 20 for never showing that tile
+        // anywhere. Individual buildings and vehicles are still legible at 19.
+        maxZoom: 19,
         // Photography carries no writing. On its own this showed rooftops and
         // coastlines with no way to tell which city you were looking at, which
         // is useless for the question the panel exists to answer. Esri publish
@@ -86,12 +93,12 @@ const BASEMAPS = [
             {
                 id: 'transport',
                 url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',
-                maxZoom: 20
+                maxZoom: 19
             },
             {
                 id: 'places',
                 url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
-                maxZoom: 20
+                maxZoom: 19
             }
         ]
     },
@@ -120,9 +127,13 @@ const BASEMAPS = [
 // leaves very little to read. Satellite imagery is already dark, needs no
 // filtering at all, and separates land from sea by itself. The drawn maps stay
 // one choice away for anyone who wants labels and borders.
-// One level past the deepest imagery any basemap offers. A source that stops
-// sooner says so through its own maxNativeZoom.
-const DEEPEST_ZOOM = Math.max(...BASEMAPS.map(b => b.maxZoom)) + 1;
+// Two levels past the deepest imagery any basemap publishes.
+//
+// Past a source's own maxNativeZoom Leaflet scales the deepest real tile rather
+// than asking for one that does not exist, so this is how much closer somebody
+// may look. Two levels is soft but readable, and it is the difference between
+// running out of zoom and being shown a tile that says there is no data.
+const DEEPEST_ZOOM = Math.max(...BASEMAPS.map(b => b.maxZoom)) + 2;
 
 const DEFAULT_BASEMAP = 'satellite';
 const BASEMAP_STORAGE_KEY = 'phishlens.basemap';
@@ -235,12 +246,14 @@ export default function GlobalThreatMap({ points = [], coverage }) {
 
             <div style={{ height: '620px', width: '100%' }}>
                 <MapContainer
-                    // Tiles appear rather than fade in.
+                    // Leaflet's own tile fade, left on.
                     //
-                    // The fade runs an opacity transition on every tile as it
-                    // arrives; across a screenful, during a pan, that is a lot
-                    // of compositing for an effect nobody is looking at.
-                    fadeAnimation={false}
+                    // It was turned off to save compositing, and what it
+                    // actually saved was the thing that hides a tile swap: each
+                    // new tile replaced the old one instantly, so a pan or a
+                    // zoom looked like the picture breaking apart and
+                    // reassembling. The real cost that was worth removing was a
+                    // CSS filter over every tile, and that is long gone.
                     // Markers drawn onto one canvas rather than as an SVG node
                     // each. With a few hundred addresses the DOM approach spends
                     // its time in layout rather than drawing.
@@ -335,15 +348,17 @@ export default function GlobalThreatMap({ points = [], coverage }) {
                         // went. Waiting to be certain what to fetch is the
                         // wrong trade when somebody is looking for a street.
                         updateWhenIdle={false}
-                        updateWhenZooming={false}
-                        // One ring of tiles beyond the viewport, not two.
-                        //
-                        // A buffer of 4 keeps roughly five times the visible
-                        // tiles alive as image elements. Every one of them is
-                        // laid out and composited on each frame, which is paid
-                        // continuously while panning in exchange for avoiding a
-                        // refetch that the browser cache mostly covers anyway.
-                        keepBuffer={2}
+                        // Tiles follow the zoom as it animates. Holding them
+                        // back left the previous level stretched across the
+                        // screen until the animation finished, which is the
+                        // other half of what looked like pixels breaking up.
+                        updateWhenZooming
+                        // Enough ring to stay ahead of a drag without keeping
+                        // five screens of tiles composited. At 2 a quick pan
+                        // outran the tiles and showed the background through
+                        // the gap; 4 was the setting that made every frame
+                        // expensive.
+                        keepBuffer={3}
                     />
 
                     {/*
@@ -361,8 +376,8 @@ export default function GlobalThreatMap({ points = [], coverage }) {
                             maxNativeZoom={overlay.maxZoom}
                             noWrap
                             updateWhenIdle={false}
-                            updateWhenZooming={false}
-                            keepBuffer={2}
+                            updateWhenZooming
+                            keepBuffer={3}
                         />
                     ))}
                     {ordered.map(point => {
