@@ -198,11 +198,12 @@ async function processPipeline(emailContent, source = 'MANUAL_API', clientMessag
         // 9. Adaptive scoring against characteristics learned from confirmed mail
         threatObject = adaptiveLearning.score(threatObject, parsedEmail);
 
-        // 10. Evidence Fusion Engine (Normalizes all findings into EvidenceObject[])
-        threatObject = evidenceFusion.fuse(threatObject);
+        // 10. Executive protection. Runs before fusion so its findings become
+        //     evidence through the same path as every other signal.
+        threatObject = executiveGuard.evaluateTarget(threatObject, parsedEmail);
 
-        // 11. Executive Protection Guard (VIP Target Context)
-        threatObject = executiveGuard.evaluateTarget(threatObject);
+        // 11. Evidence Fusion Engine (Normalizes all findings into EvidenceObject[])
+        threatObject = evidenceFusion.fuse(threatObject);
 
         // 12. 3-Tier Confidence Calculation Engine (also determines the final verdict)
         threatObject = confidenceEngine.calculate(threatObject);
@@ -910,8 +911,44 @@ app.get('/api/graph', async (req, res) => {
 });
 
 // ==================== VIP EXECUTIVE API ====================
+/**
+ * The executive directory. Only people listed here are protected against
+ * impersonation and targeting detection, so the list is operator-managed
+ * rather than shipped with placeholder names.
+ */
 app.get('/api/vips', (req, res) => {
-    res.json({ success: true, vips: executiveGuard.getVipList() });
+    res.json({ success: true, vips: executiveGuard.getVipList(), directory: executiveGuard.getDirectory() });
+});
+
+app.post('/api/vips', requireRole('ADMIN'), (req, res) => {
+    const result = executiveGuard.addPerson(req.body || {});
+    if (!result.ok) return res.status(400).json({ success: false, errors: result.errors });
+    auditLogger.log({
+        case_id: 'CONFIG',
+        event_type: 'PROTECTED_PERSON_ADDED',
+        source: req.user.email,
+        description: `${result.person.name} (${result.person.email}) added to the executive directory by ${req.user.email}`
+    });
+    res.json({ success: true, person: result.person });
+});
+
+app.delete('/api/vips/:id', requireRole('ADMIN'), (req, res) => {
+    const result = executiveGuard.removePerson(req.params.id);
+    if (!result.ok) return res.status(404).json({ success: false, errors: result.errors });
+    auditLogger.log({
+        case_id: 'CONFIG',
+        event_type: 'PROTECTED_PERSON_REMOVED',
+        source: req.user.email,
+        description: `Protected person ${req.params.id} removed from the executive directory by ${req.user.email}`
+    });
+    res.json({ success: true });
+});
+
+/** Organisation domains, used to recognise lookalike sending domains. */
+app.put('/api/vips/organization-domains', requireRole('ADMIN'), (req, res) => {
+    const result = executiveGuard.setOrganizationDomains(req.body?.domains);
+    if (!result.ok) return res.status(400).json({ success: false, errors: result.errors });
+    res.json({ success: true, organization_domains: result.organization_domains });
 });
 
 // ==================== AUDIT LOGS API ====================

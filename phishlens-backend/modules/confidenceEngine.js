@@ -12,6 +12,7 @@ class ConfidenceEngine {
         if (type === 'MQL_INTEL') return 'THREAT_INTEL';
         if (type === 'MQL_CUSTOM') return 'CUSTOM';
         if (type.startsWith('BEHAVIOUR_')) return 'BEHAVIOURAL';
+        if (type.startsWith('EXECUTIVE_') || type === 'LOOKALIKE_ORGANIZATION_DOMAIN' || type === 'PROTECTED_PERSON_TARGETED') return 'EXECUTIVE';
         if (type === 'LEARNED_PATTERN_MATCH') return 'LEARNED_PATTERN';
         return type || 'GENERAL';
     }
@@ -45,7 +46,10 @@ class ConfidenceEngine {
             // Operator-defined rules describe threats this specific deployment
             // is actually seeing, so they carry weight comparable to a built-in
             // detection family rather than being treated as a weak afterthought.
-            CUSTOM: 0.30, GENERAL: 0.20
+            CUSTOM: 0.30,
+            // Impersonating a named executive is among the most consequential
+            // things a message can do, so this weighs with the strongest families.
+            EXECUTIVE: 0.35, GENERAL: 0.20
         };
         const contributions = [];
         let threatScore = 0;

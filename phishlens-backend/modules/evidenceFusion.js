@@ -183,6 +183,20 @@ class EvidenceFusion {
             }));
         }
 
+        // 10. Executive protection: impersonation of, or sustained targeting of,
+        //     the people this deployment has designated as protected.
+        (threatObject.executive_context?.findings || []).forEach(finding => {
+            evidenceList.push(new EvidenceObject({
+                evidence_type: finding.type,
+                source: 'PHISHLENS_EXECUTIVE_GUARD',
+                finding: finding.type.replace(/_/g, ' '),
+                severity: finding.severity,
+                confidence: finding.confidence,
+                explanation: `${finding.explanation} ${threatObject.executive_context.limitation}`,
+                provenance: { source_type: 'EXECUTIVE_DIRECTORY', source_reference: finding.person?.name || 'organisation domains' }
+            }));
+        });
+
         threatObject.evidence = evidenceList;
         return threatObject;
     }
