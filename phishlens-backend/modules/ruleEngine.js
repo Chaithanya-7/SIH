@@ -190,6 +190,139 @@ const RULES = [
     },
 
     // ---------------------------------------------------------------
+    // QR CODE  (family: URL_RISK)
+    //
+    // A QR code is a link that no amount of language analysis can see: it is
+    // pixels in an attachment, and the recipient resolves it on a phone that is
+    // usually outside whatever protection the organisation runs on desktops.
+    // ---------------------------------------------------------------
+    {
+        id: 'MQL-QR-101',
+        name: 'Attachment contains a QR code linking to an external address',
+        category: 'QR',
+        severity: 'MEDIUM',
+        confidence: 0.55,
+        mitre: ['T1566.001', 'T1566.002'],
+        source: 'MITRE ATT&CK T1566.001/T1566.002 (Phishing: Spearphishing Attachment / Link)',
+        description: 'An image attached to this message carries a QR code containing a web address. The link is not written anywhere in the message text, so it is invisible to filtering that reads only the body, and a recipient following it typically leaves the managed device to do so.',
+        test: (ctx) => {
+            const code = (ctx.qr.codes || []).find(c => c.payload_kind === 'url');
+            return code && `QR code in "${code.filename}" resolves to ${code.payload}`;
+        }
+    },
+    {
+        id: 'MQL-QR-102',
+        name: 'QR code is colour-inverted',
+        category: 'QR',
+        severity: 'MEDIUM',
+        confidence: 0.45,
+        mitre: ['T1566.001'],
+        source: 'MITRE ATT&CK T1566.001 (Phishing: Spearphishing Attachment)',
+        description: 'The QR code is light modules on a dark background. Ordinary documents very rarely contain an inverted code, while inverting one is a cheap way past a scanner that reads a single polarity.',
+        test: (ctx) => {
+            const inverted = (ctx.qr.codes || []).find(c => c.polarity === 'inverted');
+            return inverted && `The QR code in "${inverted.filename}" is inverted, which is unusual in legitimate documents.`;
+        }
+    },
+    {
+        id: 'MQL-QR-103',
+        name: 'QR code carries credentials or a payment address rather than a link',
+        category: 'QR',
+        severity: 'HIGH',
+        confidence: 0.65,
+        mitre: ['T1566.001'],
+        source: 'MITRE ATT&CK T1566.001 (Phishing: Spearphishing Attachment)',
+        description: 'The code encodes something other than a web address - network credentials, a payment address or a prepared message. Each of these acts on the recipient device the moment it is scanned, without any page for them to inspect first.',
+        test: (ctx) => {
+            const risky = (ctx.qr.codes || []).find(c => ['wifi_credentials', 'cryptocurrency_address', 'message_template'].includes(c.payload_kind));
+            return risky && `QR code in "${risky.filename}" encodes ${risky.payload_kind.replace(/_/g, ' ')} rather than a link.`;
+        }
+    },
+    {
+        id: 'MQL-QR-104',
+        name: 'Message body is empty and the payload is in an attachment',
+        category: 'QR',
+        severity: 'MEDIUM',
+        confidence: 0.50,
+        mitre: ['T1566.001'],
+        source: 'MITRE ATT&CK T1566.001 (Phishing: Spearphishing Attachment)',
+        description: 'There is effectively no message text, only an attachment. Nothing is written for a content classifier to object to, because nothing is written at all - the whole message is the attachment.',
+        test: (ctx) => {
+            const body = (ctx.textBody || '').replace(/\s+/g, ' ').trim();
+            const attachments = (ctx.parsedEmail && ctx.parsedEmail.attachments) || [];
+            if (attachments.length === 0 || body.length > 120) return false;
+            return `The message body is ${body.length} character(s) long and carries ${attachments.length} attachment(s), so the payload is not in the text.`;
+        }
+    },
+
+    // ---------------------------------------------------------------
+    // AUTHENTICATION-FLOW ABUSE  (family: URL_RISK)
+    //
+    // These do not steal a password. They persuade somebody to complete a
+    // genuine authentication on the attacker's behalf, so every link is to a
+    // real provider domain and every reputation check on it comes back clean.
+    // ---------------------------------------------------------------
+    {
+        id: 'MQL-AUTHFLOW-101',
+        name: 'Message drives a device-code authorisation flow',
+        category: 'AUTHFLOW',
+        severity: 'HIGH',
+        confidence: 0.70,
+        mitre: ['T1566.002'],
+        source: 'MITRE ATT&CK T1566.002 (Phishing: Spearphishing Link); RFC 8628 (OAuth 2.0 Device Authorization Grant)',
+        description: 'The message points at a provider device-authorisation page and supplies a code to enter. The page is genuine, so no link or domain check will object to it; what the recipient authorises is a session for whoever generated the code.',
+        test: (ctx) => {
+            const DEVICE_ENDPOINTS = [
+                'microsoft.com/devicelogin', 'login.microsoftonline.com/common/oauth2/deviceauth',
+                'google.com/device', 'aka.ms/devicelogin', 'github.com/login/device',
+                'amazon.com/code', 'okta.com/activate'
+            ];
+            const link = (ctx.urls || []).find(u => DEVICE_ENDPOINTS.some(e => String(u).toLowerCase().includes(e)));
+            if (!link) return false;
+            const codeInBody = /\b([A-Z0-9]{4}[- ]?[A-Z0-9]{4})\b/.test(ctx.textBody || '');
+            return `Message links to a device-authorisation endpoint (${link})${codeInBody ? ' and supplies a code to enter' : ''}. Completing it grants a signed-in session to whoever issued the code.`;
+        }
+    },
+    {
+        id: 'MQL-AUTHFLOW-102',
+        name: 'Link passes through a generic edge or tunnelling host',
+        category: 'AUTHFLOW',
+        severity: 'MEDIUM',
+        confidence: 0.45,
+        mitre: ['T1566.002'],
+        source: 'MITRE ATT&CK T1566.002 (Phishing: Spearphishing Link)',
+        description: 'A link resolves through a general-purpose edge, worker or tunnelling service. These are ordinary developer infrastructure, so this is weak on its own - it matters because it lets a page be served from reputable infrastructure that carries no reputation of the attacker own.',
+        test: (ctx) => {
+            const RELAYS = ['workers.dev', 'trycloudflare.com', 'ngrok.io', 'ngrok-free.app', 'loca.lt', 'r2.dev', 'pages.dev', 'vercel.app', 'netlify.app', 'glitch.me'];
+            const hit = (ctx.urls || []).find(u => {
+                try {
+                    const h = new URL(u).hostname.toLowerCase();
+                    return RELAYS.some(r => h === r || h.endsWith('.' + r));
+                } catch (e) { return false; }
+            });
+            return hit && `Link is served through a generic hosting or tunnelling service: ${hit}`;
+        }
+    },
+
+    // ---------------------------------------------------------------
+    // FORWARDING CHAIN  (family: AUTHENTICATION)
+    // ---------------------------------------------------------------
+    {
+        id: 'MQL-ARC-101',
+        name: 'ARC forwarding chain is malformed',
+        category: 'ARC',
+        severity: 'MEDIUM',
+        confidence: 0.50,
+        mitre: ['T1566'],
+        source: 'RFC 8617 (Authenticated Received Chain); MITRE ATT&CK T1566 (Phishing)',
+        description: 'The message carries ARC headers that do not form a valid chain. A well-formed chain explains why authentication failed on genuinely forwarded mail; a broken one is either a misconfigured forwarder or an attempt to manufacture that excuse.',
+        test: (ctx) => {
+            if (ctx.arc.status !== 'BROKEN') return false;
+            return `ARC chain over ${ctx.arc.hops} hop(s) is malformed: ${(ctx.arc.problems || []).join(' ')}`;
+        }
+    },
+
+    // ---------------------------------------------------------------
     // URL RISK  (family: URL_RISK)
     // ---------------------------------------------------------------
     {
@@ -500,6 +633,63 @@ const RULES = [
     }
 ];
 
+/**
+ * Pulls MITRE technique identifiers out of a rule's citation string.
+ *
+ * Rules written before techniques were emitted as data cite them in prose, and
+ * rewriting thirty citations by hand to add a field would have been a chance to
+ * introduce a typo in every one of them. A rule that declares `mitre: [...]`
+ * explicitly always wins; this is the fallback for the rest.
+ */
+function mitreFromSource(source) {
+    const found = String(source || '').match(/\bT1\d{3}(?:\.\d{3})?\b/g);
+    return found ? Array.from(new Set(found)) : [];
+}
+
+/** Technique ids with the rules that attributed each, so attribution is checkable. */
+function summariseTechniques(matchedRules) {
+    const byTechnique = new Map();
+    for (const rule of matchedRules) {
+        for (const technique of (rule.mitre || [])) {
+            if (!byTechnique.has(technique)) byTechnique.set(technique, []);
+            byTechnique.get(technique).push(rule.id);
+        }
+    }
+    return Array.from(byTechnique.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([technique, rules]) => ({
+            technique,
+            name: TECHNIQUE_NAMES[technique] || null,
+            attributed_by: rules
+        }));
+}
+
+/**
+ * Names for the techniques these rules actually cite. Deliberately not a copy
+ * of the whole ATT&CK catalogue: an unnamed technique is reported with its id
+ * and a null name, which is honest, rather than carrying thousands of entries
+ * that would drift out of date.
+ */
+const TECHNIQUE_NAMES = {
+    'T1566': 'Phishing',
+    'T1566.001': 'Phishing: Spearphishing Attachment',
+    'T1566.002': 'Phishing: Spearphishing Link',
+    'T1566.003': 'Phishing: Spearphishing via Service',
+    'T1566.004': 'Phishing: Spearphishing Voice',
+    'T1534': 'Internal Spearphishing',
+    'T1598': 'Phishing for Information',
+    'T1598.002': 'Phishing for Information: Spearphishing Attachment',
+    'T1598.003': 'Phishing for Information: Spearphishing Link',
+    'T1656': 'Impersonation',
+    'T1204': 'User Execution',
+    'T1204.001': 'User Execution: Malicious Link',
+    'T1204.002': 'User Execution: Malicious File',
+    'T1586': 'Compromise Accounts',
+    'T1585': 'Establish Accounts',
+    'T1583': 'Acquire Infrastructure',
+    'T1583.001': 'Acquire Infrastructure: Domains'
+};
+
 class RuleEngine {
     buildContext(threatObject, parsedEmail) {
         const fromDomain = domainOf(parsedEmail.from?.address);
@@ -517,7 +707,9 @@ class RuleEngine {
             attachments: threatObject.attachments || [],
             nlpSignalTypes,
             intelMatches: threatObject.threat_intelligence?.matches || [],
-            domainAges: threatObject.threat_intelligence?.domain_ages || []
+            domainAges: threatObject.threat_intelligence?.domain_ages || [],
+            qr: threatObject.qr || { codes: [], codes_found: 0, not_scanned: [] },
+            arc: threatObject.forensics?.arc || { status: 'ABSENT' }
         };
     }
 
@@ -617,6 +809,7 @@ class RuleEngine {
                 source: rule.source,
                 description: rule.description,
                 decisive: rule.decisive === true,
+                mitre: rule.mitre || mitreFromSource(rule.source),
                 matched_because: typeof result === 'string' ? result : rule.description
             });
         }
@@ -630,6 +823,16 @@ class RuleEngine {
 
         threatObject.detection.matched_rules = combined;
         threatObject.detection.signals = combined.map(r => r.id);
+
+        // Techniques as identifiers, not prose.
+        //
+        // Every rule already cited MITRE in its `source` string, which reads
+        // well in a report and is useless to anything else: a SIEM cannot
+        // correlate on a sentence, and neither can a second PhishLens
+        // deployment. The same citations are emitted here as a sorted list of
+        // technique ids, alongside the rules that produced each one so a reader
+        // can see why a technique was attributed rather than having to trust it.
+        threatObject.detection.attack_patterns = summariseTechniques(combined);
         threatObject.detection.verification_status = 'PHISHLENS_NATIVE_MQL_VERIFIED';
         threatObject.detection.rule_engine = {
             engine: 'PHISHLENS_NATIVE_MQL_V1',

@@ -12,6 +12,8 @@ const mailIngestionAdapter = require('./adapters/mailIngestionAdapter');
 const emailParser = require('./modules/emailParser');
 const mqlBridge = require('./modules/mqlBridge');
 const authAnalyzer = require('./modules/authAnalyzer');
+const arcAnalyzer = require('./modules/arcAnalyzer');
+const qrAnalyzer = require('./modules/qrAnalyzer');
 const forensicEngine = require('./modules/forensicEngine');
 const attachmentAnalyzer = require('./modules/attachmentAnalyzer');
 const iocExtractor = require('./modules/iocExtractor');
@@ -179,11 +181,32 @@ async function processPipeline(emailContent, source = 'MANUAL_API', clientMessag
         // 4. Independent SPF/DKIM/DMARC authentication analysis
         threatObject = await authAnalyzer.analyze(threatObject, parsedEmail, emailContent);
 
+        // 4b. ARC chain (RFC 8617). Recorded as context, never as reassurance:
+        //     a valid chain identifies who handled the message, not whether they
+        //     can be trusted. Its one use is explaining an authentication
+        //     failure caused by ordinary forwarding rather than by spoofing.
+        threatObject = arcAnalyzer.analyze(threatObject, emailContent);
+
         // 5. Safe attachment metadata and hash analysis (no execution)
         threatObject = attachmentAnalyzer.analyze(threatObject, parsedEmail);
 
+        // 5b. QR codes in attached images, decoded locally. This runs before
+        //     IOC extraction on purpose: a link inside a QR code is invisible to
+        //     everything that reads the message text, and recovering it here
+        //     means the feeds, domain-age and lookalike checks all apply to it
+        //     exactly as they would to a link somebody typed.
+        threatObject = qrAnalyzer.analyze(threatObject, parsedEmail);
+
         // 6. IOC Extraction (IPs, Domains, URLs, Hashes)
         threatObject = iocExtractor.extract(threatObject, parsedEmail);
+
+        // The QR links join the IOC set rather than sitting in a separate
+        // field nothing looks at.
+        if (threatObject.qr?.extracted_urls?.length) {
+            threatObject.iocs = threatObject.iocs || {};
+            threatObject.iocs.urls = Array.from(new Set([...(threatObject.iocs.urls || []), ...threatObject.qr.extracted_urls]));
+            threatObject.iocs.urls_from_qr = [...threatObject.qr.extracted_urls];
+        }
 
         // ===== DETECTION LAYER: MQL + NLP =====
         // Initial threat determination from the message itself, before any

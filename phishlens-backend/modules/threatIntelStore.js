@@ -27,6 +27,33 @@ const { dataFile } = require('./dataPaths');
  * deploying commercially rather than discovering the terms later.
  */
 
+/**
+ * Splits one CSV line, honouring double-quoted fields.
+ *
+ * Needed because a phishing URL routinely contains a comma inside a quoted
+ * field, and splitting on commas alone silently truncates the URL - producing
+ * an indicator that matches nothing and looks like a working feed.
+ */
+function splitCsvLine(line) {
+    const fields = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+            if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+            else inQuotes = !inQuotes;
+        } else if (ch === ',' && !inQuotes) {
+            fields.push(current);
+            current = '';
+        } else {
+            current += ch;
+        }
+    }
+    fields.push(current);
+    return fields;
+}
+
 const FEEDS = [
     {
         id: 'urlhaus',
@@ -56,6 +83,46 @@ const FEEDS = [
         licence: 'OpenPhish community feed - free for personal/research use; review terms before commercial deployment - https://openphish.com/terms.html',
         enabledByDefault: true,
         parse: (text) => text.split(/\r?\n/).map(l => l.trim()).filter(l => /^https?:\/\//i.test(l))
+    },
+    {
+        id: 'phishtank',
+        name: 'PhishTank verified phishing URLs',
+        // Reachable without a key. An earlier version of this entry gated it
+        // behind PHISHTANK_API_KEY on the strength of a 429 seen during
+        // testing - that was rate limiting from three requests in a row, not an
+        // authentication requirement. Checked properly: the keyless URL
+        // redirects to a signed CDN link and returns the full verified set
+        // (14 MB, ~76,000 URLs), and three spaced requests all succeeded.
+        //
+        // A key still helps, because it raises the rate limit rather than
+        // unlocking the data, so it is used when present and not required.
+        url: 'https://data.phishtank.com/data/online-valid.csv',
+        keyedUrl: 'https://data.phishtank.com/data/{key}/online-valid.csv',
+        optionalKey: 'PHISHTANK_API_KEY',
+        indicator: 'url',
+        licence: 'PhishTank - free to use; registration raises rate limits. Review terms before commercial deployment - https://phishtank.org/api_info.php',
+        enabledByDefault: true,
+        // This feed is large and aggressively rate limited, so it is fetched
+        // far less often than the others. Asking for 14 MB every sync would
+        // earn a 429 and gain nothing: the set does not turn over minute to
+        // minute.
+        minimumIntervalMinutes: 360,
+        parse: (text) => {
+            const urls = [];
+            const lines = text.split(/\r?\n/);
+            // phish_id,url,phish_detail_url,submission_time,verified,verification_time,online,target
+            for (let i = 1; i < lines.length; i++) {
+                const fields = splitCsvLine(lines[i]);
+                const url = fields[1];
+                const online = (fields[6] || '').trim().toLowerCase();
+                // Only what PhishTank still considers live. A verified-then-
+                // taken-down URL is history, not a current indicator, and
+                // treating it as one is how a feed starts firing on recycled
+                // hosting.
+                if (url && /^https?:\/\//i.test(url) && online !== 'no') urls.push(url);
+            }
+            return urls;
+        }
     },
     {
         id: 'feodo',
@@ -233,7 +300,45 @@ class ThreatIntelStore {
     enabledFeeds() {
         const disabled = (process.env.THREAT_INTEL_DISABLED_FEEDS || '')
             .split(',').map(s => s.trim()).filter(Boolean);
-        return FEEDS.filter(f => f.enabledByDefault && !disabled.includes(f.id));
+
+        return FEEDS.filter(feed => {
+            if (disabled.includes(feed.id)) return false;
+            // A key-gated feed switches itself on once the operator supplies the
+            // key, and stays off otherwise. Fetching it without one returns an
+            // error page that parses to zero indicators, which looks
+            // indistinguishable from a quiet day.
+            if (feed.requiresKey) return !!process.env[feed.requiresKey];
+            return feed.enabledByDefault;
+        });
+    }
+
+    /**
+     * The URL to fetch. A required key is substituted; an optional one switches
+     * to the keyed form only when it is actually set, so the feed keeps working
+     * without it.
+     */
+    feedUrl(feed) {
+        if (feed.requiresKey) {
+            return feed.url.replace('{key}', encodeURIComponent(process.env[feed.requiresKey] || ''));
+        }
+        if (feed.optionalKey && process.env[feed.optionalKey] && feed.keyedUrl) {
+            return feed.keyedUrl.replace('{key}', encodeURIComponent(process.env[feed.optionalKey]));
+        }
+        return feed.url;
+    }
+
+    /**
+     * Whether enough time has passed to fetch this feed again.
+     *
+     * Only large, rate-limited feeds declare an interval. Requesting 14 MB on
+     * every sync earns a 429 and gains nothing, because the set does not turn
+     * over minute to minute.
+     */
+    dueForSync(feed) {
+        if (!feed.minimumIntervalMinutes) return true;
+        const last = this.lastFeedSync?.[feed.id];
+        if (!last) return true;
+        return (Date.now() - new Date(last).getTime()) >= feed.minimumIntervalMinutes * 60 * 1000;
     }
 
     /**
@@ -245,9 +350,16 @@ class ThreatIntelStore {
         console.log('[ThreatIntel] Synchronising open indicator feeds to local store...');
         const results = [];
 
+        this.lastFeedSync = this.lastFeedSync || {};
+
         for (const feed of this.enabledFeeds()) {
+            if (!this.dueForSync(feed)) {
+                results.push({ feed: feed.id, status: 'SKIPPED_NOT_DUE', detail: `Fetched less than ${feed.minimumIntervalMinutes} minutes ago; the previously synced indicators are still in use.` });
+                continue;
+            }
             try {
-                const body = await this.download(feed.url);
+                const body = await this.download(this.feedUrl(feed));
+                this.lastFeedSync[feed.id] = new Date().toISOString();
                 const parsed = feed.parse(body);
                 let added = 0;
 
@@ -438,7 +550,21 @@ class ThreatIntelStore {
     }
 
     availableFeeds() {
-        return FEEDS.map(f => ({ id: f.id, name: f.name, indicator: f.indicator, licence: f.licence, enabled_by_default: f.enabledByDefault }));
+        return FEEDS.map(f => ({
+            id: f.id,
+            name: f.name,
+            indicator: f.indicator,
+            licence: f.licence,
+            enabled_by_default: f.enabledByDefault,
+            requires_key: f.requiresKey || null,
+            optional_key: f.optionalKey || null,
+            key_present: (f.requiresKey || f.optionalKey) ? !!process.env[f.requiresKey || f.optionalKey] : null,
+            minimum_interval_minutes: f.minimumIntervalMinutes || null,
+            // Stated so a feed that is off is visibly off, rather than simply
+            // contributing nothing and looking like a feed with no hits.
+            active: f.requiresKey ? !!process.env[f.requiresKey] : f.enabledByDefault,
+            key_hint: f.keyHint || (f.optionalKey ? `Optional: setting ${f.optionalKey} raises PhishTank's rate limit. The feed works without it.` : null)
+        }));
     }
 }
 

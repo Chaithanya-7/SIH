@@ -357,6 +357,83 @@ class PDFReportGenerator {
                 .text(`   Why it matched: ${this.safe(rule.matched_because)}`);
             doc.fillColor(COLORS.muted).text(`   Rule source: ${this.safe(rule.source)}`);
         });
+
+        this.renderTechniques(doc, threatObject);
+        this.renderQrFindings(doc, threatObject);
+        this.renderArcChain(doc, threatObject);
+    }
+
+    /**
+     * Techniques as identifiers, with the rules that attributed each.
+     *
+     * A reader who disagrees with an attribution needs to see what produced it;
+     * a bare list of technique numbers is an assertion, not evidence.
+     */
+    renderTechniques(doc, threatObject) {
+        const patterns = threatObject.detection?.attack_patterns || [];
+        if (!patterns.length) return;
+
+        doc.moveDown(0.4);
+        doc.fontSize(9).fillColor(COLORS.body).font('Helvetica-Bold').text('Attack techniques (MITRE ATT&CK)');
+        doc.font('Helvetica').fontSize(8);
+        patterns.forEach(pattern => {
+            this.ensureSpace(doc, 22);
+            doc.fillColor(COLORS.body).text(`   ${this.safe(pattern.technique)}  ${this.safe(pattern.name || 'name not held locally')}`);
+            doc.fillColor(COLORS.muted).text(`      attributed by: ${this.safe((pattern.attributed_by || []).join(', '))}`);
+        });
+    }
+
+    /**
+     * The decoded destination, in full.
+     *
+     * A QR code is the one finding a reader cannot check for themselves by
+     * looking at the message - the link is not written anywhere in it - so the
+     * report has to carry the whole URL rather than a summary of it.
+     */
+    renderQrFindings(doc, threatObject) {
+        const qr = threatObject.qr;
+        if (!qr || (!qr.codes_found && !(qr.not_scanned || []).length)) return;
+
+        doc.moveDown(0.4);
+        doc.fontSize(9).fillColor(COLORS.body).font('Helvetica-Bold').text('QR codes decoded from attachments');
+        doc.font('Helvetica').fontSize(8);
+
+        (qr.codes || []).forEach(code => {
+            this.ensureSpace(doc, 40);
+            doc.fillColor(COLORS.body)
+                .text(`   ${this.safe(code.filename)} (${this.safe(code.dimensions)}, ${this.safe(code.payload_kind)}${code.polarity === 'inverted' ? ', inverted' : ''})`);
+            doc.fillColor(COLORS.rule).text(`      ${this.safe(code.payload)}`);
+        });
+
+        (qr.not_scanned || []).forEach(item => {
+            this.ensureSpace(doc, 26);
+            doc.fillColor(COLORS.muted).text(`   ${this.safe(item.filename)} — not scanned: ${this.safe(item.reason)}`);
+        });
+
+        if (!qr.codes_found) {
+            doc.fillColor(COLORS.muted).text('   No QR code was decoded from this message.');
+        }
+    }
+
+    /** The chain, and an explicit statement that a valid one is not reassurance. */
+    renderArcChain(doc, threatObject) {
+        const arc = threatObject.forensics?.arc;
+        if (!arc || arc.status === 'ABSENT') return;
+
+        doc.moveDown(0.4);
+        doc.fontSize(9).fillColor(COLORS.body).font('Helvetica-Bold')
+            .text(`Forwarding chain (ARC, RFC 8617) — ${this.safe(arc.status)}`);
+        doc.font('Helvetica').fontSize(8).fillColor(COLORS.body).text(`   ${this.safe(arc.explanation)}`);
+
+        (arc.intermediaries || []).forEach(hop => {
+            this.ensureSpace(doc, 20);
+            const seen = hop.authentication_seen
+                ? ` — recorded spf=${hop.authentication_seen.spf || 'n/a'}, dkim=${hop.authentication_seen.dkim || 'n/a'}`
+                : '';
+            doc.fillColor(COLORS.muted).text(`   i=${hop.instance} ${this.safe(hop.signing_domain || 'unnamed')}${this.safe(seen)}`);
+        });
+
+        doc.fillColor(COLORS.caution).text(`   ${this.safe(arc.risk_note)}`);
     }
 
     renderBehaviouralFindings(doc, threatObject) {

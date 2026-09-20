@@ -7,8 +7,10 @@
     "start": "electron .",
     "dev": "electron . --dev",
     "test": "node --test tests/*.test.js",
-    "build": "electron-builder"
+    "stage": "node scripts/stage-backend.js",
+    "build": "npm run stage && electron-builder"
   },
+  "author": "PhishLens",
   "license": "ISC",
   "devDependencies": {
     "electron": "^44.4.3",
@@ -43,7 +45,7 @@
         ]
       },
       {
-        "from": "../phishlens-backend/node_modules",
+        "from": "build-staging/backend-deps/node_modules",
         "to": "backend/node_modules",
         "filter": [
           "**/*",

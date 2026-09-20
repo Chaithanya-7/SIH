@@ -3,26 +3,32 @@ const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
 
-const DIR_FILE = path.join(__dirname, '../data/executive_directory.json');
-const HISTORY_FILE = path.join(__dirname, '../data/executive_targeting.json');
+const os = require('os');
 
+/**
+ * Runs against its own data directory.
+ *
+ * The previous version moved the shared executive-directory file aside and put
+ * it back afterwards. `node --test` runs test files concurrently in separate
+ * processes, so that relocated the file for every other test file at the same
+ * time - and this one writes organisation domains, which the domain-posture
+ * tests read. The result was a test that failed only when the two happened to
+ * overlap, which is the worst kind to debug.
+ */
 async function withIsolatedDirectory(run) {
-    const saved = {};
-    [DIR_FILE, HISTORY_FILE].forEach(f => {
-        saved[f] = fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : null;
-        if (saved[f] !== null) fs.unlinkSync(f);
-    });
+    const previous = process.env.PHISHLENS_DATA_DIR;
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'phishlens-execguard-'));
+    process.env.PHISHLENS_DATA_DIR = dir;
     delete require.cache[require.resolve('../modules/executiveGuard')];
     const guard = require('../modules/executiveGuard');
 
     try {
         return await run(guard);
     } finally {
-        Object.entries(saved).forEach(([f, content]) => {
-            if (content === null) { if (fs.existsSync(f)) fs.unlinkSync(f); }
-            else fs.writeFileSync(f, content);
-        });
+        if (previous === undefined) delete process.env.PHISHLENS_DATA_DIR;
+        else process.env.PHISHLENS_DATA_DIR = previous;
         delete require.cache[require.resolve('../modules/executiveGuard')];
+        try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { /* best effort */ }
     }
 }
 
@@ -206,7 +212,8 @@ test('the directory validates entries and persists them', async () => {
         assert.strictEqual(guard.addPerson({ name: 'Duplicate', email: 'anita@company.example' }).ok, false,
             'the same address must not be protected twice');
 
-        assert.ok(fs.existsSync(DIR_FILE), 'the directory must persist');
+        // Path read off the guard so it follows the isolated data directory.
+        assert.ok(fs.existsSync(guard.configFile), 'the directory must persist');
         assert.strictEqual(guard.removePerson(added.person.id).ok, true);
         assert.strictEqual(guard.getDirectory().protected_people.length, 0);
     });

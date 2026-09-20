@@ -170,12 +170,45 @@ if (!gotSingleInstanceLock) {
         else pendingRoute = target;
     });
 
-    app.whenReady().then(async () => {
+    /**
+     * Make sure phishlens:// reaches *this* copy of the application.
+     *
+     * setAsDefaultProtocolClient on its own is not enough. It does not replace a
+     * registration held by a different executable, which was verified by
+     * watching an installed build fail to take the scheme from a leftover
+     * registration pointing at a build directory: the installed app ran, called
+     * it, and the handler still pointed at the old path. Clearing the stale
+     * entry first and running it again registered the installed path
+     * immediately.
+     *
+     * That matters because the stale handler is the normal case, not an edge
+     * case. Anyone who has run this app from a build directory, or who upgrades
+     * to a version that installs somewhere else, keeps the old path. Clicking
+     * "More info" in the extension would then launch an executable that may no
+     * longer exist, and the failure would look like the extension being broken.
+     */
+    function claimProtocol() {
         if (process.defaultApp && process.argv.length >= 2) {
+            // Running from source: the scheme has to carry the script path too.
             app.setAsDefaultProtocolClient(PROTOCOL, process.execPath, [path.resolve(process.argv[1])]);
-        } else {
-            app.setAsDefaultProtocolClient(PROTOCOL);
+            return;
         }
+
+        if (app.isDefaultProtocolClient(PROTOCOL)) return;
+
+        app.removeAsDefaultProtocolClient(PROTOCOL);
+        app.setAsDefaultProtocolClient(PROTOCOL);
+
+        if (!app.isDefaultProtocolClient(PROTOCOL)) {
+            // Reported rather than passed over: deep links will go somewhere
+            // else, and the person needs to know that rather than discover it
+            // by clicking a button that does nothing.
+            console.warn(`[PhishLens] Could not claim the ${PROTOCOL}:// scheme; another application still holds it. Deep links from the extension will not reach this app.`);
+        }
+    }
+
+    app.whenReady().then(async () => {
+        claimProtocol();
 
         createWindow(deepLinkFromArgv(process.argv) || { route: 'dashboard' });
         await supervisor.start();

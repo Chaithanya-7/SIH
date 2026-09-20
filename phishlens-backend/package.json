@@ -18,16 +18,20 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "imap": "^0.8.19",
+    "jpeg-js": "^0.4.4",
+    "jsqr": "^1.4.0",
     "mailauth": "^5.0.3",
     "mailparser": "^3.9.28",
     "nodemailer": "^10.0.10",
     "pdfkit": "^0.20.2",
+    "pngjs": "^7.0.0",
     "smtp-server": "^3.19.7",
     "sqlite3": "^6.0.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.14",
-    "pdf-parse": "^2.4.5"
+    "pdf-parse": "^2.4.5",
+    "qrcode": "^1.5.4"
   },
   "overrides": {
     "nodemailer": "^10.0.10",

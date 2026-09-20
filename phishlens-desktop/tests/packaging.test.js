@@ -88,3 +88,41 @@ test('the app is not carrying the backend\'s own case history', { skip }, () => 
     assert.strictEqual(fs.existsSync(dataDir), false,
         'cases, tokens and the audit ledger are per-user state, written to the user profile at runtime');
 });
+
+/**
+ * Development tooling must not travel inside an installer.
+ *
+ * The packaging copies the backend's dependency tree wholesale, so before the
+ * staging step it shipped whatever happened to be installed for development -
+ * a file watcher, a PDF parser used only by tests, a QR *generator* used only
+ * to build test fixtures. None of it is reachable at runtime; all of it was
+ * weight in the download and surface in the install.
+ */
+test('no development-only dependency is bundled', { skip }, () => {
+    const backend = path.join(PACKAGED, 'backend');
+    const manifest = JSON.parse(fs.readFileSync(path.join(backend, 'package.json'), 'utf8'));
+    const devDeps = Object.keys(manifest.devDependencies || {});
+    assert.ok(devDeps.length > 0, 'the backend declares dev dependencies, so this check is meaningful');
+
+    const shipped = devDeps.filter(d => fs.existsSync(path.join(backend, 'node_modules', d)));
+    assert.deepStrictEqual(shipped, [], 'these are development tools and have no reason to be in an installer');
+});
+
+/** The runtime dependencies still have to be there - pruning must not overreach. */
+test('pruning dev dependencies did not remove a runtime one', { skip }, () => {
+    const backend = path.join(PACKAGED, 'backend');
+    const manifest = JSON.parse(fs.readFileSync(path.join(backend, 'package.json'), 'utf8'));
+    const missing = Object.keys(manifest.dependencies || {})
+        .filter(d => !fs.existsSync(path.join(backend, 'node_modules', d)));
+
+    assert.deepStrictEqual(missing, [], 'a runtime dependency was pruned away with the dev tooling');
+});
+
+/** The QR decoder is a runtime dependency; the QR generator is not. */
+test('the QR decoder ships and the QR generator does not', { skip }, () => {
+    const modules = path.join(PACKAGED, 'backend', 'node_modules');
+    ['jsqr', 'jpeg-js', 'pngjs'].forEach(d =>
+        assert.ok(fs.existsSync(path.join(modules, d)), `${d} decodes QR codes at runtime and must ship`));
+    assert.ok(!fs.existsSync(path.join(modules, 'qrcode')),
+        'qrcode only generates fixtures for the test suite');
+});

@@ -24,6 +24,8 @@ export default function CaseInvestigationView({ selectedCase, onOpenReport }) {
   const campaignAssoc = selectedCase.campaign_association || {};
   const campaign = selectedCase.campaign || {};
   const detection = selectedCase.detection || {};
+  const qr = selectedCase.qr || null;
+  const arc = selectedCase.forensics?.arc || null;
   const nlp = selectedCase.nlp || { status: 'NOT_ANALYZED', signals: [], score: 0 };
   const behavioral = selectedCase.behavioral || { status: 'NOT_ANALYZED', signals: [] };
   const adaptive = selectedCase.adaptive || { status: 'NOT_SCORED', contributions: [] };
@@ -210,6 +212,76 @@ export default function CaseInvestigationView({ selectedCase, onOpenReport }) {
               </div>
             )}
           </div>
+
+          {/* Techniques as identifiers an analyst can carry to another tool,
+              each showing which rules attributed it so it can be questioned. */}
+          {(detection.attack_patterns || []).length > 0 && (
+            <div style={{ backgroundColor: 'var(--bg-panel)', borderRadius: '6px', border: '1px solid var(--border)', padding: '14px' }}>
+              <h4 style={{ margin: '0 0 4px 0', fontSize: '0.82rem', color: 'var(--text-primary)', fontWeight: 600 }}>Attack techniques (MITRE ATT&amp;CK)</h4>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '10px' }}>
+                Attributed from the rules that matched. Each is shown with the rules responsible, so the attribution can be checked rather than taken on trust.
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {detection.attack_patterns.map(pattern => (
+                  <div key={pattern.technique} style={{ display: 'flex', alignItems: 'baseline', gap: '10px', backgroundColor: 'var(--bg-surface)', padding: '7px 10px', borderRadius: '4px' }}>
+                    <code style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--accent-soft)' }}>{pattern.technique}</code>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-primary)', flex: 1 }}>{pattern.name || 'Technique name not held locally'}</span>
+                    <span style={{ fontSize: '0.66rem', color: 'var(--text-dim)' }}>{pattern.attributed_by.join(', ')}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* A QR code is a link nobody can read off the screen. If one was
+              decoded, the destination is the single most important thing on
+              this page - so it is shown in full rather than summarised. */}
+          {qr && (qr.codes_found > 0 || (qr.not_scanned || []).length > 0) && (
+            <div style={{ backgroundColor: 'var(--bg-panel)', borderRadius: '6px', border: '1px solid var(--border)', padding: '14px' }}>
+              <h4 style={{ margin: '0 0 4px 0', fontSize: '0.82rem', color: 'var(--text-primary)', fontWeight: 600 }}>QR codes in attachments</h4>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '10px' }}>
+                Decoded locally from the attached images. A link inside a code appears nowhere in the message text, and is usually opened on a phone rather than the managed device.
+              </div>
+
+              {(qr.codes || []).map((code, i) => (
+                <div key={i} style={{ backgroundColor: 'var(--bg-surface)', padding: '9px 10px', borderRadius: '4px', marginBottom: '6px', borderLeft: '3px solid var(--warning)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', marginBottom: '3px' }}>
+                    <span style={{ fontSize: '0.76rem', fontWeight: 600, color: 'var(--text-primary)' }}>{code.filename}</span>
+                    <span style={{ fontSize: '0.66rem', color: 'var(--text-dim)' }}>
+                      {code.dimensions} · {code.payload_kind.replace(/_/g, ' ')}{code.polarity === 'inverted' ? ' · inverted' : ''}
+                    </span>
+                  </div>
+                  <code style={{ display: 'block', fontSize: '0.71rem', color: 'var(--accent-soft)', wordBreak: 'break-all', backgroundColor: 'var(--bg-code)', padding: '5px 7px', borderRadius: '3px' }}>
+                    {code.payload}
+                  </code>
+                </div>
+              ))}
+
+              {(qr.not_scanned || []).map((item, i) => (
+                <div key={`ns-${i}`} style={{ fontSize: '0.71rem', color: 'var(--text-dim)', marginTop: '4px' }}>
+                  <strong style={{ color: 'var(--text-muted)' }}>{item.filename}</strong> — {item.reason}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Shown only when a chain exists, and worded so a passing chain
+              cannot be read as reassurance. */}
+          {arc && arc.status !== 'ABSENT' && (
+            <div style={{ backgroundColor: 'var(--bg-panel)', borderRadius: '6px', border: '1px solid var(--border)', padding: '14px' }}>
+              <h4 style={{ margin: '0 0 4px 0', fontSize: '0.82rem', color: 'var(--text-primary)', fontWeight: 600 }}>
+                Forwarding chain (ARC) — {arc.status === 'SEALED' ? 'structurally valid' : 'malformed'}
+              </h4>
+              <div style={{ fontSize: '0.73rem', color: 'var(--text-secondary)', marginBottom: '8px', lineHeight: 1.5 }}>{arc.explanation}</div>
+              {(arc.intermediaries || []).map(hop => (
+                <div key={hop.instance} style={{ fontSize: '0.72rem', color: 'var(--text-muted)', backgroundColor: 'var(--bg-surface)', padding: '6px 9px', borderRadius: '4px', marginBottom: '4px' }}>
+                  <strong style={{ color: 'var(--text-primary)' }}>i={hop.instance}</strong> {hop.signing_domain || 'unnamed'}
+                  {hop.authentication_seen && ` — saw spf=${hop.authentication_seen.spf || 'n/a'}, dkim=${hop.authentication_seen.dkim || 'n/a'}`}
+                </div>
+              ))}
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)', fontStyle: 'italic', marginTop: '6px' }}>{arc.risk_note}</div>
+            </div>
+          )}
         </div>
       )}
 

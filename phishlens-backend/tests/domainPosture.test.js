@@ -1,5 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 
 /**
  * The advisor is tested against synthetic records rather than live DNS: what
@@ -8,13 +11,33 @@ const assert = require('node:assert');
  * nothing to do with this code.
  */
 
+/**
+ * The advisor reads the operator's configured organisation domains through
+ * executiveGuard, which loads them from the data directory. Pointing at a
+ * private directory keeps that empty regardless of what any other test file is
+ * doing concurrently - without it, this suite failed intermittently whenever
+ * the executive-guard tests happened to be writing domains at the same moment.
+ */
 function advisorWith(records) {
-    delete require.cache[require.resolve('../modules/dmarcAdvisor')];
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'phishlens-posture-'));
+    process.env.PHISHLENS_DATA_DIR = dir;
+    isolatedDirs.push(dir);
+
+    ['../modules/dmarcAdvisor', '../modules/executiveGuard'].forEach(m => delete require.cache[require.resolve(m)]);
     const advisor = require('../modules/dmarcAdvisor');
     advisor.cache.clear();
     advisor.resolveTxt = async (name) => records[name] || null;
     return advisor;
 }
+
+const isolatedDirs = [];
+const previousDataDir = process.env.PHISHLENS_DATA_DIR;
+
+test.after(() => {
+    if (previousDataDir === undefined) delete process.env.PHISHLENS_DATA_DIR;
+    else process.env.PHISHLENS_DATA_DIR = previousDataDir;
+    isolatedDirs.forEach(d => { try { fs.rmSync(d, { recursive: true, force: true }); } catch (e) { /* best effort */ } });
+});
 
 test('a domain with no DMARC record is called out as spoofable, with the record to publish', async () => {
     const advisor = advisorWith({ 'example.test': ['v=spf1 include:_spf.example.test -all'] });

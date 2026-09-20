@@ -833,3 +833,204 @@ application behaviour verified above.
 Installer size is 134 MB, up from 111 MB, because it now contains the
 dependencies it always needed. Documentation, tests, examples and source maps
 are excluded from the bundled `node_modules`.
+
+## 2026-09-20 — Attack shapes the pipeline could not see, and a caution about sources
+
+A research document proposed an intelligence architecture. Most of it was
+already built — MIME parsing, independent SPF/DKIM/DMARC, MITRE-cited rules,
+open indicator feeds, evidence-based non-binary verdicts. What follows is the
+part that genuinely was not.
+
+### First, what was not implemented, and why
+
+Every URL in the source document carried `?utm_source=chatgpt.com`, and the
+statistics attached to them were the kind of precise-sounding detail that AI
+chats fabricate: a named vendor report with a figure to one decimal place, an
+attack count for a specific month, a Zenodo record number, a campaign dated to
+the day. None of it was verifiable from here.
+
+So none of it was hardcoded. No statistic from that document appears anywhere
+in this codebase, and no report is cited that could not be checked. What *was*
+taken from it is the architecture, which is sound, and the standards it names,
+which are real and were read: RFC 8617, RFC 8628, and the MITRE technique
+identifiers.
+
+The feeds were checked by fetching them rather than trusting the list.
+
+### ARC — the chain that must never reassure
+
+`modules/arcAnalyzer.js`. RFC 8617 was not handled at all.
+
+ARC exists because ordinary authentication breaks on forwarding: a mailing list
+rewrites a message, destroying the DKIM signature and sending from its own IP,
+so SPF and DKIM fail for mail that was legitimate when sent. ARC records what
+each intermediary saw.
+
+The reason it is a separate module rather than folded into the authentication
+result is the warning in §9: ARC authenticates *who handled* a message, and says
+nothing about whether they are trustworthy. So a valid chain never lowers risk
+here. `affects_risk` is a field on the output rather than an implicit behaviour,
+so that anybody wiring ARC into scoring later has to change that line and read
+why it is there.
+
+What a chain is good for is the opposite direction: explaining why SPF failed on
+a message that really was forwarded, so an honest forward is not scored as a
+spoof. A chain that is *broken* is a signal in its own right — forging a
+plausible one is a way to manufacture an excuse for failed authentication.
+
+Structural validation only, stated plainly: instance numbering, set
+completeness, and `cv=` consistency. The seals are not re-verified
+cryptographically, because that needs each intermediary's key and the exact
+canonicalised bytes they signed, and getting it subtly wrong would produce
+confident nonsense. Unverified is reported as unverified — which costs nothing,
+since a passing chain cannot lower risk anyway.
+
+### QR codes — a link that is not in the message
+
+`modules/qrAnalyzer.js`. Every URL check in PhishLens — feeds, domain age,
+lookalike detection — operates on URLs found in the text. A QR code is a URL
+that is *not* in the text: it is pixels in an attachment, invisible to any
+amount of language analysis, and the recipient resolves it on a phone that is
+usually outside whatever protection the organisation runs on desktops.
+
+Decoded locally with jsQR, jpeg-js and pngjs — all pure JavaScript, no native
+build, no service, no key, nothing leaves the machine. The recovered URLs join
+the IOC set before enrichment runs, so the existing intelligence applies to them
+exactly as it does to a link somebody typed.
+
+PDFs are reported as *not scanned* rather than skipped silently. Reading one
+needs a full PDF renderer — a large dependency and a parser attackers actively
+target. Saying so is the difference between a known gap and a blind spot.
+
+**Three bugs found in my own decoder, by testing it rather than reading it:**
+
+1. The first version inverted the pixel buffer by hand for a second pass, with a
+   comment claiming jsQR misses inverted codes. Measured: it does not. Its
+   default `inversionAttempts` is `attemptBoth`.
+2. The second version called jsQR twice with fresh buffers to learn *which*
+   polarity read. That silently stopped inverted codes being decoded at all —
+   because **jsQR carries state between calls**. A failed `dontInvert` attempt
+   makes the next call return null for an image it decodes perfectly on its own.
+   Verified directly.
+3. `onlyInvert` throws a TypeError from inside the library on a valid image.
+
+The working version makes exactly one call, and observes polarity independently
+from the image's mean luminance. An inverted fixture is now in the test suite,
+which is what caught (2).
+
+### Authentication-flow abuse
+
+Rules for the case where every URL check comes back clean because the link
+genuinely *is* the provider's. A device-code flow (RFC 8628) points at a real
+Microsoft or Google authorisation page and supplies a code; what the recipient
+authorises is a session for whoever generated it. No domain reputation check
+will ever object.
+
+Also: a near-empty body with an attachment, which is the shape where a content
+classifier has nothing to read because nothing is written; and links served
+through generic edge or tunnelling hosts, kept deliberately weak because that is
+ordinary developer infrastructure.
+
+### MITRE techniques as data
+
+Every rule already cited MITRE in prose, which reads well in a report and is
+useless to anything else — a SIEM cannot correlate on a sentence. The same
+citations are now emitted as sorted technique identifiers, each carrying the
+rules that attributed it so the attribution can be questioned rather than
+trusted. Rules that predate this are parsed from their citation strings rather
+than being hand-edited thirty times.
+
+The name table covers only the techniques these rules actually cite. An unnamed
+technique is reported with its id and a null name, which is honest, rather than
+carrying a stale copy of the whole catalogue.
+
+### PhishTank — and a conclusion of mine that was wrong
+
+First attempt: three rapid requests returned HTTP 429, I concluded the feed
+required a registered key, and I gated it behind `PHISHTANK_API_KEY`.
+
+That was wrong, and it was wrong in the worst direction - it silently switched
+off a working source. Checked properly, with redirects followed and requests
+spaced: the keyless URL redirects to a signed CDN link and returns the complete
+verified set. **76,677 URLs, 14 MB, three spaced requests all HTTP 200.** The
+429 was rate limiting, not authentication. A key raises the rate limit; it does
+not unlock the data.
+
+Corrected: on by default, keyless, with the key used when present. Because the
+feed is large and rate limited it declares a minimum sync interval of six hours
+- asking for 14 MB every cycle earns a 429 and gains nothing, since the verified
+set does not turn over minute to minute.
+
+The effect is not marginal. The local indicator set went from roughly 20,000
+URLs and addresses to **96,692**, almost five times as many, entirely from
+re-checking something I had already decided.
+
+Its CSV is parsed with a quote-aware splitter, because a phishing URL routinely
+contains a comma and splitting on commas truncates it into an indicator that
+matches nothing. Offline entries are dropped: a taken-down URL is history, not a
+current indicator.
+
+### Sources checked, by fetching them
+
+Every endpoint below was requested rather than recalled.
+
+| Source | Result |
+|---|---|
+| abuse.ch URLhaus / ThreatFox / Feodo / MalwareBazaar | 200, 2.4 MB / 1.2 MB / 565 B / 120 KB |
+| OpenPhish community feed | 302 → GitHub raw, 200, 15 KB |
+| PhishTank verified online | 302 → signed CDN, 200, 14 MB, 76,677 rows |
+| Spamhaus DROP | 200, 47 KB |
+| MITRE ATT&CK STIX (`attack-stix-data`) | 200 - the machine-readable form, better than scraping technique pages |
+| RFCs 7208, 6376, 7489, 8601, 8617, 8628 | all 200 |
+| CISA Known Exploited Vulnerabilities | 200, 1.7 MB - but it is a vulnerability catalogue, not email intelligence |
+| Google Safe Browsing v4 | 404 without a key |
+| VirusTotal v3 | 401 without a key |
+
+Two datasets I had previously assumed were fabricated turned out to be real, and
+saying so matters more than being consistent:
+
+- **Zenodo 10.5281/zenodo.17314806** - "Phishing-Email-Detection-Dataset",
+  published 2025-10-10, CC-BY-4.0, four named academic creators, 372.9 MB merged
+  and 342.1 MB balanced. Research-grade provenance.
+- **Zenodo 10.5281/zenodo.20250116** - "Cross-model evaluation of phishing
+  detectors against LLM-generated emails", published 2026-05-16, CC-BY-4.0, tied
+  to a peer-reviewed Frontiers paper. This is the AI-generated phishing corpus,
+  and it is the only one of its kind found with a DOI and a licence.
+- **cw-l/email-corpus** exists and is MIT licensed, but it is a personal GitHub
+  account with 3 stars and no institutional backing. It fails the stated bar of
+  avoiding unverified repositories, so it is recorded as found and not adopted.
+
+### A test that failed for a reason unrelated to the change
+
+The executive-guard suite moved a shared data file aside and put it back —
+the same pattern already fixed twice elsewhere. `node --test` runs files
+concurrently, so it relocated that file for every other suite at the same time,
+and the domain-posture tests read organisation domains from it. The result was a
+failure that appeared only when the two overlapped. Both now use private data
+directories; four consecutive full runs are clean.
+
+### Packaging
+
+devDependencies were shipping inside the installer — a file watcher, a PDF
+parser used only by tests, a QR *generator* used only to build fixtures. None
+reachable at runtime, all of it weight in the download and surface in the
+install.
+
+Fixed with a staging step that resolves a production-only tree from the lockfile
+rather than a hand-maintained exclusion list, which would need every transitive
+dependency of every dev tool tracked by hand and would break silently when they
+changed.
+
+**Two bugs in that script, both caught by running it:**
+
+1. It passed an invalid npm flag, and reported the failure as a bare "install
+   failed" with nothing to act on. The message now carries the error.
+2. The real cause underneath was `spawnSync npm.cmd EINVAL` — since the fix for
+   CVE-2024-27980, Node refuses to spawn a `.cmd` without `shell: true`, and
+   says nothing useful about why.
+
+Worth noting what that near-miss looked like: the staging step failed, and a
+134 MB installer was still produced, with **zero** packages in its backend.
+Three packaging tests now assert that no dev dependency ships, that no runtime
+dependency was pruned with them, and specifically that the QR decoder ships
+while the QR generator does not.
