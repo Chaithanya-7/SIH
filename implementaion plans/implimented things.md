@@ -1034,3 +1034,38 @@ Worth noting what that near-miss looked like: the staging step failed, and a
 Three packaging tests now assert that no dev dependency ships, that no runtime
 dependency was pruned with them, and specifically that the QR decoder ships
 while the QR generator does not.
+
+### Installed, verified, uninstalled
+
+The installer was run against a real machine, on a per-user install (no
+elevation), with a deliberately stale `phishlens://` registration in place
+pointing at a path that no longer existed.
+
+| Check | Result |
+|---|---|
+| Install location | `%LOCALAPPDATA%\Programs\phishlens-desktop` |
+| Backend after launch | HTTP 200 after ~10s, cold |
+| Process tree | backend pid 2316, child of main pid 20876 |
+| Per-user data | `%APPDATA%\phishlens-desktop\data` |
+| Generated key | authenticated (401 without, 200 with) |
+| QR phishing message end to end | decoded, T1566.001 + T1566.002 attributed, verdict SUSPICIOUS, policy chose RECIPIENT_WARNED rather than containment |
+| Start menu shortcut | created |
+| Deep link `phishlens://dashboard` | launched, no duplicate instance |
+| Uninstall | install directory, Start menu entry and registry entry all removed |
+| User data after uninstall | kept, which is correct |
+| Orphan process on the port | none |
+
+**The protocol-claim fix, tested properly.** The first attempt proved nothing:
+the stale registration happened to point at the same path the app installed to,
+so "it now points at the installed app" was true before the fix as well. Tested
+again with the registration deliberately pointing at
+`E:\some\old\build\PhishLens.exe` - a path belonging to no installed
+application - the app reclaimed the scheme within a second of starting.
+
+**One leftover, stated plainly.** The uninstaller does not remove the
+`phishlens://` registration. NSIS removes what it created; that key is written
+by Electron at runtime, so nothing cleans it up. After uninstalling, the scheme
+points at a deleted executable. The practical impact is a dead deep link to an
+application that is gone, and the reinstall case is covered by the claim fix
+above. Removing it would mean dropping the runtime registration entirely, which
+breaks running from source.
