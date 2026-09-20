@@ -1393,3 +1393,86 @@ that every one of those experiments could have been run against
 `dist/win-unpacked` — the same packaged layout, no installer involved. Doing it
 that way took minutes instead of cycles, and the whole launch-method matrix
 above came from it.
+
+## 2026-09-20 — The protocol handler: found, and it was not what any of the guesses said
+
+Three hypotheses were tested and all three were wrong. The answer came from
+making the installer report on itself.
+
+### What was ruled out, with evidence
+
+**Elevation.** The installer's embedded manifest requests `asInvoker`, read
+straight out of the binary. It never elevates, so `HKCU` is the invoking user's
+hive throughout. This had been the leading theory.
+
+**The launch mechanism.** electron-builder's NSIS template starts the app with
+`StdUtils.ExecShellAsUser` on the Start Menu shortcut, passing `--updated` on
+upgrades. Every one of those was reproduced by hand against
+`dist/win-unpacked` — direct execution, `ShellExecute`, a real `.lnk`, and the
+`--updated` argument — and every one registered the scheme in about a second,
+including over a stale handler and over a bogus third path.
+
+**"The installer skipped as already installed."** The executable was rewritten
+and its timestamp moved, so the installer genuinely ran.
+
+### What it actually was
+
+The `customInstall` macro was not executing, which could not be seen from
+outside: the NSIS script is LZMA-compressed inside the installer, so 7-Zip reads
+the payload rather than the script, and the registry afterwards only shows an
+end state without saying who produced it.
+
+So the macro was made to report on itself — perform its writes, read the value
+back, and record both to a file beside the application. The first install after
+that change produced **no file at all**, and alongside it a second fact: the
+installed executable was present and current, but there was **no uninstall
+registry entry**.
+
+That places the failure precisely. In `installSection.nsh` the order is
+
+    uninstallOldVersion → installApplicationFiles → registryAddInstallInfo
+      → shortcuts → customInstall
+
+Files were installed and everything after them was not. The install section was
+terminating partway through, which is also why an earlier "upgrade install"
+appeared to *remove* the application rather than update it.
+
+Running the same installer again, with the previous version's state no longer
+in the way, completed the section and the macro reported:
+
+    customInstall ran
+    INSTDIR=C:\Users\moham\AppData\Local\Programs\phishlens-desktop
+    handler after write="C:\...\phishlens-desktop\PhishLens.exe" "%1"
+    read-back=ok
+
+The residue of a previous install is what breaks the run — the failure is in
+electron-builder's uninstall-the-old-version path, not in the custom script.
+
+### Where it stands
+
+The installer now registers the scheme itself: the command, the `URL Protocol`
+marker and a `DefaultIcon`, all verified present after install. Because the
+installer owns the key, the uninstaller can also remove it, which fixes the
+leftover recorded earlier — the app used to write the key at runtime, so NSIS
+had nothing to delete and uninstalling left the scheme pointing at a deleted
+executable.
+
+The application still re-asserts the claim over the first ten seconds of each
+launch. That is deliberate belt-and-braces: it costs one registry read when the
+scheme is already correct, and it covers an install whose section did not
+complete.
+
+The self-reporting log is kept. It is a few hundred bytes and it answers, in one
+file, a question that otherwise took an afternoon.
+
+### Verified on the installed build
+
+| Check | Result |
+|---|---|
+| Handler | points at the install directory |
+| `URL Protocol` marker | set |
+| `DefaultIcon` | set |
+| Uninstall entry | PhishLens 1.0.1 |
+| Start menu shortcut | present |
+| Backend supervised | up in ~4s |
+| `phishlens://dashboard` | opens the app, no duplicate instance |

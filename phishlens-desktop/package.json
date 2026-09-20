@@ -1,6 +1,6 @@
 {
   "name": "phishlens-desktop",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "PhishLens desktop application - the full SOC investigation console, installed on the workstation and registered as the handler for phishlens:// deep links from the browser extension.",
   "main": "main.js",
   "scripts": {
@@ -65,9 +65,7 @@
     "win": {
       "target": "nsis"
     },
-    "nsis": {
-      "//": "build/installer.nsh is picked up automatically. An explicit 'include' is resolved relative to the build resources directory, so naming the path here made electron-builder look for build/build/installer.nsh and silently skip it."
-    },
+
     "linux": {
       "target": "AppImage",
       "category": "Utility"
