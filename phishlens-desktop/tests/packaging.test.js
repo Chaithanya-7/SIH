@@ -246,14 +246,29 @@ test('the browser extension is shipped, and carries the file the app writes into
     assert.ok(resources.some(entry => entry.to === 'phishlens-extension'),
         'the console prints a folder to load; without this it names a path only a source checkout has');
 
-    // publishExtension fills this in when it publishes a configured copy. Absent
-    // from the source, the copy has nothing to fill and the extension quietly
-    // falls back to asking for a key by hand.
-    const provisioned = path.join(__dirname, '..', '..', 'phishlens-extension', 'provisioned.js');
-    assert.ok(fs.existsSync(provisioned), 'provisioned.js must exist for the app to write into');
+    // provisioned.js is written by the application at startup and carries this
+    // machine's API key. It must not travel inside an installer: an installer
+    // carrying a key hands every person who runs it the same credential, and
+    // that credential belongs to whoever built it.
+    const ext = resources.find(entry => entry.to === 'phishlens-extension');
+    assert.ok((ext.filter || []).includes('!provisioned.js'),
+        'the packaged extension must exclude the file that holds a build key');
+});
 
-    const source = fs.readFileSync(provisioned, 'utf8');
-    assert.match(source, /PHISHLENS_PROVISIONED/, 'it must define the global the extension reads');
-    // A key committed here would be a key shared by every install.
-    assert.match(source, /apiKey:\s*''/, 'the checked-in copy must carry no key');
+test('a build key cannot travel inside an installer', { skip }, () => {
+    const shipped = path.join(PACKAGED, 'phishlens-extension', 'provisioned.js');
+    assert.strictEqual(fs.existsSync(shipped), false,
+        'this file holds a live credential and is written per install, not bundled');
+});
+
+test('the provisioned settings are untracked, so a key cannot be committed', () => {
+    // Ignoring a file git already follows changes nothing, so this checks the
+    // index rather than .gitignore.
+    const tracked = execFileSync('git', ['ls-files', 'phishlens-extension/provisioned.js'], {
+        cwd: path.join(__dirname, '..', '..'),
+        encoding: 'utf8'
+    }).trim();
+
+    assert.strictEqual(tracked, '',
+        'provisioned.js is tracked - the application writes a real key into it, one git add from being published');
 });

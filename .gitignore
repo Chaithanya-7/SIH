@@ -15,3 +15,12 @@ dist/
 .vscode/
 .idea/
 .npm-cache/
+
+# The extension's provisioned settings carry this machine's API key.
+#
+# The desktop application writes it into the extension folder so the browser can
+# be handed a copy that needs no configuration. It is per-install and must never
+# be committed - a key in the repository is a key shared by everyone who clones
+# it. The file is untracked rather than merely ignored, because ignoring a file
+# git already follows changes nothing.
+phishlens-extension/provisioned.js
