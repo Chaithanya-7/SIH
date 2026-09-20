@@ -1,4 +1,5 @@
 const dns = require('dns').promises;
+const withDeadline = require('./withDeadline');
 const executiveGuard = require('./executiveGuard');
 
 /**
@@ -27,8 +28,7 @@ class DmarcAdvisor {
 
     async resolveTxt(name) {
         try {
-            const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('DNS lookup timed out')), 3000));
-            const records = await Promise.race([dns.resolveTxt(name), timeout]);
+            const records = await withDeadline(dns.resolveTxt(name), 3000, `TXT lookup for ${name}`);
             return records.map(chunks => chunks.join(''));
         } catch (e) {
             return null;

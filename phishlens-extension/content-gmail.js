@@ -34,10 +34,38 @@
     const POLL_MS = 4000;
     const MAX_PER_SWEEP = 25;
     const MAX_SEEN = 2000;
+    // Long enough for a slow mailbox, short enough that a hung request does not
+    // hold up the messages queued behind it.
+    const FETCH_TIMEOUT_MS = 8000;
+    // Gmail and Outlook both refuse messages beyond 25MB; the allowance covers
+    // base64 overhead on top of that.
+    const MAX_MESSAGE_BYTES = 35 * 1024 * 1024;
+    // The ceiling on that widening gap: a minute is long enough to stop being a
+    // burden and short enough that nobody notices the delay after a restart.
+    const MAX_BACKOFF_MS = 60000;
 
     const seen = new Set();
     let enabled = true;
     let inboxKey = null;
+    // One sweep at a time.
+    //
+    // A sweep examines up to twenty-five messages, each a network round trip,
+    // so it routinely outlasts the four-second interval that starts the next
+    // one. Overlapping sweeps did not duplicate work - `seen` is claimed before
+    // the first await - but they did multiply the in-flight requests against
+    // both the mail provider and the local backend, without ever examining a
+    // message sooner.
+    let sweeping = false;
+    // Backing off when PhishLens is not answering.
+    //
+    // A failed submission un-remembers its message so it is tried again, which
+    // is right for a single hiccup and wrong for a backend that is simply not
+    // running: twenty-five messages retried every four seconds is a steady six
+    // requests a second against something that is not there, plus a re-fetch of
+    // each original from the mail provider. Nobody sees it, and it continues
+    // for as long as the tab is open.
+    let consecutiveFailures = 0;
+    let quietUntil = 0;
 
     const provider = globalThis.PhishLensMailProviders?.forHostname(location.hostname) || null;
     if (!provider) return;
@@ -66,13 +94,36 @@
         const url = provider.rawUrl(id, location, inboxKey);
         if (!url) return null;
 
+        // Abandoned if it does not answer.
+        //
+        // A fetch with no deadline can hang for as long as the connection stays
+        // open, and this one is awaited inside a sequential loop, so a single
+        // unanswered request stopped that sweep permanently - every message
+        // behind it went unexamined, silently, with the extension still
+        // appearing to run.
+        const controller = new AbortController();
+        const deadline = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
         try {
-            const response = await fetch(url, { credentials: 'include' });
+            const response = await fetch(url, { credentials: 'include', signal: controller.signal });
             if (!response.ok) return null;
+
+            // A mail provider serves what a mailbox holds, and an attachment
+            // can be large. Reading it whole into a string before deciding
+            // anything is how a 30MB message becomes a stalled tab.
+            const length = Number(response.headers.get('content-length') || 0);
+            if (length > MAX_MESSAGE_BYTES) return null;
+
             const text = await response.text();
+            if (text.length > MAX_MESSAGE_BYTES) return null;
+
             return provider.looksLikeRawMessage(text) ? text : null;
         } catch (e) {
+            // An abort lands here too, which is the intended path rather than
+            // an error worth reporting.
             return null;
+        } finally {
+            clearTimeout(deadline);
         }
     }
 
@@ -139,25 +190,57 @@
 
         try {
             const result = await submit(payload);
+            consecutiveFailures = 0;
             if (result?.verdict) flag(entry.row, result.verdict, result.confidence);
         } catch (e) {
             // Forgotten again so it is retried, and silent: a backend that is
             // not running must not fill the console of somebody's mail client
             // with an error every four seconds.
             seen.delete(key);
+            noteFailure();
+            throw e;
         }
     }
 
-    async function sweep() {
-        if (!enabled) return;
+    /**
+     * Widens the gap between attempts while PhishLens stays unreachable.
+     *
+     * Doubling from one sweep to at most a minute, so a backend that is merely
+     * restarting is picked up within seconds while one that is switched off
+     * costs a request a minute rather than six a second. Any success resets it.
+     */
+    function noteFailure() {
+        consecutiveFailures += 1;
+        const backoff = Math.min(POLL_MS * Math.pow(2, consecutiveFailures - 1), MAX_BACKOFF_MS);
+        quietUntil = Date.now() + backoff;
+    }
 
+    async function sweep() {
+        if (!enabled || sweeping || Date.now() < quietUntil) return;
+        sweeping = true;
+
+        try {
+            await sweepOnce();
+        } finally {
+            sweeping = false;
+        }
+    }
+
+    async function sweepOnce() {
         const visible = provider.listVisible(document);
         // Unread first. Those are the ones not yet opened, which is the whole
         // reason for watching the list rather than the open message.
         visible.sort((a, b) => Number(b.unread) - Number(a.unread));
 
         for (const entry of visible.slice(0, MAX_PER_SWEEP)) {
-            await examine(entry);
+            try {
+                await examine(entry);
+            } catch (e) {
+                // Whatever stopped this message will stop the next twenty-four
+                // in exactly the same way, so the sweep ends here and the
+                // backoff decides when to try again.
+                return;
+            }
         }
     }
 

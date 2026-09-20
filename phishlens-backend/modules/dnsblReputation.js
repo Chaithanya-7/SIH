@@ -102,10 +102,24 @@ class DnsblReputation {
         const started = Date.now();
 
         try {
-            const answers = await Promise.race([
-                dns.resolve4(query),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('timed out')), this.timeoutMs))
-            ]);
+            // The loser of the race still has to be cleaned up.
+            //
+            // Promise.race settles on the first outcome but does not cancel the
+            // other, so a timer armed for six seconds survived every fast
+            // lookup - three per message, every message, each holding the event
+            // loop awake until it fired for nobody. Clearing it in `finally` is
+            // the whole fix.
+            let timer = null;
+            const deadline = new Promise((_, reject) => {
+                timer = setTimeout(() => reject(new Error('timed out')), this.timeoutMs);
+            });
+
+            let answers;
+            try {
+                answers = await Promise.race([dns.resolve4(query), deadline]);
+            } finally {
+                if (timer) clearTimeout(timer);
+            }
 
             const refusal = answers.find(a => a.startsWith(REFUSAL_PREFIX));
             if (refusal) {

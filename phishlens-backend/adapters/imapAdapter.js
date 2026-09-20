@@ -202,7 +202,11 @@ class IMAPAdapter {
 
         // Poll inbox safely every 12 seconds
         if (this.pollInterval) clearInterval(this.pollInterval);
-        this.pollInterval = setInterval(pollNewMessages, 12000);
+        // unref'd so a poll timer is never the reason this process refuses to
+        // exit. Called directly rather than behind a typeof guard: Node's
+        // timers always carry unref, and the guard is the shape that once let a
+        // missing method hide here.
+        this.pollInterval = setInterval(pollNewMessages, 12000).unref();
         pollNewMessages();
     }
 }

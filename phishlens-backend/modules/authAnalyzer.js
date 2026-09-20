@@ -1,4 +1,5 @@
 const dns = require('dns').promises;
+const withDeadline = require('./withDeadline');
 const { dkimVerify } = require('mailauth');
 
 /**
@@ -42,13 +43,11 @@ class AuthAnalyzer {
 
     async verifyDkimIndependently(rawEmailString) {
         try {
-            const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('DKIM verification timeout')), 4000)
-            );
-            const result = await Promise.race([
+            const result = await withDeadline(
                 dkimVerify(Buffer.from(rawEmailString || '', 'utf8')),
-                timeoutPromise
-            ]);
+                4000,
+                'DKIM verification'
+            );
 
             const results = (result.results || []).map(r => ({
                 result: r.status?.result || 'none',
@@ -72,10 +71,11 @@ class AuthAnalyzer {
     async lookupDmarcPolicy(domain) {
         if (!domain) return { status: 'UNAVAILABLE', policy: null, reason: 'No domain provided' };
         try {
-            const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('DMARC DNS lookup timeout')), 2500)
+            const records = await withDeadline(
+                dns.resolveTxt(`_dmarc.${domain}`),
+                2500,
+                `DMARC lookup for ${domain}`
             );
-            const records = await Promise.race([dns.resolveTxt(`_dmarc.${domain}`), timeoutPromise]);
             const txt = records.map(chunks => chunks.join('')).find(r => /^v=DMARC1/i.test(r));
             if (!txt) return { status: 'UNAVAILABLE', policy: null, reason: 'No DMARC TXT record published' };
 

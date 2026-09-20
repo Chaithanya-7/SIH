@@ -860,7 +860,15 @@ app.post('/api/ingest/email', async (req, res) => {
  * the case rather than smoothed over: a message whose authentication was never
  * visible must not end up looking like one that failed it.
  */
-app.post('/api/ingest/browser', async (req, res) => {
+// A message is a message, not a payload.
+//
+// This route inherited the global 50MB JSON limit, so a single submission could
+// push fifty megabytes through MIME parsing, QR decoding and language analysis.
+// The file-upload route already caps at 30MB; a browser is reading what a mail
+// provider chose to show somebody, which is smaller still. RFC 5321 §4.5.3.1.7
+// sets no ceiling, but providers do: Gmail and Outlook both refuse beyond 25MB
+// plus encoding overhead.
+app.post('/api/ingest/browser', express.json({ limit: '35mb' }), async (req, res) => {
     try {
         const { raw, evidence, source, provider_message_id: providerMessageId, subject, sender, snippet } = req.body || {};
         const complete = evidence !== 'BODY_ONLY' && typeof raw === 'string' && raw.trim().length > 0;

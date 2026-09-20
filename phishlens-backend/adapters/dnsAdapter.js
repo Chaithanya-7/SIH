@@ -1,4 +1,5 @@
 const dns = require('dns').promises;
+const withDeadline = require('../modules/withDeadline');
 const ipUtils = require('../utils/ipUtils');
 
 class DNSAdapter {
@@ -15,13 +16,14 @@ class DNSAdapter {
         }
 
         try {
-            // Perform reverse DNS lookup (PTR) with 2.5s timeout logic
-            const ptrPromise = dns.reverse(ip);
-            const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('DNS PTR lookup timeout')), 2500)
-            );
-
-            const ptrs = await Promise.race([ptrPromise, timeoutPromise]);
+            // Each lookup gets its own deadline.
+            //
+            // One timeout promise was created here and raced against both this
+            // lookup and the forward confirmation below. The clock starts when
+            // the promise is made, not when a race begins, so the second lookup
+            // inherited whatever time the first left over - and after a slow
+            // PTR it failed at once, having been given no chance at all.
+            const ptrs = await withDeadline(dns.reverse(ip), 2500, `PTR lookup for ${ip}`);
             const ptr = ptrs && ptrs.length > 0 ? ptrs[0] : null;
 
             if (!ptr) {
@@ -38,8 +40,7 @@ class DNSAdapter {
             // Perform forward confirmation lookup (FCrDNS)
             let forwardConfirmed = false;
             try {
-                const forwardIpsPromise = dns.resolve4(ptr);
-                const forwardIps = await Promise.race([forwardIpsPromise, timeoutPromise]);
+                const forwardIps = await withDeadline(dns.resolve4(ptr), 2500, `forward lookup for ${ptr}`);
                 forwardConfirmed = forwardIps && forwardIps.includes(ip);
             } catch (fcErr) {
                 forwardConfirmed = false;
