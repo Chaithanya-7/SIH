@@ -190,3 +190,70 @@ test('the packaged console references its assets relatively', { skip }, () => {
         assert.ok(fs.existsSync(resolved), `${rel} is referenced but missing from the package`);
     });
 });
+
+/**
+ * `files` is an allow-list, and a module left off it fails only on launch.
+ *
+ * Adding a module beside main.js and requiring it produces a build that
+ * succeeds, an installer that installs, and an application that dies at startup
+ * with "Cannot find module" - the one failure a user can neither work around
+ * nor diagnose. That shipped.
+ *
+ * Worse, the check meant to catch it grepped app.asar for the module's name and
+ * found the *require statement*, and concluded the module was present.
+ * Confirming a reference exists is not confirming its target does. These run
+ * against the source, so they fail before a build rather than after an install.
+ */
+function localRequires(file) {
+    const source = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+    const found = new Set();
+    for (const match of source.matchAll(/require\(['"]\.\/([^'"]+)['"]\)/g)) {
+        found.add(match[1].endsWith('.js') ? match[1] : `${match[1]}.js`);
+    }
+    return [...found];
+}
+
+function desktopManifest() {
+    let raw = fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8');
+    if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
+    return JSON.parse(raw);
+}
+
+test('every module the app requires at runtime is in the packaged file list', () => {
+    const packaged = new Set(desktopManifest().build.files);
+
+    const needed = new Set();
+    ['main.js', 'preload.js'].forEach(entry => localRequires(entry).forEach(name => needed.add(name)));
+    assert.ok(needed.size > 0, 'the entry points require something, so this check is meaningful');
+
+    const missing = [...needed].filter(name => !packaged.has(name));
+    assert.deepStrictEqual(missing, [],
+        `required at runtime but absent from build.files, so the app dies on launch: ${missing.join(', ')}`);
+});
+
+test('every file listed for packaging exists on disk', () => {
+    // The same failure from the other side: a name listed but misspelt copies
+    // nothing, and again only shows once installed.
+    const absent = desktopManifest().build.files
+        .filter(name => !name.includes('*') && !name.startsWith('!'))
+        .filter(name => !fs.existsSync(path.join(__dirname, '..', name)));
+
+    assert.deepStrictEqual(absent, [], `listed for packaging but not present: ${absent.join(', ')}`);
+});
+
+test('the browser extension is shipped, and carries the file the app writes into', () => {
+    const resources = desktopManifest().build.extraResources || [];
+    assert.ok(resources.some(entry => entry.to === 'phishlens-extension'),
+        'the console prints a folder to load; without this it names a path only a source checkout has');
+
+    // publishExtension fills this in when it publishes a configured copy. Absent
+    // from the source, the copy has nothing to fill and the extension quietly
+    // falls back to asking for a key by hand.
+    const provisioned = path.join(__dirname, '..', '..', 'phishlens-extension', 'provisioned.js');
+    assert.ok(fs.existsSync(provisioned), 'provisioned.js must exist for the app to write into');
+
+    const source = fs.readFileSync(provisioned, 'utf8');
+    assert.match(source, /PHISHLENS_PROVISIONED/, 'it must define the global the extension reads');
+    // A key committed here would be a key shared by every install.
+    assert.match(source, /apiKey:\s*''/, 'the checked-in copy must carry no key');
+});
