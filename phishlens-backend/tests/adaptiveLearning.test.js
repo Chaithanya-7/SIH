@@ -18,8 +18,22 @@ const BASELINE_FILE = path.join(__dirname, '../data/sender_baselines.json');
 async function withIsolatedStores(run) {
     const saved = {};
     [MODEL_FILE, BASELINE_FILE].forEach(file => {
-        saved[file] = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
-        if (saved[file] !== null) fs.unlinkSync(file);
+        // Checked and removed in one attempt rather than two.
+        //
+        // existsSync followed by unlinkSync is a race, and the test runner runs
+        // files in parallel: another suite clearing the same store between the
+        // two calls made this throw ENOENT in a full run while passing in
+        // isolation. The file being gone is the outcome this wants anyway.
+        try {
+            saved[file] = fs.readFileSync(file, 'utf8');
+        } catch (e) {
+            saved[file] = null;
+        }
+        try {
+            fs.unlinkSync(file);
+        } catch (e) {
+            if (e.code !== 'ENOENT') throw e;
+        }
     });
 
     // Required after clearing the files so the singletons start from empty state.
