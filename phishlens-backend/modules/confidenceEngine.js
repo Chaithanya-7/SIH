@@ -10,6 +10,7 @@ class ConfidenceEngine {
         if (type === 'MQL_ATT') return 'ATTACHMENT_RISK';
         if (type === 'MQL_BEC') return 'BEC_COMPOSITE';
         if (type === 'MQL_INTEL') return 'THREAT_INTEL';
+        if (type === 'MQL_CUSTOM') return 'CUSTOM';
         if (type.startsWith('BEHAVIOUR_')) return 'BEHAVIOURAL';
         if (type === 'LEARNED_PATTERN_MATCH') return 'LEARNED_PATTERN';
         return type || 'GENERAL';
@@ -40,7 +41,11 @@ class ConfidenceEngine {
             // A confirmed indicator-feed match is among the strongest single
             // facts available: someone has already observed this exact URL, host
             // or netblock being used maliciously.
-            THREAT_INTEL: 0.35, GENERAL: 0.20
+            THREAT_INTEL: 0.35,
+            // Operator-defined rules describe threats this specific deployment
+            // is actually seeing, so they carry weight comparable to a built-in
+            // detection family rather than being treated as a weak afterthought.
+            CUSTOM: 0.30, GENERAL: 0.20
         };
         const contributions = [];
         let threatScore = 0;

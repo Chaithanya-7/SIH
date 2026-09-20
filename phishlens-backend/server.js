@@ -17,6 +17,7 @@ const attachmentAnalyzer = require('./modules/attachmentAnalyzer');
 const iocExtractor = require('./modules/iocExtractor');
 const nlpAnalyzer = require('./modules/nlpAnalyzer');
 const ruleEngine = require('./modules/ruleEngine');
+const customDetectionConfig = require('./modules/customDetectionConfig');
 const behavioralAnalyzer = require('./modules/behavioralAnalyzer');
 const adaptiveLearning = require('./modules/adaptiveLearning');
 const infraEnricher = require('./modules/infraEnricher');
@@ -247,6 +248,7 @@ app.use([
     '/api/summary',
     '/api/learning',
     '/api/threat-intelligence',
+    '/api/detection-config',
     '/api/graph',
     '/api/vips',
     '/api/audit',
@@ -748,6 +750,96 @@ app.post('/api/threat-intelligence/sync', requireRole('ADMIN'), async (req, res)
     try {
         const result = await threatIntelStore.sync();
         res.json({ success: true, ...result });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// ==================== OPERATOR-DEFINED DETECTION CONTENT ====================
+/**
+ * Lets a deployment extend detection with its own MQL rules, language patterns
+ * and indicators, without editing source. Conditions are declarative and are
+ * never executed as code; see modules/customDetectionConfig.js.
+ */
+app.get('/api/detection-config', (req, res) => {
+    res.json({ success: true, ...customDetectionConfig.getAll(), schema: customDetectionConfig.getSchema() });
+});
+
+app.post('/api/detection-config/rules', requireRole('ADMIN'), (req, res) => {
+    const result = customDetectionConfig.addRule(req.body);
+    if (!result.ok) return res.status(400).json({ success: false, errors: result.errors });
+    auditLogger.log({
+        case_id: 'CONFIG',
+        event_type: 'CUSTOM_RULE_ADDED',
+        source: req.user.email,
+        description: `Custom detection rule ${result.rule.id} added by ${req.user.email}`
+    });
+    res.json({ success: true, rule: result.rule });
+});
+
+app.delete('/api/detection-config/rules/:id', requireRole('ADMIN'), (req, res) => {
+    const result = customDetectionConfig.removeRule(req.params.id);
+    if (!result.ok) return res.status(404).json({ success: false, errors: result.errors });
+    auditLogger.log({
+        case_id: 'CONFIG',
+        event_type: 'CUSTOM_RULE_REMOVED',
+        source: req.user.email,
+        description: `Custom detection rule ${req.params.id} removed by ${req.user.email}`
+    });
+    res.json({ success: true });
+});
+
+app.post('/api/detection-config/nlp-patterns', requireRole('ADMIN'), (req, res) => {
+    const result = customDetectionConfig.addNlpPattern(req.body);
+    if (!result.ok) return res.status(400).json({ success: false, errors: result.errors });
+    res.json({ success: true, pattern: result.pattern });
+});
+
+app.delete('/api/detection-config/nlp-patterns/:type', requireRole('ADMIN'), (req, res) => {
+    const result = customDetectionConfig.removeNlpPattern(req.params.type);
+    if (!result.ok) return res.status(404).json({ success: false, errors: result.errors });
+    res.json({ success: true });
+});
+
+app.post('/api/detection-config/indicators', requireRole('ADMIN'), (req, res) => {
+    const result = customDetectionConfig.addIndicators(req.body || {});
+    res.json({ success: true, ...result });
+});
+
+app.delete('/api/detection-config/indicators/:value', requireRole('ADMIN'), (req, res) => {
+    const result = customDetectionConfig.removeIndicator(req.params.value);
+    if (!result.ok) return res.status(404).json({ success: false, errors: result.errors });
+    res.json({ success: true });
+});
+
+/** Re-reads the configuration file after a direct edit, without a restart. */
+app.post('/api/detection-config/reload', requireRole('ADMIN'), (req, res) => {
+    customDetectionConfig.load();
+    res.json({ success: true, ...customDetectionConfig.getAll() });
+});
+
+/** Checks a rule against a sample message before committing it. */
+app.post('/api/detection-config/test', requireRole('ADMIN'), async (req, res) => {
+    try {
+        const { rule, emailContent } = req.body;
+        if (!rule || !emailContent) {
+            return res.status(400).json({ success: false, error: 'rule and emailContent are both required' });
+        }
+
+        const errors = customDetectionConfig.validateRule(rule);
+        if (errors.length) return res.status(400).json({ success: false, errors });
+
+        const parsedEmail = await emailParser.parse(emailContent);
+        let threatObject = mqlBridge.normalize(parsedEmail, null, emailContent);
+        threatObject = await authAnalyzer.analyze(threatObject, parsedEmail, emailContent);
+        threatObject = attachmentAnalyzer.analyze(threatObject, parsedEmail);
+        threatObject = iocExtractor.extract(threatObject, parsedEmail);
+        threatObject = nlpAnalyzer.analyze(threatObject, parsedEmail);
+
+        const context = ruleEngine.buildCustomContext(threatObject, parsedEmail);
+        const matched = customDetectionConfig.evaluate(rule.conditions, context);
+
+        res.json({ success: true, matched, evaluated_context: context });
     } catch (e) {
         res.status(500).json({ success: false, error: e.message });
     }

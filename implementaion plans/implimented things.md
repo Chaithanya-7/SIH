@@ -143,6 +143,26 @@ The pipeline now follows the architecture in `workflow.md`: MQL + NLP form the d
 - Feeds auto-sync 5 seconds after startup and every 6 hours, never blocking boot or message processing; `THREAT_INTEL_AUTO_SYNC=false` disables all outbound feed traffic.
 - 32 tests passing.
 
+## 2026-09-20 — Operator-configurable detection content
+
+Requested: a way to feed the tool information for MQL and NLP, and to describe new types of phishing, so a deployment can configure detection as it wants.
+
+- **`modules/customDetectionConfig.js`** — one local JSON file (`data/custom_detection.json`) holding operator-defined MQL rules, NLP language patterns and indicator lists. Editable directly or through the API, reloadable without a restart, and never committed (gitignored).
+- **Declarative conditions, never executed code.** A rule engine that ran operator-supplied JavaScript would be a remote code execution hole the moment anyone reached the API or dropped a file in the data directory. Conditions are field/operator/value structures evaluated by a fixed interpreter; nothing reaches `eval` or `Function`. There is a test asserting that a code-shaped condition is refused and that supplied content never executes.
+- **20 queryable fields** (subject, body, sender address/domain/display name, reply-to domain, URLs and hosts, attachment names/extensions/count, SPF/DKIM/DMARC, NLP signals, already-matched rule ids, sender domain age) with text, list and numeric operators, combinable with `all` / `any` / `not` up to five levels.
+- **ReDoS guard**: `matches_regex` rejects nested-quantifier patterns and long patterns, so one unfortunate rule cannot hang analysis of every incoming message.
+- **A cited source is mandatory on every custom rule**, exactly as for built-in rules, so operator content stays as auditable as the shipped detection.
+- **Custom NLP patterns** are evaluated alongside the built-in categories and carry their own operator attribution.
+- **Operator indicator lists** (URLs, domains, IPs) are checked before the downloaded feeds and take effect even when no feed has ever been synchronised.
+- **Graduated authority.** Custom rules were initially scored so weakly that an operator's own HIGH rule still produced a SAFE verdict, which would have looked broken. They now have their own scoring family capped at 0.30, and an operator may additionally mark a rule `decisive` — gated behind declaring it CRITICAL, since a decisive match raises the verdict to high risk on its own. Verified live: operator HIGH rule alone → SUSPICIOUS (0.38); the same rule declared CRITICAL + decisive → HIGH_RISK (0.70) with the floor shown in the contributions.
+- **Malformed entries are skipped individually and reported** through `GET /api/detection-config`, so one bad rule never silently disables the whole configuration.
+- **`POST /api/detection-config/test`** dry-runs a rule against a sample message and returns the evaluated context, so a rule can be checked before it is committed. Rule additions and removals are audit-logged with the acting user.
+- 45 tests passing.
+
+### Answer recorded on continuous monitoring (asked 2026-09-20)
+
+The tool does **not** yet continuously monitor a live mailbox. The ingestion adapters exist (Gmail API + Pub/Sub, IMAP, SMTP, REST/webhook) but Gmail needs OAuth configured, IMAP and SMTP are off by default, remediation still defaults to `simulation`, the browser extension is a thin client that does not read mail, and the desktop app does not run the backend. Only the REST/webhook path is exercised today. Closing this is Phase 9 plus having the desktop app supervise the backend, and it should not be described as live monitoring until that is genuinely true.
+
 ### Next architectural gap (not yet started)
 
 - `DETECTION_PROVIDER` is still hardcoded to `sublime` with no local Sublime service in this repository — every ingestion path still calls out to an external, unconfigured detection dependency for MQL/rule matching (`mqlBridge.js` only normalizes a Sublime response; it does not run its own rules). This is the single largest remaining gap against the master plan's Phase 3 (Detection Engine): a native, source-cited MQL/rule engine (MITRE ATT&CK, APWG, CISA, OWASP, abuse.ch/OpenPhish/PhishTank-seeded rules per the compact plan) is not yet implemented, so the platform has no working detection path without an external Sublime instance.

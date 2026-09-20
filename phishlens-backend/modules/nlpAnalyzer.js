@@ -12,6 +12,8 @@
  * announcements, SANS/CISA phishing-indicator guidance, and NIST SP 800-177
  * language on email threats. Each pattern below cites its specific source.
  */
+const customDetectionConfig = require('./customDetectionConfig');
+
 class NlpAnalyzer {
     getText(threatObject, parsedEmail) {
         const subject = threatObject.message?.subject || parsedEmail?.subject || '';
@@ -94,7 +96,19 @@ class NlpAnalyzer {
             }
         ];
 
-        const signals = patterns.map(pattern => {
+        // Operator-defined language patterns are evaluated alongside the
+        // built-in ones and carry their own source, so a deployment can teach
+        // PhishLens about phishing wording it is actually seeing.
+        const customPatterns = customDetectionConfig.nlpPatterns.map(p => ({
+            type: p.type,
+            severity: p.severity,
+            confidence: Number(p.confidence),
+            terms: p.terms.map(t => String(t).toLowerCase()),
+            explanation: p.explanation,
+            source: `Operator-defined: ${p.source || 'local configuration'}`
+        }));
+
+        const signals = patterns.concat(customPatterns).map(pattern => {
             const matches = pattern.terms.filter(term => combined.includes(term));
             return matches.length ? {
                 type: pattern.type,

@@ -337,6 +337,12 @@ class ThreatIntelStore {
      * without requiring a re-sync.
      */
     lookupUrl(url) {
+        // Operator-supplied indicators are authoritative for this deployment and
+        // are checked before, and independently of, the downloaded feeds - they
+        // work even when no feed has ever been synchronised.
+        const operatorHit = this.lookupOperatorIndicator(url, 'url');
+        if (operatorHit) return operatorHit;
+
         if (!this.isSynced()) return null;
         if (this.urls.has(url)) {
             return { matched: 'EXACT_URL', indicator: url, feed: this.feedForUrl(url) };
@@ -353,13 +359,39 @@ class ThreatIntelStore {
         return null;
     }
 
+    /** Checks the operator's own indicator lists, which always take effect. */
+    lookupOperatorIndicator(value, kind) {
+        const custom = require('./customDetectionConfig').indicators;
+        if (kind === 'url') {
+            if (custom.urls.includes(value)) {
+                return { matched: 'EXACT_URL', indicator: value, feed: 'operator_defined' };
+            }
+            const host = hostOf(value);
+            if (host && custom.domains.includes(host)) {
+                return { matched: 'DOMAIN', indicator: host, feed: 'operator_defined' };
+            }
+            return null;
+        }
+        if (kind === 'domain' && custom.domains.includes(String(value).toLowerCase())) {
+            return { matched: 'DOMAIN', indicator: value, feed: 'operator_defined' };
+        }
+        if (kind === 'ip' && custom.ips.includes(value)) {
+            return { matched: 'IP', indicator: value, feed: 'operator_defined' };
+        }
+        return null;
+    }
+
     feedForUrl(url) {
         const host = hostOf(url);
         return (host && this.urlHosts.get(host)) || 'urlhaus';
     }
 
     lookupDomain(domain) {
-        if (!this.isSynced() || !domain) return null;
+        if (!domain) return null;
+        const operatorHit = this.lookupOperatorIndicator(domain, 'domain');
+        if (operatorHit) return operatorHit;
+
+        if (!this.isSynced()) return null;
         const key = domain.toLowerCase();
         if (MULTI_TENANT_HOSTS.has(key)) return null;
         if (this.domains.has(key)) return { matched: 'DOMAIN', indicator: key, feed: this.domains.get(key) };
@@ -368,7 +400,11 @@ class ThreatIntelStore {
     }
 
     lookupIp(ip) {
-        if (!this.isSynced() || !ip) return null;
+        if (!ip) return null;
+        const operatorHit = this.lookupOperatorIndicator(ip, 'ip');
+        if (operatorHit) return operatorHit;
+
+        if (!this.isSynced()) return null;
         if (this.ips.has(ip)) return { matched: 'IP', indicator: ip, feed: this.ips.get(ip) };
 
         const asLong = ipv4ToLong(ip);

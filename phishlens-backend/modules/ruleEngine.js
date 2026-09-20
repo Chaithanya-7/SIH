@@ -44,6 +44,8 @@ const EXECUTIVE_TITLE_TERMS = [
     'president', 'chairman', 'managing director', 'vice president', 'head of'
 ];
 
+const customDetectionConfig = require('./customDetectionConfig');
+
 const URL_SHORTENERS = new Set([
     'bit.ly', 'tinyurl.com', 't.co', 'goo.gl', 'ow.ly', 'is.gd', 'buff.ly',
     'rebrand.ly', 'cutt.ly', 'shorturl.at', 'tiny.cc', 'rb.gy'
@@ -519,6 +521,68 @@ class RuleEngine {
         };
     }
 
+    /** Flattened, documented view of a message for operator-defined rules. */
+    buildCustomContext(threatObject, parsedEmail) {
+        const senderAddress = (parsedEmail.from?.address || '').toLowerCase();
+        const urls = threatObject.iocs?.urls || [];
+        const senderAge = (threatObject.threat_intelligence?.domain_ages || [])
+            .find(d => d.is_sender_domain && d.status === 'AVAILABLE');
+
+        return {
+            subject: parsedEmail.subject || '',
+            body: parsedEmail.textBody || '',
+            senderAddress,
+            senderDomain: domainOf(senderAddress) || '',
+            senderDisplayName: parsedEmail.from?.name || '',
+            replyToDomain: parsedEmail.replyTo ? (domainOf(parsedEmail.replyTo) || '') : '',
+            urls,
+            urlHosts: urls.map(u => { try { return new URL(u).hostname.toLowerCase(); } catch (e) { return null; } }).filter(Boolean),
+            attachmentNames: (threatObject.attachments || []).map(a => a.file_name),
+            attachmentExtensions: (threatObject.attachments || []).map(a => (a.extension || '').toLowerCase()),
+            auth: threatObject.forensics?.authentication || {},
+            nlpSignals: (threatObject.nlp?.signals || []).map(s => s.type),
+            matchedRuleIds: (threatObject.detection?.matched_rules || []).map(r => r.id),
+            senderDomainAgeDays: senderAge ? senderAge.age_days : null
+        };
+    }
+
+    /**
+     * Operator-defined rules run in the enrichment stage so they can reason
+     * over everything the built-in pipeline established, including which
+     * built-in rules already fired. They produce evidence through exactly the
+     * same path as built-in rules and cannot set a verdict directly.
+     */
+    evaluateCustomRules(threatObject, parsedEmail) {
+        const custom = customDetectionConfig.rules;
+        if (!custom.length) return [];
+
+        const ctx = this.buildCustomContext(threatObject, parsedEmail);
+        const matched = [];
+
+        for (const rule of custom) {
+            try {
+                if (!customDetectionConfig.evaluate(rule.conditions, ctx)) continue;
+                matched.push({
+                    id: rule.id,
+                    name: rule.name,
+                    category: 'CUSTOM',
+                    severity: rule.severity,
+                    confidence: Number(rule.confidence),
+                    source: `Operator-defined: ${rule.source}`,
+                    description: rule.description || rule.name,
+                    // Only honoured when the operator declared it explicitly on a
+                    // CRITICAL rule; validation enforces that pairing.
+                    decisive: rule.decisive === true && rule.severity === 'CRITICAL',
+                    matched_because: rule.description || `Operator-defined rule ${rule.id} matched this message.`
+                });
+            } catch (err) {
+                console.error(`[RuleEngine] Custom rule ${rule.id} failed to evaluate: ${err.message}`);
+            }
+        }
+
+        return matched;
+    }
+
     /**
      * Rules are evaluated in two stages.
      *
@@ -533,7 +597,7 @@ class RuleEngine {
         const ctx = this.buildContext(threatObject, parsedEmail);
 
         const applicable = RULES.filter(r => (r.stage || 'message') === stage);
-        const matched = [];
+        const matched = stage === 'enrichment' ? this.evaluateCustomRules(threatObject, parsedEmail) : [];
         for (const rule of applicable) {
             let result;
             try {
