@@ -163,6 +163,23 @@ Requested: a way to feed the tool information for MQL and NLP, and to describe n
 
 The tool does **not** yet continuously monitor a live mailbox. The ingestion adapters exist (Gmail API + Pub/Sub, IMAP, SMTP, REST/webhook) but Gmail needs OAuth configured, IMAP and SMTP are off by default, remediation still defaults to `simulation`, the browser extension is a thin client that does not read mail, and the desktop app does not run the backend. Only the REST/webhook path is exercised today. Closing this is Phase 9 plus having the desktop app supervise the backend, and it should not be described as live monitoring until that is genuinely true.
 
+## 2026-09-20 — Phase 9: ingestion coverage and the first verified live path
+
+- **`modules/ingestionRegistry.js`** — an inventory of every way mail can enter, with each path's real state reported by the adapter itself rather than assumed from the existence of code. `GET /api/ingestion` answers the question that matters: could a message reach a user without being examined.
+  - **Stall detection.** A poller that dies quietly is worse than one that was never enabled, because the dashboard keeps looking healthy while mail stops being examined. Sources that should report in declare a heartbeat interval and are marked STALLED after three missed intervals, with a warning saying mail arriving that way may not be examined. They recover automatically when polling resumes.
+  - **Honest top-line state.** `monitoring_live_mail` is false, with an explicit warning, whenever only the manual submission paths are active — so a deployment that is merely analysing submitted samples is never described as monitoring a mailbox.
+  - Unwatched paths carry an `enable_hint` saying exactly how to turn them on.
+- **SMTP, IMAP and Gmail adapters now publish real state** — listening/disabled/failed with the reason, per-source ingested counts, last message time, and failures. IMAP heartbeats every poll cycle and reports connection failures as FAILED rather than only logging them.
+- **Message file ingestion added** (`POST /api/ingest/file`), the entry path that was entirely missing: analyst-submitted samples and user-reported phishing forwarded as `.eml`. Outlook `.msg` is detected by its OLE signature and rejected with a clear explanation rather than being parsed as garbage.
+- **Gmail preflight** (`gmailIngestionAdapter.preflight()`) states precisely which environment variables are missing and what to do next, instead of failing opaquely at the OAuth redirect. It also records that push delivery needs a Pub/Sub subscription, which is easy to miss.
+- **Security fix caught during wiring**: the protected-route list contained `/api/ingest/email`, which does not cover `/api/ingest/file` — the new upload route would have been unauthenticated. Replaced with the `/api/ingest` prefix so no future ingestion route can be added unauthenticated by omission, with `/api/ingestion` listed separately because Express prefix matching needs a path boundary. Verified both return 401 without a key.
+- **First genuinely verified continuous-monitoring path.** The SMTP gateway was started for real and a message delivered to it over SMTP with nodemailer: accepted with `250 OK`, intercepted by the listener, analysed automatically with no API call, and stored as case SM-2026-016026 at HIGH_RISK 0.86. The uploaded `.eml` BEC sample scored HIGH_RISK 0.99. This is the first path that can honestly be called live monitoring.
+- 53 tests passing.
+
+### Still not live monitoring Gmail
+
+Gmail ingestion remains unverified because it requires the operator's own Google Cloud OAuth client and a Pub/Sub push subscription, neither of which can be created or tested from here. The code path exists and the preflight now says exactly what is missing. Remediation also still defaults to `simulation`, so actions are not performed against a real mailbox until both OAuth and `REMEDIATION_MODE=live` are configured.
+
 ### Next architectural gap (not yet started)
 
 - `DETECTION_PROVIDER` is still hardcoded to `sublime` with no local Sublime service in this repository — every ingestion path still calls out to an external, unconfigured detection dependency for MQL/rule matching (`mqlBridge.js` only normalizes a Sublime response; it does not run its own rules). This is the single largest remaining gap against the master plan's Phase 3 (Detection Engine): a native, source-cited MQL/rule engine (MITRE ATT&CK, APWG, CISA, OWASP, abuse.ch/OpenPhish/PhishTank-seeded rules per the compact plan) is not yet implemented, so the platform has no working detection path without an external Sublime instance.

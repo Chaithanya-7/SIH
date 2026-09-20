@@ -2,6 +2,7 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const Imap = require('imap');
+const ingestionRegistry = require('../modules/ingestionRegistry');
 
 class IMAPAdapter {
     constructor() {
@@ -53,12 +54,28 @@ class IMAPAdapter {
 
         if (!this.enabled || !this.config.user || !this.config.password) {
             console.log('ℹ️ [IMAPAdapter] IMAP Poller disabled (configure IMAP_ENABLED=true in .env to activate real Gmail/Outlook polling).');
+            ingestionRegistry.setState('imap_poller', {
+                configured: !!(this.config.user && this.config.password),
+                enabled: this.enabled,
+                status: ingestionRegistry.STATUS.DISABLED,
+                detail: this.enabled
+                    ? 'Enabled but IMAP_USER/IMAP_PASSWORD are missing, so no mailbox is being polled.'
+                    : 'IMAP polling is switched off. No mailbox is being watched through this path.'
+            });
             return;
         }
 
         console.log(`📡 [IMAPAdapter] IMAP worker started for ${this.config.user} on ${this.config.host} (Last UID: ${this.lastProcessedUid})...`);
+        ingestionRegistry.setState('imap_poller', {
+            configured: true, enabled: true, status: ingestionRegistry.STATUS.ACTIVE,
+            detail: `Polling ${this.config.user} on ${this.config.host} every 12s.`
+        });
 
         const pollNewMessages = () => {
+            // Reported every cycle, so a poller that stops is visible as STALLED
+            // rather than quietly leaving the mailbox unexamined.
+            ingestionRegistry.heartbeat('imap_poller');
+
             if (this.isProcessing) {
                 console.log('ℹ️ [IMAPAdapter] Previous poll cycle still executing. Skipping duplicate poll.');
                 return;
@@ -123,12 +140,14 @@ class IMAPAdapter {
                                     try {
                                         if (this.onMailReceived) {
                                             await this.onMailReceived(rawMessage, 'IMAP_INBOX', null, currentUid);
+                                            ingestionRegistry.recordMessage('imap_poller');
                                             if (currentUid > 0) {
                                                 this.saveLastUid(currentUid);
                                             }
                                         }
                                     } catch (err) {
                                         console.error(`[IMAPAdapter] Pipeline execution failed for UID ${currentUid}, UID state not advanced:`, err.message);
+                                        ingestionRegistry.recordFailure('imap_poller', err);
                                     } finally {
                                         finishTask();
                                     }
@@ -161,6 +180,13 @@ class IMAPAdapter {
 
             imap.once('error', (err) => {
                 console.error('[IMAPAdapter] Connection Error:', err.message);
+                // Surfaced rather than only logged: a mailbox that cannot be
+                // reached is a mailbox that is not being watched.
+                ingestionRegistry.recordFailure('imap_poller', err);
+                ingestionRegistry.setState('imap_poller', {
+                    status: ingestionRegistry.STATUS.FAILED,
+                    detail: `Cannot reach ${this.config.host}: ${err.message}. This mailbox is not being examined.`
+                });
                 this.isProcessing = false;
             });
 

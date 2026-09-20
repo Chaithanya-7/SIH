@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const tokenStore = require('../modules/tokenStore');
 const mailboxConnectionManager = require('../modules/mailboxConnectionManager');
 const dedupStore = require('../modules/dedupStore');
+const ingestionRegistry = require('../modules/ingestionRegistry');
 
 class GmailIngestionAdapter {
     constructor() {
@@ -15,6 +16,50 @@ class GmailIngestionAdapter {
 
     setPipelineHandler(pipelineHandler) {
         this.pipelineHandler = pipelineHandler;
+        this.reportState();
+    }
+
+    /**
+     * States precisely what is missing before Gmail can be connected, so an
+     * operator is told what to do rather than meeting an opaque failure at the
+     * OAuth redirect.
+     */
+    preflight() {
+        const missing = [];
+        if (!this.clientId) missing.push('GOOGLE_CLIENT_ID');
+        if (!this.clientSecret) missing.push('GOOGLE_CLIENT_SECRET');
+
+        const connections = typeof mailboxConnectionManager.getAllConnections === 'function'
+            ? mailboxConnectionManager.getAllConnections()
+            : [];
+        const connected = connections.filter(c => c.status === 'CONNECTED');
+
+        return {
+            oauth_app_configured: missing.length === 0,
+            missing_environment: missing,
+            redirect_uri: this.redirectUri,
+            connected_mailboxes: connected.length,
+            ready: missing.length === 0 && connected.length > 0,
+            next_step: missing.length > 0
+                ? `Create an OAuth client in a Google Cloud project, then set ${missing.join(' and ')} plus GMAIL_REDIRECT_URI (currently ${this.redirectUri}).`
+                : connected.length === 0
+                    ? 'OAuth is configured. Connect a mailbox from the dashboard to begin ingesting mail.'
+                    : 'Gmail ingestion is configured and at least one mailbox is connected.',
+            limitation: 'Push delivery additionally requires a Google Cloud Pub/Sub topic with a push subscription pointing at /api/webhooks/gmail. Without it, mail is only collected when a sync runs.'
+        };
+    }
+
+    /** Publishes Gmail's real readiness to the ingestion coverage report. */
+    reportState() {
+        const state = this.preflight();
+        ingestionRegistry.setState('gmail_api', {
+            configured: state.oauth_app_configured,
+            enabled: state.oauth_app_configured,
+            status: state.ready
+                ? ingestionRegistry.STATUS.ACTIVE
+                : ingestionRegistry.STATUS.NOT_CONFIGURED,
+            detail: state.next_step
+        });
     }
 
     getAuthUrl(state = '', promptScope = 'modify') {

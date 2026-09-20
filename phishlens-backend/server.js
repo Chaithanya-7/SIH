@@ -18,6 +18,7 @@ const iocExtractor = require('./modules/iocExtractor');
 const nlpAnalyzer = require('./modules/nlpAnalyzer');
 const ruleEngine = require('./modules/ruleEngine');
 const customDetectionConfig = require('./modules/customDetectionConfig');
+const ingestionRegistry = require('./modules/ingestionRegistry');
 const behavioralAnalyzer = require('./modules/behavioralAnalyzer');
 const adaptiveLearning = require('./modules/adaptiveLearning');
 const infraEnricher = require('./modules/infraEnricher');
@@ -243,7 +244,11 @@ gmailIngestionAdapter.setPipelineHandler(processPipeline);
 // Protect sensitive SOC administration and data APIs
 app.use([
     '/api/analyze',
-    '/api/ingest/email',
+    // Covers every /api/ingest/* path, so a new ingestion route can never be
+    // added unauthenticated by omission. '/api/ingestion' is listed separately
+    // because Express prefix matching requires a path boundary.
+    '/api/ingest',
+    '/api/ingestion',
     '/api/cases',
     '/api/summary',
     '/api/learning',
@@ -630,8 +635,10 @@ app.post('/api/analyze', async (req, res) => {
         const { emailContent } = req.body;
         if (!emailContent) return res.status(400).json({ success: false, error: 'emailContent is required' });
         const threatObject = await processPipeline(emailContent, 'MANUAL_TEST_API');
+        ingestionRegistry.recordMessage('rest_api');
         res.json({ success: true, threatObject });
     } catch (error) {
+        ingestionRegistry.recordFailure('rest_api', error);
         res.status(500).json({ success: false, error: error.stack || error.message });
     }
 });
@@ -641,10 +648,55 @@ app.post('/api/ingest/email', async (req, res) => {
         const { emailContent, source } = req.body;
         if (!emailContent) return res.status(400).json({ success: false, error: 'emailContent is required' });
         const threatObject = await processPipeline(emailContent, source || 'WEBHOOK_INBOUND');
+        ingestionRegistry.recordMessage('webhook');
         res.json({ success: true, threatObject });
     } catch (error) {
+        ingestionRegistry.recordFailure('webhook', error);
         res.status(500).json({ success: false, error: error.stack || error.message });
     }
+});
+
+/**
+ * Message file ingestion (.eml / .msg), for analyst-submitted samples and
+ * user-reported phishing forwarded as an attachment. The body is the raw
+ * message itself rather than a multipart form, so the same bytes that were on
+ * disk are what get parsed and hashed.
+ */
+app.post('/api/ingest/file', express.text({ type: '*/*', limit: '30mb' }), async (req, res) => {
+    try {
+        const rawMessage = typeof req.body === 'string' ? req.body : '';
+        if (!rawMessage.trim()) {
+            return res.status(400).json({ success: false, error: 'Request body must contain the raw message file content' });
+        }
+        // A .msg (Outlook OLE) file is a compound binary document, not MIME.
+        if (rawMessage.startsWith('\xD0\xCF\x11\xE0')) {
+            return res.status(415).json({
+                success: false,
+                error: 'Outlook .msg files are a compound binary format and are not supported. Export the message as .eml and submit that instead.'
+            });
+        }
+
+        const filename = (req.query.filename || '').toString().slice(0, 255);
+        const threatObject = await processPipeline(rawMessage, filename ? `FILE_UPLOAD:${filename}` : 'FILE_UPLOAD');
+        ingestionRegistry.recordMessage('file_upload');
+        res.json({ success: true, threatObject });
+    } catch (error) {
+        ingestionRegistry.recordFailure('file_upload', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * Ingestion coverage: every way mail can enter, whether it is actually being
+ * watched, and whether anything that should be reporting in has gone quiet.
+ * This is what answers "could a message reach a user without being examined".
+ */
+app.get('/api/ingestion', (req, res) => {
+    res.json({
+        success: true,
+        ...ingestionRegistry.getCoverage(),
+        gmail: gmailIngestionAdapter.preflight()
+    });
 });
 
 // ==================== CASES API (DATA ISOLATION) ====================

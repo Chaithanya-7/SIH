@@ -1,4 +1,6 @@
 const { SMTPServer } = require('smtp-server');
+const ingestionRegistry = require('../modules/ingestionRegistry');
+const { STATUS } = ingestionRegistry;
 
 class SMTPListenerAdapter {
     constructor() {
@@ -11,6 +13,10 @@ class SMTPListenerAdapter {
     start(onMailReceivedCallback) {
         if (process.env.ENABLE_SMTP_INGESTION !== 'true') {
             console.log('ℹ️  [SMTPListener] Disabled. Set ENABLE_SMTP_INGESTION=true and SMTP_USERNAME/SMTP_PASSWORD to enable authenticated SMTP ingestion.');
+            ingestionRegistry.setState('smtp_gateway', {
+                configured: false, enabled: false, status: STATUS.DISABLED,
+                detail: 'SMTP ingestion is switched off. Mail relayed to this gateway would not be examined.'
+            });
             return;
         }
 
@@ -18,6 +24,11 @@ class SMTPListenerAdapter {
         const password = process.env.SMTP_PASSWORD;
         if (!username || !password) {
             console.error('❌ [SMTPListener] Refusing to start: SMTP_USERNAME and SMTP_PASSWORD are required.');
+            ingestionRegistry.setState('smtp_gateway', {
+                configured: false, enabled: true, status: STATUS.FAILED,
+                detail: 'Enabled but SMTP_USERNAME/SMTP_PASSWORD are missing, so the listener did not start.'
+            });
+            ingestionRegistry.recordFailure('smtp_gateway', 'Missing SMTP_USERNAME or SMTP_PASSWORD');
             return;
         }
 
@@ -50,9 +61,11 @@ class SMTPListenerAdapter {
                         if (this.onMailReceived) {
                             await this.onMailReceived(rawEmail, 'SMTP_GATEWAY');
                         }
+                        ingestionRegistry.recordMessage('smtp_gateway');
                         finish();
                     } catch (error) {
                         console.error('[SMTPListener] Pipeline rejected message:', error.message);
+                        ingestionRegistry.recordFailure('smtp_gateway', error);
                         finish(new Error('Message processing failed'));
                     }
                 });
@@ -61,10 +74,19 @@ class SMTPListenerAdapter {
 
         this.server.listen(this.port, this.host, () => {
             console.log(`✅ [SMTPListener] Active Local SMTP Gateway listening on ${this.host}:${this.port}`);
+            ingestionRegistry.setState('smtp_gateway', {
+                configured: true, enabled: true, status: STATUS.ACTIVE,
+                detail: `Listening on ${this.host}:${this.port} with authentication required.`
+            });
         });
 
         this.server.on('error', (err) => {
             console.error('[SMTPListener] Server error:', err.message);
+            ingestionRegistry.setState('smtp_gateway', {
+                status: STATUS.FAILED,
+                detail: `Listener error: ${err.message}. Mail relayed here is not being examined.`
+            });
+            ingestionRegistry.recordFailure('smtp_gateway', err);
         });
     }
 }
