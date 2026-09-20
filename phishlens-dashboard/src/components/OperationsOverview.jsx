@@ -122,7 +122,7 @@ function EveryEmail({ cases, onOpenCase }) {
             {ordered.length === 0 ? (
                 <div style={{ padding: '28px 18px', textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.79rem' }}>
                     {cases.length === 0
-                        ? 'No emails have been examined yet. Connect a mailbox, or use "Check an email" to try one.'
+                        ? 'No emails have been examined yet. Switch on monitoring under "Where mail arrives", or drop one onto "Check an email".'
                         : 'No email has that result.'}
                 </div>
             ) : (

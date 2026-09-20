@@ -45,6 +45,7 @@
         "https://outlook.office365.com/*"
       ],
       "js": [
+        "mail-providers.js",
         "content-gmail.js"
       ],
       "run_at": "document_idle"

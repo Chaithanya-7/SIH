@@ -141,12 +141,35 @@ class IngestionRegistry {
         }
     }
 
+    /**
+     * A message arriving through a channel is proof that channel is working.
+     *
+     * This used to only increment a counter, so a path could deliver messages
+     * while still reporting NOT_CONFIGURED, and `monitoring_live_mail` stayed
+     * false with mail visibly flowing through. The browser watcher showed it
+     * plainly: two messages examined, status "not set up", and a console saying
+     * nothing was being monitored.
+     *
+     * Nothing else can tell the registry that the browser extension is
+     * installed - there is no configuration to read, no process to start. The
+     * evidence is the traffic, so the traffic is what marks it live. A channel
+     * that then stops reporting goes STALLED on its own through
+     * evaluateStalled, which is the honest way back down.
+     */
     recordMessage(id) {
         const source = this.sources.get(id);
         if (!source) return;
         source.messages_ingested += 1;
         source.last_message_at = new Date().toISOString();
         source.last_heartbeat_at = new Date().toISOString();
+
+        if (!source.always_available && source.status !== STATUS.ACTIVE) {
+            source.configured = true;
+            source.enabled = true;
+            source.status = STATUS.ACTIVE;
+            source.detail = 'Examining messages as they arrive.';
+            if (!source.started_at) source.started_at = new Date().toISOString();
+        }
     }
 
     recordFailure(id, error) {

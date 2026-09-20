@@ -154,3 +154,41 @@ test('the browser watcher is a channel the coverage report knows about', () => {
     assert.strictEqual(browser.always_available, false, 'it watches on its own rather than waiting to be sent something');
     assert.match(browser.enable_hint, /extension/i, 'it must say that it needs the browser extension');
 });
+
+test('a channel that has delivered messages is reported as working', () => {
+    const { registry } = fresh();
+
+    let browser = registry.getCoverage().sources.find(s => s.id === 'browser_watch');
+    assert.strictEqual(browser.status, 'NOT_CONFIGURED', 'nothing has arrived yet');
+    assert.strictEqual(registry.getCoverage().monitoring_live_mail, false);
+
+    // Two messages examined through the browser watcher. There is nothing else
+    // that could tell the registry the extension is installed - no config to
+    // read, no process to start - so the traffic is the only evidence there is.
+    registry.recordMessage('browser_watch');
+    registry.recordMessage('browser_watch');
+
+    browser = registry.getCoverage().sources.find(s => s.id === 'browser_watch');
+    assert.strictEqual(browser.messages_ingested, 2);
+    assert.strictEqual(browser.status, 'ACTIVE',
+        'a channel that has examined messages must not still report as not set up');
+    assert.strictEqual(browser.configured, true);
+
+    const coverage = registry.getCoverage();
+    assert.strictEqual(coverage.monitoring_live_mail, true,
+        'mail flowing through a channel means mail is being monitored');
+    assert.strictEqual(coverage.summary.automatic_active, 1);
+});
+
+test('a message submitted by hand does not make the deployment look monitored', () => {
+    const { registry } = fresh();
+
+    // Uploading a file is somebody doing the work themselves. It must not turn
+    // into a claim that something is watching on their behalf.
+    registry.recordMessage('file_upload');
+
+    const coverage = registry.getCoverage();
+    assert.strictEqual(coverage.monitoring_live_mail, false,
+        'an always-available endpoint receiving something is not monitoring');
+    assert.strictEqual(coverage.summary.automatic_active, 0);
+});

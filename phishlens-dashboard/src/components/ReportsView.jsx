@@ -94,7 +94,7 @@ export default function ReportsView({ cases = [], onOpenCase }) {
                 {visible.length === 0 ? (
                     <div style={{ padding: '30px 18px', textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.82rem' }}>
                         {cases.length === 0
-                            ? 'No messages have been examined yet. Connect a mailbox, or check an email from the "Check an email" page.'
+                            ? 'No messages have been examined yet. Switch on monitoring under "Where mail arrives", or drop one onto "Check an email".'
                             : 'No message matches that search.'}
                     </div>
                 ) : visible.map(item => {
