@@ -13,6 +13,7 @@ const emailParser = require('./modules/emailParser');
 const mqlBridge = require('./modules/mqlBridge');
 const authAnalyzer = require('./modules/authAnalyzer');
 const arcAnalyzer = require('./modules/arcAnalyzer');
+const textDeception = require('./modules/textDeception');
 const qrAnalyzer = require('./modules/qrAnalyzer');
 const forensicEngine = require('./modules/forensicEngine');
 const attachmentAnalyzer = require('./modules/attachmentAnalyzer');
@@ -211,6 +212,14 @@ async function processPipeline(emailContent, source = 'MANUAL_API', clientMessag
         // ===== DETECTION LAYER: MQL + NLP =====
         // Initial threat determination from the message itself, before any
         // enrichment that depends on the network or on stored history.
+
+        // 6b. Text deception. Runs before any language analysis because the
+        //     language analysis reads its output: a zero-width space between
+        //     each character defeats every substring match, and folding the
+        //     text back is what makes the patterns applicable at all. The
+        //     obfuscation itself is the stronger signal - ordinary mail does
+        //     not hide characters inside words.
+        threatObject = textDeception.analyze(threatObject, parsedEmail);
 
         // 7. Explainable NLP / social-engineering signal analysis
         threatObject = nlpAnalyzer.analyze(threatObject, parsedEmail);

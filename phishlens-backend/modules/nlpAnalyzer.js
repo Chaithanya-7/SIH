@@ -16,6 +16,25 @@ const customDetectionConfig = require('./customDetectionConfig');
 
 class NlpAnalyzer {
     getText(threatObject, parsedEmail) {
+        // Normalised text where it is available.
+        //
+        // Every pattern below matches substrings, and a substring match is
+        // defeated by inserting a zero-width space between each character -
+        // measured on this exact analyser, the score went from 0.48 to zero
+        // while the message rendered identically. Reading the normalised copy
+        // closes that, so the patterns see what the recipient sees.
+        const deception = threatObject.text_deception?.normalised;
+        if (deception) {
+            const normalisedBody = deception.body || '';
+            if (normalisedBody) {
+                return {
+                    subject: deception.subject || '',
+                    body: normalisedBody,
+                    combined: `${deception.subject || ''} ${normalisedBody}`.toLowerCase()
+                };
+            }
+        }
+
         const subject = threatObject.message?.subject || parsedEmail?.subject || '';
         let body = parsedEmail?.textBody || '';
 

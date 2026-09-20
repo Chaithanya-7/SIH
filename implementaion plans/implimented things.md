@@ -1154,3 +1154,78 @@ disable registrable-domain extraction for every host. Both failure paths are
 tested.
 
 **186 backend tests** (was 175).
+
+## 2026-09-20 — The keyword layer could be switched off by the attacker
+
+Given latitude to choose the approach rather than follow a source list, the
+most valuable thing available was not another feed. It was a vulnerability in
+what was already built.
+
+### Demonstrated, not theorised
+
+Take a sentence the language analyser detects — "Please verify your password
+immediately. This is your final notice to sign in to your account." — and insert
+a zero-width space between every character.
+
+| | signals | score |
+|---|---|---|
+| Plain text | 2 | 0.48 |
+| Zero-width space between each character | **0** | **0** |
+
+The message renders identically in every mail client. The bytes differ, 94
+against 187. Every pattern in that analyser matches substrings, and a substring
+match cannot survive characters inserted between its letters.
+
+This reframes the premise the work started from. Attackers are said to have
+stopped using obvious keywords. Frequently they have not — the keywords are
+arranged so the filter cannot see them, which costs one line of code and defeats
+every keyword list ever written, including a perfectly good one.
+
+### Two outputs, both necessary
+
+`modules/textDeception.js` produces:
+
+1. **A normalised copy of the text**, which the language analyser now reads
+   instead of the raw body. Invisible characters removed, NFKC applied to fold
+   fullwidth and mathematical variants, and Cyrillic/Greek/Armenian/Cherokee
+   lookalikes folded to their Latin skeleton. Verified: obfuscated text now
+   scores exactly what the text it renders as scores — 2 signals, 0.48.
+2. **Findings about what was done to the text**, which are worth more than the
+   words they concealed. Fluent AI-written prose is still fluent after
+   normalisation; deliberately obfuscated prose is not. That distinction does
+   not care how well the message is written, which is precisely the property
+   needed here.
+
+Four rules act on the second: invisible characters through the body, invisible
+characters in the display name or subject (the two fields shown before a message
+is opened), a word built from more than one alphabet, and a text-direction
+override — the long-standing way to make a filename display with a different
+extension from the one it has.
+
+### What it must not flag, and does not
+
+- **Ordinary correspondence** — clean, no findings.
+- **A genuinely Greek email** — not flagged. The mixed-script check runs per
+  *word*, not per message, exactly so that writing in another language is not
+  treated as deception. A message containing English and Greek sentences is
+  unremarkable; a single word built from both alphabets is not.
+- **One stray zero-width character** — not flagged. Copying from a web page
+  genuinely leaves one behind; scattering them through the text does not happen
+  by accident. The threshold is five in the body.
+- **A zero-width non-joiner in isolation** — not flagged. ZWNJ is grammatically
+  significant in Persian and several Indic scripts, and treating its presence as
+  an attack would penalise writing in those languages.
+
+### End to end
+
+A message combining a Cyrillic display name, a zero-width space in the subject
+and zero-width injection through the body, run through the real pipeline:
+
+- **HIGH_RISK, 0.77**
+- Three deception rules matched
+- 76 hidden characters counted
+- `Аpple` resolved to `Apple`
+- **The language signals were recovered** — URGENCY_PRESSURE and
+  CREDENTIAL_REQUEST both fired, which they could not have done before
+
+**200 backend tests** (was 186).

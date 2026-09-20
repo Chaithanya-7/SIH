@@ -191,6 +191,76 @@ const RULES = [
     },
 
     // ---------------------------------------------------------------
+    // TEXT DECEPTION  (family: LANGUAGE)
+    //
+    // Characters chosen so the message reads one way to a person and another
+    // to a filter. Fluent AI-written prose is still fluent after
+    // normalisation; deliberately obfuscated prose is not, which makes these
+    // findings worth more than whatever they were concealing.
+    // ---------------------------------------------------------------
+    {
+        id: 'MQL-DECEPT-101',
+        name: 'Invisible characters inserted inside the message text',
+        category: 'DECEPTION',
+        severity: 'HIGH',
+        confidence: 0.75,
+        mitre: ['T1566'],
+        source: 'MITRE ATT&CK T1566 (Phishing); Unicode Technical Standard #39 (Security Mechanisms)',
+        description: 'Zero-width or non-printing characters have been placed inside the text. They render as nothing, so the recipient reads an ordinary message, while any filter matching words or phrases sees strings broken into fragments that match nothing. This is the standard way to defeat keyword detection, and it has no legitimate purpose in the body of business correspondence.',
+        test: (ctx) => {
+            const inBody = (ctx.deception.hidden_characters || []).filter(h => h.field === 'body' && !h.directional);
+            const total = inBody.reduce((sum, h) => sum + h.count, 0);
+            // A handful can occur legitimately through copy-and-paste from a
+            // web page. Scattering them through the text does not.
+            if (total < 5) return false;
+            return `${total} invisible character(s) (${inBody.map(h => h.character).join(', ')}) are embedded in the message body, which breaks up words for any filter reading the text while changing nothing a reader sees.`;
+        }
+    },
+    {
+        id: 'MQL-DECEPT-102',
+        name: 'Invisible characters in the sender name or subject',
+        category: 'DECEPTION',
+        severity: 'HIGH',
+        confidence: 0.70,
+        mitre: ['T1566', 'T1656'],
+        source: 'MITRE ATT&CK T1566 (Phishing), T1656 (Impersonation); Unicode Technical Standard #39',
+        description: 'Non-printing characters appear in the display name or subject - the two fields shown before a message is opened. Concealment there is aimed at whatever inspects a message without opening it.',
+        test: (ctx) => {
+            const hit = (ctx.deception.hidden_characters || []).find(h => h.field === 'display_name' || h.field === 'subject');
+            return hit && `The ${hit.field.replace('_', ' ')} contains ${hit.count} ${hit.character}(s), invisible to the reader.`;
+        }
+    },
+    {
+        id: 'MQL-DECEPT-103',
+        name: 'Word built from more than one alphabet',
+        category: 'DECEPTION',
+        severity: 'HIGH',
+        confidence: 0.80,
+        mitre: ['T1656', 'T1583.001'],
+        source: 'MITRE ATT&CK T1656 (Impersonation), T1583.001 (Acquire Infrastructure: Domains); Unicode Technical Standard #39 confusable detection',
+        description: 'A single word mixes characters from two different alphabets - Cyrillic letters inside a Latin word, for example. Rendered, it is indistinguishable from the ordinary spelling; compared as text it is a different string entirely, so it matches no brand list and no blocklist. Ordinary writing does not do this within a word.',
+        test: (ctx) => {
+            const mixed = (ctx.deception.mixed_script_words || [])[0];
+            if (!mixed) return false;
+            return `"${mixed.word}" is built from ${mixed.scripts.join(' and ')} characters and reads as "${mixed.resolves_to}".`;
+        }
+    },
+    {
+        id: 'MQL-DECEPT-104',
+        name: 'Text-direction override present',
+        category: 'DECEPTION',
+        severity: 'HIGH',
+        confidence: 0.80,
+        mitre: ['T1566.001'],
+        source: 'MITRE ATT&CK T1566.001 (Spearphishing Attachment); Unicode Bidirectional Algorithm (UAX #9)',
+        description: 'A bidirectional override character is present. These reverse the order text is drawn in, and the long-standing use is disguising what a file is: a name ending .exe can be made to display as though it ends .txt. There is no ordinary reason for one to appear in a sender name, subject or filename.',
+        test: (ctx) => {
+            const hit = (ctx.deception.hidden_characters || []).find(h => h.directional);
+            return hit && `A ${hit.character} appears in the ${hit.field.replace('_', ' ')}, which changes how the text is rendered relative to how it is stored.`;
+        }
+    },
+
+    // ---------------------------------------------------------------
     // HOSTING PROVENANCE  (family: URL_RISK)
     // ---------------------------------------------------------------
     {
@@ -741,6 +811,7 @@ class RuleEngine {
             intelMatches: threatObject.threat_intelligence?.matches || [],
             domainAges: threatObject.threat_intelligence?.domain_ages || [],
             qr: threatObject.qr || { codes: [], codes_found: 0, not_scanned: [] },
+            deception: threatObject.text_deception || { hidden_characters: [], mixed_script_words: [] },
             arc: threatObject.forensics?.arc || { status: 'ABSENT' }
         };
     }
