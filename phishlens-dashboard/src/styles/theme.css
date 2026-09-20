@@ -147,45 +147,23 @@ textarea::placeholder {
   color: var(--text-primary) !important;
 }
 
-/* A light-theme map at full saturation is glaring next to muted UI chrome. */
-:root[data-theme='light'] .leaflet-tile {
-  filter: saturate(0.85) brightness(1.02);
-}
-
 /*
- * A dark basemap made from light tiles, since no keyless service serves one.
+ * Basemap tiles are not filtered.
  *
- * Order matters here and the previous order worked against itself: dimming to
- * 0.7 *before* inverting turned dark pixels into light ones, so land and water
- * both landed in the middle greys and the map came out washed out and flat.
- * Inverting first, then dimming and lifting contrast, keeps them apart.
+ * They were, in both themes, and it was a mistake that got worse the longer it
+ * went on. A filter applies to every basemap equally, so four styles chosen for
+ * being different from each other - drawn, topographic, humanitarian, satellite
+ * - all arrived looking like the same washed blue-grey, and the reason for
+ * offering a choice disappeared.
+ *
+ * It also cost exactly what a map is for. Inverting a tile inverts its labels:
+ * street names and place names become light-on-light or dark-on-dark, and at
+ * the zoom where somebody is actually reading them - looking for a street, a
+ * building, a district - they are least legible. Contrast and saturation
+ * adjustments on top flattened the distinction between a motorway and a
+ * footpath, which the cartographer had encoded deliberately.
+ *
+ * So each basemap now renders as its authors drew it. A light map inside a dark
+ * panel is a normal thing for an operations console - the map is the data, and
+ * the chrome around it is what carries the theme.
  */
-/*
- * A dark basemap made from light tiles, since no keyless service serves one.
- *
- * Order matters and an earlier version worked against itself: dimming before
- * inverting turned dark pixels into light ones, so land and water both settled
- * into the middle greys and the map looked washed out. Inverting first keeps
- * them apart.
- *
- * Brightness then over-corrected twice. At 0.62 the map was so dark that
- * coastlines vanished into the panel behind it, which is worse than glare
- * because nothing is left to read; 0.86 was still short. Inverting a pale
- * cartography simply produces a dark image, so the correction has to go the
- * other way - lift it above 1 and drop the contrast, which separates land from
- * sea instead of crushing both toward the background.
- */
-:root[data-theme='dark'] .leaflet-tile {
-  filter: invert(1) hue-rotate(185deg) brightness(1.05) contrast(0.78) saturate(0.45);
-}
-
-/*
- * Photography is not inverted.
- *
- * Satellite imagery is already dark and inverting it turns land pink and the
- * sea orange. The layer carrying it says so, and this exempts it.
- */
-:root[data-theme='dark'] .phishlens-tiles-as-is .leaflet-tile,
-:root[data-theme='dark'] .leaflet-tile.phishlens-tiles-as-is {
-  filter: brightness(0.95) saturate(0.9);
-}

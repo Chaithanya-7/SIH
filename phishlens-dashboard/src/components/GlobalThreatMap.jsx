@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Popup, Tooltip } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Popup, Tooltip, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
 /**
@@ -49,10 +49,10 @@ function when(value) {
  * is a paid dependency this tool is not allowed, so everything here is a
  * service that answers without an account.
  *
- * `invertible` is the part that is easy to get wrong. A dark map is made by
- * inverting light cartography, which works for drawn maps and is nonsense for a
- * photograph: inverting satellite imagery turns land pink and oceans orange.
- * Imagery is already dark, so it is left alone.
+ * None of them are filtered to match the console's theme. Doing that made four
+ * deliberately different styles arrive looking identical, and inverting a tile
+ * inverts its labels - so street and place names became least legible at
+ * exactly the zoom somebody is reading them. Each renders as drawn.
  */
 const BASEMAPS = [
     {
@@ -60,8 +60,7 @@ const BASEMAPS = [
         label: 'Standard',
         url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
         attribution: '&copy; OpenStreetMap contributors',
-        maxZoom: 19,
-        invertible: true
+        maxZoom: 19
     },
     {
         id: 'satellite',
@@ -71,7 +70,23 @@ const BASEMAPS = [
         // Esri serves this one row-before-column, which is why the template
         // above reads {z}/{y}/{x} rather than the usual order.
         maxZoom: 19,
-        invertible: false
+        // Photography carries no writing. On its own this showed rooftops and
+        // coastlines with no way to tell which city you were looking at, which
+        // is useless for the question the panel exists to answer. Esri publish
+        // free reference layers that draw roads and names over imagery, and
+        // they are what make it readable rather than merely detailed.
+        overlays: [
+            {
+                id: 'transport',
+                url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',
+                maxZoom: 19
+            },
+            {
+                id: 'places',
+                url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+                maxZoom: 19
+            }
+        ]
     },
     {
         id: 'terrain',
@@ -79,8 +94,7 @@ const BASEMAPS = [
         url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
         attribution: '&copy; OpenStreetMap contributors, SRTM | &copy; OpenTopoMap',
         subdomains: 'abc',
-        maxZoom: 17,
-        invertible: true
+        maxZoom: 17
     },
     {
         id: 'plain',
@@ -88,8 +102,7 @@ const BASEMAPS = [
         url: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
         attribution: '&copy; OpenStreetMap contributors | Humanitarian OSM Team',
         subdomains: 'abc',
-        maxZoom: 19,
-        invertible: true
+        maxZoom: 19
     }
 ];
 
@@ -102,6 +115,39 @@ const BASEMAPS = [
 // one choice away for anyone who wants labels and borders.
 const DEFAULT_BASEMAP = 'satellite';
 const BASEMAP_STORAGE_KEY = 'phishlens.basemap';
+
+/**
+ * Tells Leaflet how big its container actually is.
+ *
+ * Leaflet measures its container once, at construction, and caches that. This
+ * map lives in a panel whose width changes - the sidebar collapses, the window
+ * resizes - and without re-measuring, clicks land at the wrong coordinates and
+ * the tile grid is computed for a viewport that no longer exists.
+ *
+ * Added while chasing a zoom that would not respond, which turned out not to be
+ * this: animated zoom waits for a CSS transitionend event, and the automated
+ * browser it was being tested in never fires one. Kept anyway, because
+ * re-measuring on resize is correct regardless of what it did not fix.
+ */
+function KeepMapSized() {
+    const map = useMap();
+
+    React.useEffect(() => {
+        const container = map.getContainer();
+        // After the current paint, so the panel has settled before measuring.
+        const settle = requestAnimationFrame(() => map.invalidateSize({ animate: false }));
+
+        const observer = new ResizeObserver(() => map.invalidateSize({ animate: false }));
+        observer.observe(container);
+
+        return () => {
+            cancelAnimationFrame(settle);
+            observer.disconnect();
+        };
+    }, [map]);
+
+    return null;
+}
 
 export default function GlobalThreatMap({ points = [], coverage }) {
     // Remembered per browser: a basemap is a preference, not a setting worth a
@@ -198,10 +244,16 @@ export default function GlobalThreatMap({ points = [], coverage }) {
                     // `worldCopyJump` made it worse by teleporting the view between
                     // copies mid-drag, which is the jump that felt like a glitch.
                     worldCopyJump={false}
+                    // A firm edge, so the world cannot be dragged off into
+                    // blank space. `noWrap` on the tile layers stops the tiles
+                    // themselves repeating; this stops the view wandering past
+                    // where there are any.
                     maxBounds={[[-85, -180], [85, 180]]}
                     maxBoundsViscosity={1.0}
                     style={{ height: '100%', width: '100%', backgroundColor: 'var(--bg-code)' }}
                 >
+                    <KeepMapSized />
+
                     <TileLayer
                         // Remounted when the basemap changes, so Leaflet builds
                         // a fresh layer rather than swapping URLs underneath the
@@ -228,8 +280,28 @@ export default function GlobalThreatMap({ points = [], coverage }) {
                         // so panning back over ground already covered costs
                         // nothing.
                         keepBuffer={4}
-                        className={basemap.invertible ? undefined : 'phishlens-tiles-as-is'}
                     />
+
+                    {/*
+                      * Roads and place names drawn over the imagery.
+                      *
+                      * Only the imagery basemap has these: a drawn map already
+                      * carries its own labels, and a second set on top of them
+                      * would collide.
+                      */}
+                    {(basemap.overlays || []).map(overlay => (
+                        <TileLayer
+                            key={`${basemap.id}-${overlay.id}`}
+                            url={overlay.url}
+                            maxZoom={19}
+                            maxNativeZoom={overlay.maxZoom}
+                            noWrap
+                            bounds={[[-85, -180], [85, 180]]}
+                            updateWhenIdle
+                            updateWhenZooming={false}
+                            keepBuffer={4}
+                        />
+                    ))}
                     {ordered.map(point => {
                         const meta = SEVERITY[point.severity] || SEVERITY.LOW;
                         const messages = point.messages || [];
