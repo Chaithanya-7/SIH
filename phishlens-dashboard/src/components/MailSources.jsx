@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Globe, Server, Inbox, Upload, Webhook, Terminal, CheckCircle2, AlertTriangle, Circle } from 'lucide-react';
 import { api } from '../services/api';
+import BrowserWatcherSetup from './BrowserWatcherSetup';
 
 /**
  * Every way mail can reach this computer, and whether each one is watched.
@@ -199,6 +200,10 @@ export default function MailSources() {
                     appears, and anything dangerous is flagged before you open it.
                 </p>
             </div>
+
+            {!monitoring && (
+                <BrowserWatcherSetup extensionPath={coverage.extension_path} />
+            )}
 
             <div>
                 <h3 style={{ margin: '0 0 3px 0', fontSize: '0.9rem', color: 'var(--text-primary)' }}>Automatic monitoring</h3>

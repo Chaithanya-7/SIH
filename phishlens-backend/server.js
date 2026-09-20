@@ -972,6 +972,10 @@ app.get('/api/ingestion', (req, res) => {
     res.json({
         success: true,
         ...ingestionRegistry.getCoverage(),
+        // Where the browser extension actually lives on this machine, so the
+        // console can spell out the folder to load rather than describing it.
+        // In a packaged install it sits beside the backend in resources.
+        extension_path: require('path').resolve(__dirname, '..', 'phishlens-extension'),
         gmail: gmailIngestionAdapter.preflight()
     });
 });
