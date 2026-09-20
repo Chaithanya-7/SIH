@@ -42,29 +42,90 @@ function when(value) {
 }
 
 /**
- * The basemap, and why it is OpenStreetMap's own tiles.
+ * The basemaps on offer, all of them keyless.
  *
- * CARTO's basemaps were tried here first: muted, dark, and served at double
- * resolution, which is exactly what this panel wants. They now render the words
- * "API KEY REQUIRED" across every tile. That is a paid dependency, and this
- * tool is not allowed one - so the map uses OpenStreetMap's own tile service,
- * which needs no key and no account and asks only for attribution.
+ * CARTO's were tried first - muted, dark, double resolution, exactly what this
+ * panel wants - and they now render "API KEY REQUIRED" across every tile. That
+ * is a paid dependency this tool is not allowed, so everything here is a
+ * service that answers without an account.
  *
- * The honest trade: OSM serves no double-resolution tile, so there is no @2x
- * variant to request and labels are softer on a high-density screen than a paid
- * basemap would be. That is the cost of the constraint.
- *
- * Their cartography is light, which glares inside a dark console. It is turned
- * dark by a CSS filter on `.leaflet-tile` in theme.css, which already follows
- * the theme - a second copy of that logic lived here briefly and was removed.
+ * `invertible` is the part that is easy to get wrong. A dark map is made by
+ * inverting light cartography, which works for drawn maps and is nonsense for a
+ * photograph: inverting satellite imagery turns land pink and oceans orange.
+ * Imagery is already dark, so it is left alone.
  */
-const OSM_TILES = {
-    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-    attribution: '&copy; OpenStreetMap contributors'
-};
+const BASEMAPS = [
+    {
+        id: 'standard',
+        label: 'Standard',
+        url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 19,
+        invertible: true
+    },
+    {
+        id: 'satellite',
+        label: 'Satellite',
+        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        attribution: 'Imagery &copy; Esri, Maxar, Earthstar Geographics',
+        // Esri serves this one row-before-column, which is why the template
+        // above reads {z}/{y}/{x} rather than the usual order.
+        maxZoom: 19,
+        invertible: false
+    },
+    {
+        id: 'terrain',
+        label: 'Terrain',
+        url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+        attribution: '&copy; OpenStreetMap contributors, SRTM | &copy; OpenTopoMap',
+        subdomains: 'abc',
+        maxZoom: 17,
+        invertible: true
+    },
+    {
+        id: 'plain',
+        label: 'Plain',
+        url: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+        attribution: '&copy; OpenStreetMap contributors | Humanitarian OSM Team',
+        subdomains: 'abc',
+        maxZoom: 19,
+        invertible: true
+    }
+];
 
+// Imagery by default.
+//
+// The console is dark, and a drawn map has to be inverted to sit in it - which
+// pushes OpenStreetMap's pale ocean to within a shade of the panel behind it and
+// leaves very little to read. Satellite imagery is already dark, needs no
+// filtering at all, and separates land from sea by itself. The drawn maps stay
+// one choice away for anyone who wants labels and borders.
+const DEFAULT_BASEMAP = 'satellite';
+const BASEMAP_STORAGE_KEY = 'phishlens.basemap';
 
 export default function GlobalThreatMap({ points = [], coverage }) {
+    // Remembered per browser: a basemap is a preference, not a setting worth a
+    // round trip, and losing it on every reload is the sort of small friction
+    // that makes a panel feel unfinished.
+    const [basemapId, setBasemapId] = React.useState(() => {
+        try {
+            return localStorage.getItem(BASEMAP_STORAGE_KEY) || DEFAULT_BASEMAP;
+        } catch (e) {
+            return DEFAULT_BASEMAP;
+        }
+    });
+
+    const basemap = BASEMAPS.find(b => b.id === basemapId) || BASEMAPS[0];
+
+    const chooseBasemap = (id) => {
+        setBasemapId(id);
+        try {
+            localStorage.setItem(BASEMAP_STORAGE_KEY, id);
+        } catch (e) {
+            // A browser refusing storage is not a reason to refuse the change.
+        }
+    };
+
 
     const ordered = useMemo(() => {
         // Draw lower severities first so high-risk markers are never hidden beneath them.
@@ -90,7 +151,22 @@ export default function GlobalThreatMap({ points = [], coverage }) {
                         {points.length} located address{points.length === 1 ? '' : 'es'} · drag to pan, scroll to zoom, click a dot to see the messages
                     </div>
                 </div>
-                <div style={{ display: 'flex', gap: '14px', fontSize: '0.7rem' }}>
+                <div style={{ display: 'flex', gap: '14px', fontSize: '0.7rem', alignItems: 'center' }}>
+                    <select
+                        value={basemap.id}
+                        onChange={e => chooseBasemap(e.target.value)}
+                        title="Choose the map style"
+                        style={{
+                            background: 'var(--bg-surface)', border: '1px solid var(--border-strong)',
+                            borderRadius: '6px', padding: '4px 8px', fontSize: '0.72rem',
+                            color: 'var(--text-secondary)', cursor: 'pointer'
+                        }}
+                    >
+                        {BASEMAPS.map(option => (
+                            <option key={option.id} value={option.id}>{option.label}</option>
+                        ))}
+                    </select>
+
                     {Object.entries(SEVERITY).map(([key, meta]) => (
                         <span key={key} style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-muted)' }}>
                             <span style={{ width: '9px', height: '9px', borderRadius: '50%', backgroundColor: meta.colour, display: 'inline-block' }} />
@@ -102,6 +178,10 @@ export default function GlobalThreatMap({ points = [], coverage }) {
 
             <div style={{ height: '620px', width: '100%' }}>
                 <MapContainer
+                    // Markers drawn onto one canvas rather than as an SVG node
+                    // each. With a few hundred addresses the DOM approach spends
+                    // its time in layout rather than drawing.
+                    preferCanvas
                     center={[22, 12]}
                     zoom={2}
                     minZoom={2}
@@ -123,14 +203,32 @@ export default function GlobalThreatMap({ points = [], coverage }) {
                     style={{ height: '100%', width: '100%', backgroundColor: 'var(--bg-code)' }}
                 >
                     <TileLayer
-                        attribution={OSM_TILES.attribution}
-                        url={OSM_TILES.url}
-                        // OpenStreetMap publishes to 19; asking for more only
-                        // stretches the last real tile and invents detail.
+                        // Remounted when the basemap changes, so Leaflet builds
+                        // a fresh layer rather than swapping URLs underneath the
+                        // tiles it has already drawn.
+                        key={basemap.id}
+                        attribution={basemap.attribution}
+                        url={basemap.url}
+                        subdomains={basemap.subdomains || 'abc'}
+                        // Each service publishes to its own depth. Asking past it
+                        // stretches the last real tile and invents detail that is
+                        // not there; maxNativeZoom lets the map keep zooming while
+                        // reusing the deepest tile that actually exists.
                         maxZoom={19}
+                        maxNativeZoom={basemap.maxZoom}
                         // Tiles stop at the edge of the world rather than repeating.
                         noWrap
                         bounds={[[-85, -180], [85, 180]]}
+                        // Nothing is requested mid-gesture. Panning across a
+                        // continent used to fire a request for every tile it
+                        // crossed and then throw them away on arrival.
+                        updateWhenIdle
+                        updateWhenZooming={false}
+                        // Two screens' worth of tiles are kept around the edge,
+                        // so panning back over ground already covered costs
+                        // nothing.
+                        keepBuffer={4}
+                        className={basemap.invertible ? undefined : 'phishlens-tiles-as-is'}
                     />
                     {ordered.map(point => {
                         const meta = SEVERITY[point.severity] || SEVERITY.LOW;
