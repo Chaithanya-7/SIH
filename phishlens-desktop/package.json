@@ -37,7 +37,20 @@
           "!scratch/**",
           "!tests/**",
           "!.env",
+          "!test.json",
+          "!.gitignore",
           "!**/*.log"
+        ]
+      },
+      {
+        "from": "../phishlens-backend/node_modules",
+        "to": "backend/node_modules",
+        "filter": [
+          "**/*",
+          "!.bin/**",
+          "!**/{test,tests,example,examples,.github,.nyc_output}/**",
+          "!**/*.{md,markdown,map,ts}",
+          "!**/{LICENSE,LICENCE,AUTHORS,CHANGELOG,HISTORY}*"
         ]
       }
     ],

@@ -350,7 +350,9 @@ Previously the desktop app was a shell that expected the backend to already be r
 
 9 supervisor tests added (`npm test` in `phishlens-desktop`) covering attach-not-duplicate, leaving a borrowed backend alone, rejecting a non-PhishLens listener, the restart-loop limit, the restart-budget reset, and key persistence.
 
-**Honest caveat documented in the README**: the backend's `sqlite3` is a native module, so a packaged build must rebuild it for Electron's ABI (or point `PHISHLENS_BACKEND_NODE` at a system Node). A packaged build that skips this starts and then fails when the campaign graph opens its database.
+**Caveat documented in the README**: the backend's `sqlite3` is a native module, so a packaged build must rebuild it for Electron's ABI (or point `PHISHLENS_BACKEND_NODE` at a system Node). A packaged build that skips this starts and then fails when the campaign graph opens its database.
+
+> **Correction, 2026-09-20.** The caveat above is wrong, and is left in place rather than edited away so the record shows what was believed at the time. `sqlite3` 6.x is a Node-API addon — `napi_versions: [3, 6]`, and the compiled binary exports `napi_*` symbols — and Node-API is ABI-stable across runtimes. The same `node_sqlite3.node` opens a database, creates a table, inserts, reads the row back and closes cleanly under system Node (ABI 137) and under Electron's Node (ABI 149). No rebuild is needed. It was written from reasoning about native modules in general rather than from checking this one, and checking took a single command. See the packaging entry below for what the real packaging defect turned out to be.
 
 **92 backend tests + 9 desktop tests passing.**
 
@@ -735,3 +737,99 @@ so the label cannot disagree with the screen.
 | No stored choice, OS set to dark | dark applied |
 | Label after a theme change that was not a click | tracks correctly |
 | Settings page | themed, toggle present |
+
+## 2026-09-20 — The installer, built and actually run: it was broken, and so was the caveat
+
+The one thing that had been claimed but never proven. "Runs from the repository"
+was verified; "installs on a clean machine" was not. Proving it turned up two
+defects, one of them in my own documentation.
+
+### The first build succeeded and shipped a backend that cannot start
+
+electron-builder exited 0 and produced a 111 MB `PhishLens Setup 1.0.0.exe`. The
+backend inside it had **no `node_modules` at all** — no express, no sqlite3, no
+mailparser. It would have installed cleanly and then died on the first
+`require`, on a user's machine, with nothing in the build log to suggest
+anything was wrong.
+
+The cause is that electron-builder omits `node_modules` from an
+`extraResources` file set, and no filter pattern overrides it — adding
+`**/node_modules/**/*` to the filter changed nothing, which was checked rather
+than assumed. The fix is a second resource set whose `from` points directly at
+the directory, so `node_modules` is not a path segment being filtered but the
+root being copied.
+
+A green build is not evidence that the thing built works. That is the whole
+lesson of this entry.
+
+### The native-module caveat was wrong
+
+The previous entry documented, at some length, that `sqlite3` would have to be
+rebuilt for Electron's ABI before packaging or the app would fail when the
+campaign graph opened its database.
+
+That is false. `sqlite3` 6.x is a Node-API addon — its `package.json` declares
+`napi_versions: [3, 6]` and the compiled binary exports `napi_*` symbols — and
+Node-API is ABI-stable across runtimes. The same `node_sqlite3.node` opens a
+database, creates a table, inserts, reads the row back and closes cleanly under
+system Node (ABI 137) and under Electron's Node (ABI 149).
+
+It was written from reasoning about native modules in general rather than from
+checking this one, and checking took a single command. The README is corrected,
+and the original claim is left in the log above with a dated correction under it
+so the record shows what was believed at the time.
+
+Correcting it also removed dead code: `runtime()` had an `if (!app.isPackaged)`
+branch whose two sides returned identical values, left over from when a system
+Node was going to be preferred.
+
+### What the packaged app actually did
+
+Launched from `dist/win-unpacked` — the real packaged layout — with no data
+directory and nothing on the port:
+
+| Check | Result |
+|---|---|
+| Backend answers after launch | HTTP 200 after ~9s, from a cold start |
+| Backend is a child of the app | backend pid 10376, parent 25580 (the Electron main process) |
+| Runtime used | Electron's own Node, no system Node required |
+| Data location | `%APPDATA%\phishlens-desktop\data` |
+| Written into the install directory | nothing |
+| Generated key | 64 chars; `/api/summary` 401 without it, 200 with it |
+| SQLite campaign graph | opened and written under Electron's Node, no rebuild |
+| Full pipeline, twice | both HIGH_RISK; the second correlated into a campaign |
+| Audit ledger | 6 entries written |
+| Ingestion coverage | reported honestly: `monitoring_live_mail: false` |
+| Closing the app | 5 processes → 0, port released, no orphan |
+
+The machine was returned to how it was found: the data directory created by the
+run held only synthetic test mail and was removed, and the repository's own data
+directory was untouched throughout.
+
+### Six packaging tests
+
+They inspect the built output rather than the source tree, and skip cleanly when
+there is no build to inspect: the backend and console are present; **every
+declared dependency resolves from the packaged location**; the sqlite3 binary is
+there; sqlite3 loads under Electron's Node specifically; and no `.env`, `data`,
+`tests`, `scratch` or stray `test.json` travels inside the installer.
+
+That last one matters on its own — an installer is a thing you hand to other
+people, and the first build was shipping a `test.json` from somebody's scratch
+work.
+
+**15 desktop tests** (was 9), 151 backend tests, dashboard builds clean.
+
+### Not done
+
+The installer binary exists and is verified in unpacked form. It has **not** been
+run against this machine: installing writes to Program Files and registers the
+`phishlens://` scheme with the operating system, which is the user's call rather
+than something to do while they are not looking. Everything that would differ
+between the unpacked run and a real install is NSIS's own business — file
+placement, shortcuts, the uninstaller, protocol registration — not the
+application behaviour verified above.
+
+Installer size is 134 MB, up from 111 MB, because it now contains the
+dependencies it always needed. Documentation, tests, examples and source maps
+are excluded from the bundled `node_modules`.

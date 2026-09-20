@@ -70,20 +70,23 @@ The installer bundles the dashboard build **and** the backend, and registers
 the `phishlens://` scheme with the operating system. Installers are produced
 per platform: NSIS on Windows, AppImage on Linux, DMG on macOS.
 
-### Native module caveat
+### The native module needs no rebuild
 
-The backend depends on `sqlite3`, which is a compiled native module. Its binary
-must match the ABI of whatever runtime executes it:
+An earlier version of this file said `sqlite3` had to be rebuilt for Electron's
+ABI before packaging. **That was wrong**, and it is corrected here rather than
+quietly deleted, because acting on it would have meant a pointless build step.
 
-- **Running from the repository**, the backend's `node_modules` were built by
-  your system Node, and the supervisor runs it with a compatible runtime.
-- **In a packaged build**, the backend runs under Electron's embedded Node, so
-  `sqlite3` must be rebuilt for Electron's ABI before packaging (for example
-  with `electron-rebuild`), or set `PHISHLENS_BACKEND_NODE` to a system Node
-  binary on the target machine.
+`sqlite3` 6.x is a Node-API addon — its `package.json` declares
+`napi_versions: [3, 6]` and the compiled binary exports `napi_*` symbols.
+Node-API is ABI-stable across runtimes, so the same binary loads under system
+Node and under Electron's embedded Node without being rebuilt.
 
-This is stated rather than glossed over: a packaged build that skips the
-rebuild will start and then fail when the campaign graph opens its database.
+Verified by running it: the same `node_sqlite3.node` opens a database, creates a
+table, inserts, reads the row back and closes cleanly under system Node
+(ABI 137) and under Electron's Node (ABI 149).
+
+`PHISHLENS_BACKEND_NODE` still exists for running the backend under a Node
+binary of your choosing, but it is not needed to work around this.
 
 ## Deep links
 

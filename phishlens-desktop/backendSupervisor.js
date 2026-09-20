@@ -95,17 +95,28 @@ class BackendSupervisor extends EventEmitter {
     }
 
     /**
-     * Which runtime to spawn. The backend's native sqlite3 binding is compiled
-     * for a specific ABI, so the system Node that installed it is preferred.
-     * Electron's own Node is the fallback for a machine with no Node installed,
-     * and requires the binding to have been rebuilt for Electron at package time.
+     * Which runtime to spawn.
+     *
+     * Electron's own Node, always, so the app works on a machine with no Node
+     * installed - which is the point of shipping an installer.
+     *
+     * An earlier version of this preferred a system Node, on the grounds that
+     * the backend's sqlite3 binding was compiled for a specific ABI and would
+     * not load under Electron. That was wrong: sqlite3 6.x is a Node-API addon
+     * (`napi_versions: [3, 6]`, and the binary exports napi_* symbols), and
+     * Node-API is ABI-stable across runtimes. Verified by opening a database,
+     * writing, reading it back and closing under both - system Node at ABI 137
+     * and Electron's Node at ABI 149, with the same binary.
+     *
+     * The branch that used to distinguish packaged from unpackaged returned the
+     * same value on both sides, so it decided nothing and is gone.
+     *
+     * PHISHLENS_BACKEND_NODE remains for running the backend under a Node of
+     * your choosing; it is not needed to work around anything.
      */
     runtime() {
         if (process.env.PHISHLENS_BACKEND_NODE) {
             return { command: process.env.PHISHLENS_BACKEND_NODE, env: {}, label: 'configured Node' };
-        }
-        if (!app.isPackaged) {
-            return { command: process.execPath, env: { ELECTRON_RUN_AS_NODE: '1' }, label: 'Electron Node' };
         }
         return { command: process.execPath, env: { ELECTRON_RUN_AS_NODE: '1' }, label: 'Electron Node' };
     }
