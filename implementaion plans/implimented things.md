@@ -1684,3 +1684,31 @@ blindly risks locking the operator out.
 A CORS rejection is returned as a 500 rather than a 403, because the origin
 check signals refusal by throwing. Misleading, but cosmetic, and left alone
 rather than changed in passing.
+
+### The fake login was never reachable — a correction
+
+I said twice that the "Demo Identity" button was the one genuinely fake thing
+left in the product, and that it could not be removed safely because it might be
+the only way into the web console. Both halves were wrong, and checking took two
+greps I should have run the first time I raised it.
+
+`AuthModal` is imported by the dashboard and rendered **zero times**. It is not
+in the tree, so the button cannot be clicked. `showAuthModal` and
+`setShowAuthModal` appear exactly once each — at their own declaration — the
+same dead-state pattern as the five unused counters removed alongside them.
+
+The server had already closed the door independently: `/api/auth/google/verify`
+returns **403** unless `ENABLE_DEMO_IDENTITY=true` is explicitly set, and **501**
+outright when `NODE_ENV=production`. So even a reachable button would have been
+refused by default.
+
+The dead import and dead state are gone. `AuthModal.jsx` stays on disk, because
+it also holds the only organization-creation screen ever written, but it now
+says at the top what it is: not wired in, and not to be wired in until the
+fabricated-identity path is replaced with real verification. Its mailbox section
+already has a working replacement in `MailboxConnections.jsx`.
+
+The useful lesson is about the shape of the mistake rather than the mistake. I
+had flagged this item twice as "left undone, risky to touch" without once
+checking whether it ran. An unverified caveat repeated is worse than an open
+question, because it reads as a finding.

@@ -11,7 +11,6 @@ import ResponsePosture from './ResponsePosture';
 import MailboxConnections from './MailboxConnections';
 import AuditTimeline from './AuditTimeline';
 import ForensicReportModal from './ForensicReportModal';
-import AuthModal from './AuthModal';
 import AdminQuarantineQueue from './AdminQuarantineQueue';
 import IngestionCoverageView from './IngestionCoverageView';
 import OperationsOverview from './OperationsOverview';
@@ -41,7 +40,6 @@ export default function Dashboard() {
   const [currentUser, setCurrentUser] = useState(null);
   const [currentOrg, setCurrentOrg] = useState(null);
   const [mailboxConn, setMailboxConn] = useState(null);
-  const [showAuthModal, setShowAuthModal] = useState(false);
 
   const loadData = async () => {
     try {

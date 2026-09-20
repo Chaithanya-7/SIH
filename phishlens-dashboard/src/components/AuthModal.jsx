@@ -2,6 +2,22 @@ import React, { useState } from 'react';
 import { Shield, User, Building, Mail, CheckCircle2, AlertCircle, RefreshCw, Key, LogOut } from 'lucide-react';
 import { api } from '../services/api';
 
+/**
+ * NOT WIRED IN. Nothing renders this component.
+ *
+ * It was imported by the dashboard and never placed in the tree, so its
+ * "Demo Identity" button - which mints a client-side `g_mock_<timestamp>`
+ * account id and asks the server to trust it - has never been reachable. The
+ * server refuses that identity anyway unless ENABLE_DEMO_IDENTITY is explicitly
+ * set, and returns 501 in production.
+ *
+ * The file is kept because it also holds the only organization-creation and
+ * Gmail-connection screens that were ever written. If any of it is wired back
+ * in, the demo identity path must be replaced with real verification first -
+ * it fabricates an identity and presents it as a Google sign-in.
+ *
+ * Mailbox connection has a working replacement in MailboxConnections.jsx.
+ */
 export default function AuthModal({ currentUser, currentOrg, mailboxConn, onAuthSuccess, onClose }) {
   const [mode, setMode] = useState(!currentUser ? 'login' : (!currentOrg ? 'org' : 'mailbox'));
   const [emailInput, setEmailInput] = useState(currentUser?.email || '');
