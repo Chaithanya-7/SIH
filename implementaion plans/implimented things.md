@@ -1795,3 +1795,101 @@ that looked blank, and this connect banner that looked absent. Both were
 screenshots and text reads taken before React had finished painting; reading the
 DOM afterwards showed both fully populated. Worth remembering that a single
 early read is not evidence of absence.
+
+## 2026-09-20 — Signing in with Google
+
+Asked for directly: connect Gmail by signing in, not by generating an app
+password.
+
+### The existing OAuth could never have worked
+
+There was already Gmail OAuth machinery — `getAuthUrl`, `exchangeCodeForTokens`,
+a token store — and a redirect URI pointing at
+`http://localhost:3001/api/auth/gmail/callback`. **That route did not exist.**
+Google would have sent the user's browser to a 404 and the flow could never have
+completed. There was no PKCE either.
+
+### Somebody has to own the OAuth client
+
+Google issues no token without a registered client, so this cannot be made to
+work with zero setup. The options were to ship ours inside every copy — which
+makes every install depend on our account, puts the same secret in every
+package, and breaks the rule that this tool depends on nobody's servers — or to
+ask the operator for one of their own. It is free and it is done once, so that
+is what this does, and the console walks through it in four steps with a direct
+link to each Google Cloud page.
+
+Saying so on screen matters as much as doing it: the setup panel explains *why*
+there is no shared client, rather than presenting five steps of homework with no
+reason.
+
+### The flow
+
+The loopback redirect Google documents for installed applications. Consent
+happens in the real browser — Google refuses it inside an embedded view, and the
+desktop app already routes `window.open` outward — and the redirect lands on a
+port this server is already listening on. `redirectUri` follows whatever port
+the backend actually bound, because Google permits any port on the loopback
+address for a desktop client, and a hardcoded one is a thing to keep in step by
+hand.
+
+PKCE (RFC 7636) throughout: a 48-byte verifier, an S256 challenge, and the
+verifier never leaves this machine. That is what makes a desktop client safe
+despite its "secret" not really being one — Google says as much, and it ships
+inside every copy of any installed app.
+
+`state` is 24 random bytes, single-use and expiring in ten minutes. It is
+consumed the moment it is used, so a replayed authorization code finds nothing
+waiting.
+
+### Authenticating the poller instead of building a second one
+
+Once there are tokens, mail still has to be read. Rather than add a parallel
+Gmail-API ingestion path, the OAuth token authenticates the IMAP poller that
+already works, over SASL XOAUTH2. Everything after authentication — folder
+selection, UID tracking, coverage reporting, the pipeline itself — is the same
+verified code. The only difference is `LOGIN` versus `XOAUTH2`.
+
+Access tokens last about an hour, so only the refresh token is stored, and it is
+encrypted. A fresh access token is fetched before each poll.
+
+### A correction I made to my own copy
+
+The first version of the sign-in panel said PhishLens "asks Google only for
+permission to read your mail". That was false. Gmail's IMAP has no read-only
+scope: `https://mail.google.com/` is the only one that grants IMAP access, and
+it carries full mailbox access including deletion. `gmail.readonly` works with
+the Gmail API but not with IMAP.
+
+The panel now says plainly that Google's consent screen will say full access,
+that this is accurate, that it is not something PhishLens chose, and that an app
+password is the alternative. Putting a reassuring label on an identical request
+is exactly what teaches people to click through consent screens without reading
+them — which is the behaviour this product exists to defend against.
+
+### A public route, and the test that objected
+
+The callback has to be public: Google redirects a browser to it, and a browser
+carries no session token. An existing hardening test forbade any public
+`/api/auth/gmail` route, and it failed.
+
+It was right to. Its stated reason was that those endpoints read `req.user.id`,
+so exempting one turns an authorization check into a `TypeError` on undefined.
+The callback does not read `req.user` — it derives everything from the state —
+so the hazard does not apply, but the blanket rule did.
+
+Rather than weaken the test, it was narrowed to the real rule and made stricter:
+only the callback may be exempt, **and** a second test now reads the callback's
+own source and fails if it ever references `req.user`. Verified by injecting
+`req.user.id` into the handler and watching the new test fail.
+
+### Also fixed
+
+`add()` rejected a duplicate email address, which made the advice written
+yesterday — connect the account twice, once for Inbox and once for Spam —
+impossible to follow. Uniqueness is per address *and* folder now.
+
+**228 backend tests, 228 passing.** Eleven new: PKCE correctness against RFC
+7636, verifier uniqueness, single-use and expiring state, the exact SASL XOAUTH2
+byte format, client-ID validation, the secret never appearing in a status
+response, and the two public-route rules above.

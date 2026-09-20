@@ -174,6 +174,7 @@ test('every /api route is authenticated unless deliberately exempted', () => {
     const exemptions = [...stripComments(block[1]).matchAll(/'([^']+)'/g)].map(m => m[1]).sort();
 
     assert.deepStrictEqual(exemptions, [
+        '/api/auth/gmail/callback',
         '/api/auth/google/verify',
         '/api/health',
         '/api/webhooks/gmail'
@@ -184,11 +185,38 @@ test('every /api route is authenticated unless deliberately exempted', () => {
  * These connect a mailbox to an account that is already signed in and read
  * req.user.id, so exempting them would turn an authorization check into a
  * TypeError on undefined.
+ *
+ * The OAuth callback is the one exception and is a different kind of endpoint:
+ * it is reached by Google redirecting the user's browser, which carries no
+ * session token and cannot be given one. It is allowed to be public only
+ * because it derives everything it needs from a single-use `state` this server
+ * issued, and never consults req.user - which the next test enforces, so the
+ * exemption cannot quietly become the hazard described above.
  */
-test('the Gmail connect endpoints are not among the public exemptions', () => {
+test('no Gmail connect endpoint is public except the OAuth callback', () => {
     const src = fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8');
     const block = src.match(/const PUBLIC_API_ROUTES = new Set\(\[([\s\S]*?)\]\)/)[1];
-    assert.doesNotMatch(stripComments(block), /auth\/gmail/);
+    const gmailExemptions = [...stripComments(block).matchAll(/'(\/api\/auth\/gmail[^']*)'/g)].map(m => m[1]);
+
+    assert.deepStrictEqual(gmailExemptions, ['/api/auth/gmail/callback'],
+        'only the OAuth callback may be public, and only because it reads no session');
+});
+
+test('the public OAuth callback never reads req.user', () => {
+    const src = fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8');
+
+    const start = src.indexOf("app.get('/api/auth/gmail/callback'");
+    assert.ok(start > -1, 'the callback route must exist for its redirect URI to resolve');
+
+    // Up to the next top-level route registration.
+    const rest = src.slice(start + 1);
+    const next = rest.search(/\napp\.(get|post|put|delete|use)\(/);
+    const handler = next === -1 ? rest : rest.slice(0, next);
+
+    assert.doesNotMatch(handler, /req\.user/,
+        'a public handler that reads req.user dereferences undefined - the callback must use its state instead');
+    assert.match(handler, /req\.query\.state/,
+        'the callback must consume the state, which is the only thing authorising it');
 });
 
 // ---------------------------------------------------------------------------

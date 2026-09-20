@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Mail, Plus, Trash2, CheckCircle2, AlertTriangle, Loader } from 'lucide-react';
 import { api } from '../services/api';
+import GoogleSignIn from './GoogleSignIn';
 
 /**
  * Connecting a real mailbox, in the words of someone who has one.
@@ -91,6 +92,8 @@ export default function MailboxConnections() {
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <GoogleSignIn onConnected={load} />
+
             <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border)', borderRadius: '8px', padding: '18px' }}>
                 <h3 style={{ margin: '0 0 6px 0', fontSize: '1rem', color: 'var(--text-primary)' }}>Your mailboxes</h3>
                 <p style={{ margin: '0 0 16px 0', fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.6, maxWidth: '640px' }}>
@@ -152,7 +155,7 @@ export default function MailboxConnections() {
                         onClick={() => { setAdding(true); setError(null); setSuccess(null); }}
                         style={{ marginTop: '15px', background: 'var(--accent)', color: 'var(--text-on-accent)', border: 'none', borderRadius: '6px', padding: '9px 15px', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '7px' }}
                     >
-                        <Plus size={15} /> Connect a mailbox
+                        <Plus size={15} /> Connect with an app password instead
                     </button>
                 )}
             </div>

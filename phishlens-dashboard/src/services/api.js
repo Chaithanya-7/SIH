@@ -177,6 +177,28 @@ export const api = {
     return res.data;
   },
 
+  // ---- Signing in with Google ----
+  //
+  // The OAuth client belongs to whoever runs this copy. These read and write
+  // that registration; beginGoogleSignIn returns a URL that must be opened in
+  // the real browser, because Google refuses consent inside an embedded view.
+  getGoogleClient: async () => {
+    const res = await axios.get(`${API_BASE}/auth/google/client`);
+    return res.data;
+  },
+  saveGoogleClient: async (clientId, clientSecret) => {
+    const res = await axios.post(`${API_BASE}/auth/google/client`, { clientId, clientSecret });
+    return res.data;
+  },
+  forgetGoogleClient: async () => {
+    const res = await axios.delete(`${API_BASE}/auth/google/client`);
+    return res.data;
+  },
+  beginGoogleSignIn: async (folder) => {
+    const res = await axios.post(`${API_BASE}/auth/google/begin`, { folder });
+    return res.data;
+  },
+
   getConnections: async () => {
     const res = await axios.get(`${API_BASE}/connections`);
     return res.data;

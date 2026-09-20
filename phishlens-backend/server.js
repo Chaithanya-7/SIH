@@ -16,6 +16,7 @@ const arcAnalyzer = require('./modules/arcAnalyzer');
 const textDeception = require('./modules/textDeception');
 const threadIntegrity = require('./modules/threadIntegrity');
 const mailConnections = require('./modules/mailConnections');
+const googleOAuth = require('./modules/googleOAuth');
 const qrAnalyzer = require('./modules/qrAnalyzer');
 const forensicEngine = require('./modules/forensicEngine');
 const attachmentAnalyzer = require('./modules/attachmentAnalyzer');
@@ -348,7 +349,12 @@ const PUBLIC_API_ROUTES = new Set([
     '/api/auth/google/verify',
     // Google's push endpoint. It cannot carry our session token, and is
     // separately verified by checking the Pub/Sub JWT in verifyPubSubRequest.
-    '/api/webhooks/gmail'
+    '/api/webhooks/gmail',
+    // The OAuth redirect lands here from the user's browser, which has no
+    // session token and cannot be given one. What protects it is the `state`
+    // parameter: unguessable, single-use, and expiring in ten minutes, so a
+    // request without one this server issued cannot complete a connection.
+    '/api/auth/gmail/callback'
 ]);
 
 app.use('/api', (req, res, next) => {
@@ -459,6 +465,96 @@ app.post('/api/org/rotate-invite', requireRole('ADMIN'), (req, res) => {
 });
 
 // ==================== GMAIL AUTHORIZATION & MAILBOX ENDPOINTS ====================
+/**
+ * Signing in with Google.
+ *
+ * The client belongs to whoever runs this copy, not to us. Embedding ours would
+ * make every install depend on our credential and would hand a distributed
+ * secret to anyone who opened the package, so the console asks for one instead
+ * and explains how to make it. It is free.
+ */
+app.get('/api/auth/google/client', requireRole('ADMIN'), (req, res) => {
+    res.json({ success: true, ...googleOAuth.status() });
+});
+
+app.post('/api/auth/google/client', requireRole('ADMIN'), (req, res) => {
+    try {
+        const status = googleOAuth.saveClient({
+            clientId: req.body?.clientId,
+            clientSecret: req.body?.clientSecret
+        });
+        auditLogger.log({
+            org_id: req.user.organization_id, user_id: req.user.id,
+            event_type: 'GOOGLE_CLIENT_CONFIGURED', source: `ADMIN:${req.user.email}`,
+            description: `Google OAuth client ${status.client_id} registered for mailbox sign-in.`
+        });
+        res.json({ success: true, ...status });
+    } catch (e) {
+        res.status(400).json({ success: false, error: e.message, hint: e.hint || null });
+    }
+});
+
+app.delete('/api/auth/google/client', requireRole('ADMIN'), (req, res) => {
+    res.json({ success: true, ...googleOAuth.forgetClient() });
+});
+
+/** Starts the flow and hands back the URL for the user's real browser. */
+app.post('/api/auth/google/begin', requireRole('ADMIN'), (req, res) => {
+    try {
+        const { url, state } = googleOAuth.begin({
+            port: config.port,
+            folder: req.body?.folder || 'INBOX',
+            scope: req.body?.scope || 'read'
+        });
+        res.json({ success: true, url, state });
+    } catch (e) {
+        res.status(400).json({ success: false, error: e.message, hint: e.hint || null });
+    }
+});
+
+/**
+ * Where Google sends the browser back.
+ *
+ * Responds with a page rather than JSON, because a person is looking at it.
+ */
+app.get('/api/auth/gmail/callback', async (req, res) => {
+    const page = (title, body, tone) => `<!doctype html>
+<html><head><meta charset="utf-8"><title>PhishLens</title>
+<style>
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background:#0f1115; color:#e6e8ec;
+         display:flex; align-items:center; justify-content:center; height:100vh; margin:0; }
+  .card { max-width: 520px; padding: 32px 36px; background:#171a21; border:1px solid #262b36; border-radius:12px; }
+  h1 { font-size: 1.15rem; margin:0 0 10px; color:${tone}; }
+  p { font-size: 0.92rem; line-height:1.6; color:#aeb4bf; margin:0 0 8px; }
+</style></head>
+<body><div class="card"><h1>${title}</h1>${body}</div></body></html>`;
+
+    try {
+        if (req.query.error) {
+            return res.status(400).send(page('Sign-in cancelled',
+                `<p>Google reported: ${String(req.query.error).replace(/[<>]/g, '')}</p><p>Nothing was connected. You can close this tab.</p>`,
+                '#e5a03a'));
+        }
+
+        const result = await googleOAuth.complete({ code: req.query.code, state: req.query.state });
+        const connection = await mailConnections.addOAuth(result);
+
+        auditLogger.log({
+            event_type: 'MAILBOX_CONNECTED', source: 'GOOGLE_SSO',
+            description: `Connected ${connection.email} (${connection.folder}) by signing in with Google.`
+        });
+
+        res.send(page('Connected',
+            `<p><strong>${connection.email}</strong> is connected, watching <strong>${connection.folder}</strong>.</p>
+             <p>PhishLens will examine new messages as they arrive. You can close this tab and return to the app.</p>`,
+            '#4ade80'));
+    } catch (e) {
+        res.status(400).send(page('Could not connect that mailbox',
+            `<p>${String(e.message).replace(/[<>]/g, '')}</p><p>Nothing was stored. You can close this tab and try again.</p>`,
+            '#f87171'));
+    }
+});
+
 app.get('/api/auth/gmail/url', (req, res) => {
     const url = gmailIngestionAdapter.getAuthUrl(req.user.id);
     res.json({ success: true, url });

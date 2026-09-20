@@ -3,6 +3,8 @@ const crypto = require('crypto');
 const Imap = require('imap');
 const { dataFile } = require('./dataPaths');
 const secretStore = require('./secretStore');
+const googleOAuth = require('./googleOAuth');
+const { GoogleOAuth: GoogleOAuthClass } = googleOAuth;
 const ingestionRegistry = require('./ingestionRegistry');
 
 /**
@@ -137,6 +139,7 @@ class MailConnections {
             host: connection.host,
             port: connection.port,
             folder: connection.folder,
+            auth: connection.auth || 'password',
             password_hint: connection.password_hint,
             added_at: connection.added_at,
             last_checked_at: connection.last_checked_at || null,
@@ -150,10 +153,17 @@ class MailConnections {
         return [...this.connections.values()].map(c => this.describe(c));
     }
 
-    imapConfig(connection, password) {
-        return {
+    /**
+     * `credential` is either an app password or a Google access token.
+     *
+     * Signing in with Google changes only how the session authenticates -
+     * SASL XOAUTH2 instead of LOGIN. Everything after that point (folders, UID
+     * tracking, coverage reporting) is the same code, which is the reason to
+     * authenticate the existing poller rather than build a second one.
+     */
+    imapConfig(connection, credential, mode = 'password') {
+        const base = {
             user: connection.email,
-            password,
             host: connection.host,
             port: connection.port,
             tls: true,
@@ -161,6 +171,35 @@ class MailConnections {
             // A mailbox connection must not accept an intercepted certificate.
             tlsOptions: { servername: connection.host, rejectUnauthorized: true }
         };
+        if (mode === 'oauth') {
+            return { ...base, xoauth2: GoogleOAuthClass.xoauth2(connection.email, credential) };
+        }
+        return { ...base, password: credential };
+    }
+
+    /**
+     * A usable credential for this connection, refreshing the Google token if
+     * that is what it uses.
+     *
+     * Access tokens last about an hour, so a stored one is always assumed
+     * stale; only the refresh token is kept, and only encrypted.
+     */
+    async credentialFor(connection) {
+        if (connection.auth === 'oauth') {
+            const refreshToken = secretStore.decrypt(connection.secret);
+            if (!refreshToken) return { error: 'The stored Google sign-in could not be read. Reconnect this mailbox.' };
+            try {
+                const { accessToken } = await googleOAuth.refresh(refreshToken);
+                return { credential: accessToken, mode: 'oauth' };
+            } catch (e) {
+                const detail = e.response?.data?.error_description || e.response?.data?.error || e.message;
+                return { error: `Google refused to renew access for this mailbox (${detail}). Sign in again.` };
+            }
+        }
+
+        const password = secretStore.decrypt(connection.secret);
+        if (!password) return { error: 'The stored password could not be decrypted. Reconnect this mailbox.' };
+        return { credential: password, mode: 'password' };
     }
 
     /**
@@ -170,7 +209,7 @@ class MailConnections {
      * refused at the point the person can still do something about it, with the
      * server's own words rather than a generic failure.
      */
-    test({ email, password, host, port, folder = 'INBOX' }) {
+    test({ email, password, host, port, folder = 'INBOX', accessToken = null }) {
         return new Promise(resolve => {
             let settled = false;
             const done = result => {
@@ -180,7 +219,9 @@ class MailConnections {
                 resolve(result);
             };
 
-            const imap = new Imap(this.imapConfig({ email, host, port }, password));
+            const imap = new Imap(accessToken
+                ? this.imapConfig({ email, host, port }, accessToken, 'oauth')
+                : this.imapConfig({ email, host, port }, password));
 
             imap.once('ready', () => {
                 imap.openBox(folder, true, (err, box) => {
@@ -237,8 +278,12 @@ class MailConnections {
 
         if (!email || !password) throw new Error('An email address and password are both required.');
         if (!resolvedHost) throw new Error('An IMAP server address is required.');
-        if ([...this.connections.values()].some(c => c.email.toLowerCase() === String(email).toLowerCase())) {
-            throw new Error(`${email} is already connected.`);
+        // Per folder, not per address. One connection watches one folder, and
+        // covering both inbox and spam means connecting the same account twice
+        // - which the console tells people to do, and which an address-only
+        // check made impossible.
+        if (this.findByEmailAndFolder(email, folder)) {
+            throw new Error(`${email} is already connected for the folder "${folder}".`);
         }
 
         const probe = await this.test({ email, password, host: resolvedHost, port: resolvedPort, folder });
@@ -257,6 +302,62 @@ class MailConnections {
             folder,
             secret: secretStore.encrypt(password),
             password_hint: require('./secretStore').SecretStore.hint(password),
+            added_at: new Date().toISOString(),
+            messages_seen: 0,
+            last_uid: 0
+        };
+
+        this.connections.set(connection.id, connection);
+        this.save();
+        this.startWatching(connection.id);
+
+        return { ...this.describe(connection), messages_in_folder: probe.messages_in_folder };
+    }
+
+    findByEmailAndFolder(email, folder) {
+        const address = String(email || '').toLowerCase();
+        const box = String(folder || 'INBOX');
+        return [...this.connections.values()].find(
+            c => c.email.toLowerCase() === address && String(c.folder || 'INBOX') === box
+        ) || null;
+    }
+
+    /**
+     * Stores a mailbox authenticated by signing in with Google.
+     *
+     * The refresh token is what gets kept, because access tokens expire within
+     * the hour and a stored one would be useless by the next poll. Proving the
+     * session before storing it matters more here than with a password: consent
+     * can be granted and the IMAP session still be refused, if IMAP is switched
+     * off for the account.
+     */
+    async addOAuth({ email, refreshToken, accessToken, folder = 'INBOX' }) {
+        if (!email || !refreshToken) throw new Error('A Google sign-in did not return enough to connect this mailbox.');
+
+        if (this.findByEmailAndFolder(email, folder)) {
+            throw new Error(`${email} is already connected for the folder "${folder}".`);
+        }
+
+        const host = PROVIDERS.gmail.host;
+        const port = PROVIDERS.gmail.port;
+
+        const probe = await this.test({ email, host, port, folder, accessToken });
+        if (!probe.ok) {
+            const error = new Error(probe.error);
+            error.hint = probe.hint || 'Gmail must have IMAP switched on: Gmail settings, "Forwarding and POP/IMAP", Enable IMAP.';
+            throw error;
+        }
+
+        const connection = {
+            id: `mbx-${crypto.randomBytes(6).toString('hex')}`,
+            provider: 'gmail',
+            auth: 'oauth',
+            email,
+            host,
+            port,
+            folder,
+            secret: secretStore.encrypt(refreshToken),
+            password_hint: 'Signed in with Google',
             added_at: new Date().toISOString(),
             messages_seen: 0,
             last_uid: 0
@@ -362,18 +463,21 @@ class MailConnections {
      * flood of duplicate cases.
      */
     pollOnce(id) {
-        return new Promise((resolve, reject) => {
+        return new Promise(async (resolve, reject) => {
             const connection = this.connections.get(id);
             if (!connection) return resolve({ skipped: 'connection removed' });
 
-            const password = secretStore.decrypt(connection.secret);
-            if (!password) {
-                connection.last_error = 'The stored password could not be decrypted. Reconnect this mailbox.';
+            const resolved = await this.credentialFor(connection);
+            if (resolved.error) {
+                connection.last_error = resolved.error;
                 this.save();
-                return resolve({ skipped: 'secret unreadable' });
+                this.publishCoverage();
+                return resolve({ skipped: 'credential unavailable' });
             }
+            const password = resolved.credential;
+            const authMode = resolved.mode;
 
-            const imap = new Imap(this.imapConfig(connection, password));
+            const imap = new Imap(this.imapConfig(connection, password, authMode));
             let handled = 0;
 
             imap.once('ready', () => {
