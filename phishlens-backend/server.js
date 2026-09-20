@@ -980,10 +980,14 @@ app.get('/api/ingestion', (req, res) => {
     res.json({
         success: true,
         ...ingestionRegistry.getCoverage(),
-        // Where the browser extension actually lives on this machine, so the
-        // console can spell out the folder to load rather than describing it.
-        // In a packaged install it sits beside the backend in resources.
-        extension_path: require('path').resolve(__dirname, '..', 'phishlens-extension'),
+        // Deliberately not reporting where the browser extension lives.
+        //
+        // The backend guessed it from its own location, which is right only
+        // when nothing has been configured otherwise - and the desktop
+        // application may have been pointed at a checkout elsewhere. Two
+        // answers to one question meant the console could print a folder that
+        // was not the one being kept up to date. The application knows, and
+        // tells the console directly.
         gmail: gmailIngestionAdapter.preflight()
     });
 });

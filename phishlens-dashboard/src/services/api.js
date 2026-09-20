@@ -24,7 +24,23 @@ export const desktopReady = (async () => {
   return false;
 })();
 
-axios.interceptors.request.use((config) => {
+/**
+ * Every request waits for the key to be settled before it goes out.
+ *
+ * Adopting the desktop key is asynchronous - it crosses to the main process and
+ * back - while the screens start loading the moment they mount. Whichever
+ * happened to win decided whether a request carried a credential, and when the
+ * screens won, the console reported "Authentication required" for a key it was
+ * about to receive. It recovered on the next poll, which made it look
+ * intermittent rather than ordered.
+ *
+ * Awaiting here rather than in each screen means no caller has to remember, and
+ * no request can be the one that goes out early. In a browser the promise
+ * resolves immediately and nothing waits.
+ */
+axios.interceptors.request.use(async (config) => {
+  await desktopReady.catch(() => false);
+
   if (currentSessionToken) {
     config.headers['Authorization'] = `Bearer ${currentSessionToken}`;
   }
