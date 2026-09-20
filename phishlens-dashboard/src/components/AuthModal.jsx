@@ -147,63 +147,63 @@ export default function AuthModal({ currentUser, currentOrg, mailboxConn, onAuth
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
     }}>
       <div style={{
-        backgroundColor: '#0d1322', border: '1px solid #1e293b', borderRadius: '8px',
-        width: '440px', padding: '24px', color: '#f8fafc', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)'
+        backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border)', borderRadius: '8px',
+        width: '440px', padding: '24px', color: 'var(--text-primary)', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)'
       }}>
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', borderBottom: '1px solid #1e293b', pb: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', borderBottom: '1px solid var(--border)', pb: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Shield size={20} color="#3b82f6" />
+            <Shield size={20} color="var(--accent)" />
             <span style={{ fontWeight: 700, fontSize: '1rem' }}>PhishLens Account & Identity</span>
           </div>
           {onClose && (
-            <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1.2rem' }}>×</button>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: '1.2rem' }}>×</button>
           )}
         </div>
 
         {error && (
-          <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid #ef4444', borderRadius: '4px', padding: '10px', fontSize: '0.75rem', color: '#ef4444', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ backgroundColor: 'var(--tint-danger)', border: '1px solid var(--danger)', borderRadius: '4px', padding: '10px', fontSize: '0.75rem', color: 'var(--danger)', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <AlertCircle size={14} />
             <span>{error}</span>
           </div>
         )}
 
         {message && (
-          <div style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', border: '1px solid #10b981', borderRadius: '4px', padding: '10px', fontSize: '0.75rem', color: '#10b981', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ backgroundColor: 'var(--tint-success)', border: '1px solid var(--success)', borderRadius: '4px', padding: '10px', fontSize: '0.75rem', color: 'var(--success)', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <CheckCircle2 size={14} />
             <span>{message}</span>
           </div>
         )}
 
         {/* Tab Navigation */}
-        <div style={{ display: 'flex', gap: '4px', backgroundColor: '#131b2e', padding: '4px', borderRadius: '6px', marginBottom: '18px' }}>
-          <button onClick={() => setMode('login')} style={{ flex: 1, padding: '6px', fontSize: '0.75rem', borderRadius: '4px', border: 'none', backgroundColor: mode === 'login' ? '#1e293b' : 'transparent', color: mode === 'login' ? '#f8fafc' : '#64748b', cursor: 'pointer' }}>Demo Identity</button>
-          <button onClick={() => setMode('org')} style={{ flex: 1, padding: '6px', fontSize: '0.75rem', borderRadius: '4px', border: 'none', backgroundColor: mode === 'org' ? '#1e293b' : 'transparent', color: mode === 'org' ? '#f8fafc' : '#64748b', cursor: 'pointer' }}>Organization</button>
-          <button onClick={() => setMode('mailbox')} style={{ flex: 1, padding: '6px', fontSize: '0.75rem', borderRadius: '4px', border: 'none', backgroundColor: mode === 'mailbox' ? '#1e293b' : 'transparent', color: mode === 'mailbox' ? '#f8fafc' : '#64748b', cursor: 'pointer' }}>Gmail Connection</button>
+        <div style={{ display: 'flex', gap: '4px', backgroundColor: 'var(--bg-surface)', padding: '4px', borderRadius: '6px', marginBottom: '18px' }}>
+          <button onClick={() => setMode('login')} style={{ flex: 1, padding: '6px', fontSize: '0.75rem', borderRadius: '4px', border: 'none', backgroundColor: mode === 'login' ? 'var(--border)' : 'transparent', color: mode === 'login' ? 'var(--text-primary)' : 'var(--text-dim)', cursor: 'pointer' }}>Demo Identity</button>
+          <button onClick={() => setMode('org')} style={{ flex: 1, padding: '6px', fontSize: '0.75rem', borderRadius: '4px', border: 'none', backgroundColor: mode === 'org' ? 'var(--border)' : 'transparent', color: mode === 'org' ? 'var(--text-primary)' : 'var(--text-dim)', cursor: 'pointer' }}>Organization</button>
+          <button onClick={() => setMode('mailbox')} style={{ flex: 1, padding: '6px', fontSize: '0.75rem', borderRadius: '4px', border: 'none', backgroundColor: mode === 'mailbox' ? 'var(--border)' : 'transparent', color: mode === 'mailbox' ? 'var(--text-primary)' : 'var(--text-dim)', cursor: 'pointer' }}>Gmail Connection</button>
         </div>
 
         {/* 1. Google Auth Mode */}
         {mode === 'login' && (
           <form onSubmit={handleGoogleSignIn} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div>
-              <label style={{ fontSize: '0.72rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Google Account Email</label>
+              <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Google Account Email</label>
               <input
                 type="email"
                 value={emailInput}
                 onChange={e => setEmailInput(e.target.value)}
                 placeholder="user@company.com"
-                style={{ width: '100%', backgroundColor: '#131b2e', border: '1px solid #1e293b', borderRadius: '4px', padding: '8px 10px', color: '#f8fafc', fontSize: '0.8rem' }}
+                style={{ width: '100%', backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: '4px', padding: '8px 10px', color: 'var(--text-primary)', fontSize: '0.8rem' }}
                 required
               />
             </div>
             <div>
-              <label style={{ fontSize: '0.72rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Display Name</label>
+              <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Display Name</label>
               <input
                 type="text"
                 value={nameInput}
                 onChange={e => setNameInput(e.target.value)}
                 placeholder="User Name"
-                style={{ width: '100%', backgroundColor: '#131b2e', border: '1px solid #1e293b', borderRadius: '4px', padding: '8px 10px', color: '#f8fafc', fontSize: '0.8rem' }}
+                style={{ width: '100%', backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: '4px', padding: '8px 10px', color: 'var(--text-primary)', fontSize: '0.8rem' }}
               />
             </div>
 
@@ -211,7 +211,7 @@ export default function AuthModal({ currentUser, currentOrg, mailboxConn, onAuth
               type="submit"
               disabled={loading}
               style={{
-                backgroundColor: '#3b82f6', color: '#ffffff', border: 'none', borderRadius: '4px',
+                backgroundColor: 'var(--accent)', color: 'var(--text-on-accent)', border: 'none', borderRadius: '4px',
                 padding: '10px', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer', display: 'flex',
                 alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '6px'
               }}
@@ -225,40 +225,40 @@ export default function AuthModal({ currentUser, currentOrg, mailboxConn, onAuth
         {mode === 'org' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             {/* Create Org */}
-            <form onSubmit={handleCreateOrg} style={{ backgroundColor: '#131b2e', border: '1px solid #1e293b', borderRadius: '6px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Building size={14} color="#3b82f6" /> Create Organization (Becomes ADMIN)
+            <form onSubmit={handleCreateOrg} style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Building size={14} color="var(--accent)" /> Create Organization (Becomes ADMIN)
               </div>
               <input
                 type="text"
                 value={orgName}
                 onChange={e => setOrgName(e.target.value)}
                 placeholder="Organization Name (e.g. Acme Corp)"
-                style={{ backgroundColor: '#0d1322', border: '1px solid #1e293b', borderRadius: '4px', padding: '6px 8px', color: '#f8fafc', fontSize: '0.75rem' }}
+                style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border)', borderRadius: '4px', padding: '6px 8px', color: 'var(--text-primary)', fontSize: '0.75rem' }}
               />
               <input
                 type="text"
                 value={orgDomain}
                 onChange={e => setOrgDomain(e.target.value)}
                 placeholder="Approved Email Domain (e.g. acme.com)"
-                style={{ backgroundColor: '#0d1322', border: '1px solid #1e293b', borderRadius: '4px', padding: '6px 8px', color: '#f8fafc', fontSize: '0.75rem' }}
+                style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border)', borderRadius: '4px', padding: '6px 8px', color: 'var(--text-primary)', fontSize: '0.75rem' }}
               />
-              <button type="submit" style={{ backgroundColor: '#3b82f6', color: '#fff', border: 'none', borderRadius: '4px', padding: '6px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Create & Become ADMIN</button>
+              <button type="submit" style={{ backgroundColor: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '4px', padding: '6px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Create & Become ADMIN</button>
             </form>
 
             {/* Join Org */}
-            <form onSubmit={handleJoinOrg} style={{ backgroundColor: '#131b2e', border: '1px solid #1e293b', borderRadius: '6px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Key size={14} color="#10b981" /> Join Organization with Admin Invite Code
+            <form onSubmit={handleJoinOrg} style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Key size={14} color="var(--success)" /> Join Organization with Admin Invite Code
               </div>
               <input
                 type="text"
                 value={inviteCode}
                 onChange={e => setInviteCode(e.target.value)}
                 placeholder="Invite Code (e.g. INV-2026-XXXXXX)"
-                style={{ backgroundColor: '#0d1322', border: '1px solid #1e293b', borderRadius: '4px', padding: '6px 8px', color: '#f8fafc', fontSize: '0.75rem' }}
+                style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border)', borderRadius: '4px', padding: '6px 8px', color: 'var(--text-primary)', fontSize: '0.75rem' }}
               />
-              <button type="submit" style={{ backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: '4px', padding: '6px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Join as EMPLOYEE</button>
+              <button type="submit" style={{ backgroundColor: 'var(--success)', color: '#fff', border: 'none', borderRadius: '4px', padding: '6px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Join as EMPLOYEE</button>
             </form>
           </div>
         )}
@@ -266,25 +266,25 @@ export default function AuthModal({ currentUser, currentOrg, mailboxConn, onAuth
         {/* 3. Gmail Mailbox Connection Mode */}
         {mode === 'mailbox' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <div style={{ backgroundColor: '#131b2e', border: '1px solid #1e293b', borderRadius: '6px', padding: '14px' }}>
-              <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '8px' }}>Mailbox Authorization State:</div>
+            <div style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '14px' }}>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Mailbox Authorization State:</div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Mail size={18} color={mailboxConn?.status === 'CONNECTED' ? '#10b981' : '#f59e0b'} />
+                  <Mail size={18} color={mailboxConn?.status === 'CONNECTED' ? 'var(--success)' : 'var(--warning)'} />
                   <div>
-                    <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#f8fafc' }}>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                       {mailboxConn?.provider_account || 'No Mailbox Connected'}
                     </div>
-                    <div style={{ fontSize: '0.7rem', color: mailboxConn?.status === 'CONNECTED' ? '#10b981' : '#f59e0b' }}>
+                    <div style={{ fontSize: '0.7rem', color: mailboxConn?.status === 'CONNECTED' ? 'var(--success)' : 'var(--warning)' }}>
                       Status: {mailboxConn?.status || 'DISCONNECTED'}
                     </div>
                   </div>
                 </div>
 
                 {mailboxConn?.status === 'CONNECTED' ? (
-                  <button onClick={handleDisconnectMailbox} style={{ backgroundColor: 'rgba(239, 68, 68, 0.2)', border: '1px solid #ef4444', color: '#ef4444', borderRadius: '4px', padding: '4px 8px', fontSize: '0.72rem', cursor: 'pointer' }}>Disconnect</button>
+                  <button onClick={handleDisconnectMailbox} style={{ backgroundColor: 'var(--tint-danger)', border: '1px solid var(--danger)', color: 'var(--danger)', borderRadius: '4px', padding: '4px 8px', fontSize: '0.72rem', cursor: 'pointer' }}>Disconnect</button>
                 ) : (
-                  <button onClick={handleConnectGmail} style={{ backgroundColor: '#3b82f6', color: '#fff', border: 'none', borderRadius: '4px', padding: '6px 12px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Connect Gmail</button>
+                  <button onClick={handleConnectGmail} style={{ backgroundColor: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '4px', padding: '6px 12px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>Connect Gmail</button>
                 )}
               </div>
             </div>
@@ -294,7 +294,7 @@ export default function AuthModal({ currentUser, currentOrg, mailboxConn, onAuth
                 onClick={handleSyncMailbox}
                 disabled={loading}
                 style={{
-                  backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: '4px',
+                  backgroundColor: 'var(--success)', color: '#fff', border: 'none', borderRadius: '4px',
                   padding: '8px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
                 }}

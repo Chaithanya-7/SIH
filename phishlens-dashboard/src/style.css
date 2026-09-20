@@ -1,32 +1,32 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
-  --bg-app: #090d16;
-  --bg-sidebar: #0d1322;
-  --bg-card: #131b2e;
-  --bg-elevated: #1a243b;
-  --bg-hover: #222d46;
-  --border-color: #1e293b;
-  --border-highlight: #334155;
+  --bg-app: var(--bg-code);
+  --bg-sidebar: var(--bg-panel);
+  --bg-card: var(--bg-surface);
+  --bg-elevated: var(--bg-surface);
+  --bg-hover: var(--bg-raised);
+  --border-color: var(--border);
+  --border-highlight: var(--border-strong);
 
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
+  --text-primary: var(--text-primary);
+  --text-secondary: var(--text-muted);
+  --text-muted: var(--text-dim);
 
-  --color-accent: #3b82f6;
-  --color-accent-hover: #2563eb;
-  --color-accent-bg: rgba(59, 130, 246, 0.12);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent);
+  --color-accent-bg: var(--tint-accent);
   
-  --color-red: #ef4444;
-  --color-red-bg: rgba(239, 68, 68, 0.12);
-  --color-amber: #f59e0b;
-  --color-amber-bg: rgba(245, 158, 11, 0.12);
-  --color-green: #10b981;
-  --color-green-bg: rgba(16, 185, 129, 0.12);
-  --color-grey: #64748b;
-  --color-grey-bg: rgba(100, 116, 139, 0.12);
-  --color-purple: #8b5cf6;
-  --color-purple-bg: rgba(139, 92, 246, 0.12);
+  --color-red: var(--danger);
+  --color-red-bg: var(--tint-danger);
+  --color-amber: var(--warning);
+  --color-amber-bg: var(--tint-warning);
+  --color-green: var(--success);
+  --color-green-bg: var(--tint-success);
+  --color-grey: var(--text-dim);
+  --color-grey-bg: var(--tint-neutral);
+  --color-purple: var(--violet);
+  --color-purple-bg: var(--tint-accent);
 
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, Consolas, monospace;
@@ -64,11 +64,11 @@ html, body, #root, #app {
   background: var(--bg-app);
 }
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: var(--border-strong);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: var(--border-strong);
 }
 
 /* Typography Classes */
@@ -101,7 +101,7 @@ html, body, #root, #app {
 
 /* Skeleton Loading State */
 .skeleton {
-  background: linear-gradient(90deg, #131b2e 25%, #1e293b 50%, #131b2e 75%);
+  background: linear-gradient(90deg, var(--bg-surface) 25%, var(--border) 50%, var(--bg-surface) 75%);
   background-size: 200% 100%;
   animation: skeletonLoading 1.5s infinite;
   border-radius: 4px;

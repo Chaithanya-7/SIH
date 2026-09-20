@@ -36,20 +36,20 @@ export default function ThreatFeed({ cases, selectedCase, onSelectCase }) {
   }).slice().reverse();
 
   return (
-    <div style={{ backgroundColor: '#131b2e', borderRadius: '8px', border: '1px solid #1e293b', padding: '14px', display: 'flex', flexDirection: 'column', height: '100%', minHeight: '500px' }}>
+    <div style={{ backgroundColor: 'var(--bg-surface)', borderRadius: '8px', border: '1px solid var(--border)', padding: '14px', display: 'flex', flexDirection: 'column', height: '100%', minHeight: '500px' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-        <h3 style={{ margin: 0, fontSize: '0.9rem', color: '#f8fafc', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        <h3 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-primary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           Threat Queue ({filteredCases.length})
         </h3>
-        <span style={{ fontSize: '0.7rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10b981' }}></span> Live Ingestion
+        <span style={{ fontSize: '0.7rem', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--success)' }}></span> Live Ingestion
         </span>
       </div>
 
       {/* Search Input */}
       <div style={{ position: 'relative', marginBottom: '10px' }}>
-        <Search size={14} color="#64748b" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+        <Search size={14} color="var(--text-dim)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
         <input
           type="text"
           placeholder="Filter queue by subject, sender, ID..."
@@ -57,12 +57,12 @@ export default function ThreatFeed({ cases, selectedCase, onSelectCase }) {
           onChange={(e) => setSearchQuery(e.target.value)}
           style={{
             width: '100%',
-            backgroundColor: '#0d1322',
-            border: '1px solid #1e293b',
+            backgroundColor: 'var(--bg-panel)',
+            border: '1px solid var(--border)',
             borderRadius: '6px',
             padding: '6px 10px 6px 30px',
             fontSize: '0.75rem',
-            color: '#f8fafc',
+            color: 'var(--text-primary)',
             outline: 'none'
           }}
         />
@@ -75,9 +75,9 @@ export default function ThreatFeed({ cases, selectedCase, onSelectCase }) {
             key={tab}
             onClick={() => setFilter(tab)}
             style={{
-              backgroundColor: filter === tab ? '#3b82f6' : '#0d1322',
-              color: filter === tab ? '#ffffff' : '#94a3b8',
-              border: '1px solid #1e293b',
+              backgroundColor: filter === tab ? 'var(--accent)' : 'var(--bg-panel)',
+              color: filter === tab ? 'var(--text-on-accent)' : 'var(--text-muted)',
+              border: '1px solid var(--border)',
               borderRadius: '4px',
               padding: '3px 8px',
               fontSize: '0.7rem',
@@ -94,7 +94,7 @@ export default function ThreatFeed({ cases, selectedCase, onSelectCase }) {
       {/* Feed List */}
       <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
         {filteredCases.length === 0 ? (
-          <div style={{ color: '#64748b', textAlign: 'center', padding: '32px 16px', fontSize: '0.8rem' }}>
+          <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: '32px 16px', fontSize: '0.8rem' }}>
             No security incidents match the selected filter.
           </div>
         ) : (
@@ -104,11 +104,11 @@ export default function ThreatFeed({ cases, selectedCase, onSelectCase }) {
             const isHigh = verdict === 'HIGH_RISK';
             const isSusp = verdict === 'SUSPICIOUS';
 
-            let badgeBg = 'rgba(100, 116, 139, 0.15)';
-            let badgeColor = '#94a3b8';
-            if (isHigh) { badgeBg = 'rgba(239, 68, 68, 0.15)'; badgeColor = '#ef4444'; }
-            else if (isSusp) { badgeBg = 'rgba(245, 158, 11, 0.15)'; badgeColor = '#f59e0b'; }
-            else if (verdict === 'SAFE') { badgeBg = 'rgba(16, 185, 129, 0.15)'; badgeColor = '#10b981'; }
+            let badgeBg = 'var(--tint-neutral)';
+            let badgeColor = 'var(--text-muted)';
+            if (isHigh) { badgeBg = 'var(--tint-danger)'; badgeColor = 'var(--danger)'; }
+            else if (isSusp) { badgeBg = 'var(--tint-warning)'; badgeColor = 'var(--warning)'; }
+            else if (verdict === 'SAFE') { badgeBg = 'var(--tint-success)'; badgeColor = 'var(--success)'; }
 
             const relativeTime = getRelativeTime(c.message?.delivered_at || c.timestamps?.ingested_at);
 
@@ -117,8 +117,8 @@ export default function ThreatFeed({ cases, selectedCase, onSelectCase }) {
                 key={c.case_id}
                 onClick={() => onSelectCase(c)}
                 style={{
-                  backgroundColor: isSelected ? '#1e293b' : '#0d1322',
-                  border: isSelected ? '1px solid #3b82f6' : '1px solid #1e293b',
+                  backgroundColor: isSelected ? 'var(--border)' : 'var(--bg-panel)',
+                  border: isSelected ? '1px solid var(--accent)' : '1px solid var(--border)',
                   borderRadius: '6px',
                   padding: '10px 12px',
                   cursor: 'pointer',
@@ -130,16 +130,16 @@ export default function ThreatFeed({ cases, selectedCase, onSelectCase }) {
                     <span style={{ backgroundColor: badgeBg, color: badgeColor, fontSize: '0.65rem', fontWeight: 700, padding: '1px 6px', borderRadius: '3px', textTransform: 'uppercase' }}>
                       {verdict.replace('_', ' ')}
                     </span>
-                    <span className="font-mono" style={{ fontSize: '0.72rem', color: '#3b82f6', fontWeight: 600 }}>{c.case_id}</span>
+                    <span className="font-mono" style={{ fontSize: '0.72rem', color: 'var(--accent)', fontWeight: 600 }}>{c.case_id}</span>
                   </div>
-                  <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{relativeTime}</span>
+                  <span style={{ fontSize: '0.68rem', color: 'var(--text-dim)' }}>{relativeTime}</span>
                 </div>
 
-                <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#f8fafc', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {c.message?.subject || '(No Subject)'}
                 </div>
 
-                <div style={{ fontSize: '0.72rem', color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {c.message?.sender || 'Unknown Sender'}
                 </div>
               </div>

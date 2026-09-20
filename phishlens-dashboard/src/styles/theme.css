@@ -1,0 +1,157 @@
+/**
+ * PhishLens theme tokens.
+ *
+ * Components reference semantic tokens rather than raw colours, so the two
+ * themes stay in step and a colour is never defined in two places. Dark is the
+ * default because a SOC console is usually run on a wall display or in a dim
+ * room; light is provided for printing, projectors and daylight review.
+ *
+ * Status colours are not simply inverted between themes. A red that reads
+ * correctly on near-black is too light on white, so each theme carries its own
+ * status ramp chosen for contrast against that theme's surfaces.
+ */
+
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* surfaces, from furthest back to nearest */
+  --bg-app: #0a0a0f;
+  --bg-panel: #0d1322;
+  --bg-surface: #131b2e;
+  --bg-raised: #1e293b;
+  --bg-code: #090d16;
+
+  --border: #1e293b;
+  --border-strong: #334155;
+
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
+  --text-on-accent: #ffffff;
+
+  --accent: #3b82f6;
+  --accent-soft: #93c5fd;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --success: #10b981;
+  --violet: #8b5cf6;
+  --pink: #ec4899;
+  --brand-violet: #8900ff;
+  --brand-violet-soft: #eee6ff;
+  --brand-cyan: #00c2ff;
+
+  /* translucent status tints used for badges and callouts */
+  --tint-danger: rgba(239, 68, 68, 0.15);
+  --tint-warning: rgba(245, 158, 11, 0.15);
+  --tint-success: rgba(16, 185, 129, 0.15);
+  --tint-accent: rgba(59, 130, 246, 0.15);
+  --tint-neutral: rgba(100, 116, 139, 0.15);
+
+  --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --bg-app: #eef2f7;
+  --bg-panel: #ffffff;
+  --bg-surface: #f8fafc;
+  --bg-raised: #eef2f7;
+  --bg-code: #f1f5f9;
+
+  --border: #dbe3ec;
+  --border-strong: #b6c2d1;
+
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #4b5a6d;
+  --text-dim: #6b7a8d;
+  --text-on-accent: #ffffff;
+
+  /* Darkened so each still meets contrast on white surfaces. */
+  --accent: #1d4ed8;
+  --accent-soft: #1e40af;
+  --danger: #c02626;
+  --warning: #a35a06;
+  --success: #07734f;
+  --violet: #6d28d9;
+  --pink: #be1d63;
+  --brand-violet: #6d28d9;
+  --brand-violet-soft: #f3ecff;
+  --brand-cyan: #0369a1;
+
+  --tint-danger: rgba(192, 38, 38, 0.10);
+  --tint-warning: rgba(163, 90, 6, 0.12);
+  --tint-success: rgba(7, 115, 79, 0.10);
+  --tint-accent: rgba(29, 78, 216, 0.10);
+  --tint-neutral: rgba(100, 116, 139, 0.10);
+
+  --shadow-panel: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+html,
+body {
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+  /* Only colours transition; layout properties must not animate on theme change. */
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+#root {
+  background-color: var(--bg-app);
+  min-height: 100vh;
+}
+
+/* Inputs and buttons do not inherit colours by default in every browser. */
+input,
+textarea,
+select,
+button {
+  font-family: inherit;
+  color: inherit;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-dim);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-panel);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-dim);
+}
+
+/* Leaflet renders its own surfaces, which otherwise stay dark in light mode. */
+.leaflet-container {
+  background: var(--bg-code) !important;
+}
+
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: var(--bg-surface) !important;
+  color: var(--text-primary) !important;
+}
+
+/* A light-theme map at full saturation is glaring next to muted UI chrome. */
+:root[data-theme='light'] .leaflet-tile {
+  filter: saturate(0.85) brightness(1.02);
+}
+
+:root[data-theme='dark'] .leaflet-tile {
+  filter: brightness(0.7) invert(1) contrast(0.9) hue-rotate(200deg) saturate(0.6);
+}

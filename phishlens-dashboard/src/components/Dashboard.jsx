@@ -13,9 +13,12 @@ import AuthModal from './AuthModal';
 import AdminQuarantineQueue from './AdminQuarantineQueue';
 import IngestionCoverageView from './IngestionCoverageView';
 import IntelligenceStateView from './IntelligenceStateView';
+import ThemeToggle from './ThemeToggle';
+import { useTheme } from '../hooks/useTheme';
 import { User, Building, Mail, Lock, Inbox, Brain } from 'lucide-react';
 
 export default function Dashboard() {
+  const { theme, toggleTheme } = useTheme();
   const [activeNav, setActiveNav] = useState('investigations');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [cases, setCases] = useState([]);
@@ -149,8 +152,8 @@ export default function Dashboard() {
         className="sidebar-responsive"
         style={{
           width: sidebarCollapsed ? '64px' : '230px',
-          backgroundColor: '#0d1322',
-          borderRight: '1px solid #1e293b',
+          backgroundColor: 'var(--bg-panel)',
+          borderRight: '1px solid var(--border)',
           display: 'flex',
           flexDirection: 'column',
           transition: 'width 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -159,27 +162,27 @@ export default function Dashboard() {
         }}
       >
         {/* Header Branding */}
-        <div style={{ padding: '16px 14px', display: 'flex', alignItems: 'center', justifyContent: sidebarCollapsed ? 'center' : 'space-between', borderBottom: '1px solid #1e293b' }}>
+        <div style={{ padding: '16px 14px', display: 'flex', alignItems: 'center', justifyContent: sidebarCollapsed ? 'center' : 'space-between', borderBottom: '1px solid var(--border)' }}>
           {!sidebarCollapsed && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{ backgroundColor: '#3b82f6', width: '28px', height: '28px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Shield size={16} color="#ffffff" />
+              <div style={{ backgroundColor: 'var(--accent)', width: '28px', height: '28px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Shield size={16} color="var(--text-on-accent)" />
               </div>
               <div>
-                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#f8fafc', letterSpacing: '-0.02em' }}>PhishLens</div>
-                <div style={{ fontSize: '0.62rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Enterprise SOC</div>
+                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>PhishLens</div>
+                <div style={{ fontSize: '0.62rem', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Enterprise SOC</div>
               </div>
             </div>
           )}
           {sidebarCollapsed && (
-            <div style={{ backgroundColor: '#3b82f6', width: '28px', height: '28px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Shield size={16} color="#ffffff" />
+            <div style={{ backgroundColor: 'var(--accent)', width: '28px', height: '28px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Shield size={16} color="var(--text-on-accent)" />
             </div>
           )}
 
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            style={{ backgroundColor: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
+            style={{ backgroundColor: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
             title="Toggle Sidebar Navigation"
           >
             {sidebarCollapsed ? <Menu size={16} /> : <ChevronLeft size={16} />}
@@ -197,8 +200,8 @@ export default function Dashboard() {
                 onClick={() => setActiveNav(item.id)}
                 title={sidebarCollapsed ? item.label : undefined}
                 style={{
-                  backgroundColor: isActive ? '#1e293b' : 'transparent',
-                  color: isActive ? '#3b82f6' : '#94a3b8',
+                  backgroundColor: isActive ? 'var(--border)' : 'transparent',
+                  color: isActive ? 'var(--accent)' : 'var(--text-muted)',
                   border: 'none',
                   borderRadius: '5px',
                   padding: sidebarCollapsed ? '10px' : '8px 10px',
@@ -212,46 +215,49 @@ export default function Dashboard() {
                   transition: 'all 0.15s ease'
                 }}
               >
-                <Icon size={16} color={isActive ? '#3b82f6' : '#94a3b8'} />
+                <Icon size={16} color={isActive ? 'var(--accent)' : 'var(--text-muted)'} />
                 {!sidebarCollapsed && <span>{item.label}</span>}
               </button>
             );
           })}
         </nav>
 
-        {/* Footer Status */}
-        {!sidebarCollapsed && (
-          <div style={{ padding: '12px 14px', borderTop: '1px solid #1e293b', fontSize: '0.68rem', color: '#64748b' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-              <Activity size={12} color={systemHealth.status === 'OPERATIONAL' ? '#10b981' : '#f59e0b'} />
-              <span style={{ color: systemHealth.status === 'OPERATIONAL' ? '#10b981' : '#f59e0b', fontWeight: 600 }}>
-                {systemHealth.status === 'OPERATIONAL' ? 'Systems Operational' : `System Degraded (${systemHealth.services?.detection || 'Degraded'})`}
-              </span>
-            </div>
-            <div>Automated Threat Engine</div>
-          </div>
-        )}
+        {/* Footer: status and appearance */}
+        <div style={{ padding: sidebarCollapsed ? '10px 8px' : '12px 14px', borderTop: '1px solid var(--border)', fontSize: '0.68rem', color: 'var(--text-dim)' }}>
+          {!sidebarCollapsed && (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                <Activity size={12} color={systemHealth.status === 'OPERATIONAL' ? 'var(--success)' : 'var(--warning)'} />
+                <span style={{ color: systemHealth.status === 'OPERATIONAL' ? 'var(--success)' : 'var(--warning)', fontWeight: 600 }}>
+                  {systemHealth.status === 'OPERATIONAL' ? 'Systems Operational' : `System Degraded (${systemHealth.services?.detection || 'Degraded'})`}
+                </span>
+              </div>
+              <div style={{ marginBottom: '10px' }}>Automated Threat Engine</div>
+            </>
+          )}
+          <ThemeToggle theme={theme} onToggle={toggleTheme} collapsed={sidebarCollapsed} />
+        </div>
       </aside>
 
       {/* 2. Main Content Workspace */}
       <main className="main-content">
         {/* Minimal Top Bar */}
-        <header style={{ backgroundColor: '#0d1322', borderBottom: '1px solid #1e293b', padding: '10px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: '0.82rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ color: '#64748b' }}>PhishLens</span>
-            <span style={{ color: '#334155' }}>/</span>
-            <span style={{ color: '#f8fafc', fontWeight: 600, textTransform: 'capitalize' }}>{activeNav}</span>
+        <header style={{ backgroundColor: 'var(--bg-panel)', borderBottom: '1px solid var(--border)', padding: '10px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ color: 'var(--text-dim)' }}>PhishLens</span>
+            <span style={{ color: 'var(--border-strong)' }}>/</span>
+            <span style={{ color: 'var(--text-primary)', fontWeight: 600, textTransform: 'capitalize' }}>{activeNav}</span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: systemHealth.status === 'OPERATIONAL' ? '#10b981' : '#f59e0b' }}>
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: systemHealth.status === 'OPERATIONAL' ? '#10b981' : '#f59e0b' }}></span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: systemHealth.status === 'OPERATIONAL' ? 'var(--success)' : 'var(--warning)' }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: systemHealth.status === 'OPERATIONAL' ? 'var(--success)' : 'var(--warning)' }}></span>
               <span>{systemHealth.status === 'OPERATIONAL' ? 'Systems Operational' : `System Degraded (${systemHealth.services?.detection || 'Degraded'})`}</span>
             </div>
 
             <button
               onClick={loadData}
-              style={{ backgroundColor: '#131b2e', border: '1px solid #1e293b', color: '#94a3b8', borderRadius: '4px', padding: '5px 10px', fontSize: '0.72rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+              style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border)', color: 'var(--text-muted)', borderRadius: '4px', padding: '5px 10px', fontSize: '0.72rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
             >
               <RefreshCw size={13} /> Sync
             </button>
@@ -264,33 +270,33 @@ export default function Dashboard() {
           {activeNav === 'overview' && (
             <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div>
-                <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#f8fafc' }}>Security Overview</h2>
-                <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '2px' }}>
+                <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>Security Overview</h2>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
                   Monitor active threats, campaigns and protected identities.
                 </div>
               </div>
 
               {/* Compact Metrics */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px' }}>
-                <div style={{ backgroundColor: '#131b2e', borderRadius: '6px', border: '1px solid #1e293b', padding: '12px' }}>
-                  <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Total Cases</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#f8fafc', marginTop: '2px' }}>{totalThreats}</div>
+                <div style={{ backgroundColor: 'var(--bg-surface)', borderRadius: '6px', border: '1px solid var(--border)', padding: '12px' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>Total Cases</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>{totalThreats}</div>
                 </div>
-                <div style={{ backgroundColor: '#131b2e', borderRadius: '6px', border: '1px solid #1e293b', padding: '12px' }}>
-                  <div style={{ fontSize: '0.7rem', color: '#64748b' }}>High Risk</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#ef4444', marginTop: '2px' }}>{highRiskCount}</div>
+                <div style={{ backgroundColor: 'var(--bg-surface)', borderRadius: '6px', border: '1px solid var(--border)', padding: '12px' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>High Risk</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--danger)', marginTop: '2px' }}>{highRiskCount}</div>
                 </div>
-                <div style={{ backgroundColor: '#131b2e', borderRadius: '6px', border: '1px solid #1e293b', padding: '12px' }}>
-                  <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Active Campaigns</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#8b5cf6', marginTop: '2px' }}>{activeCampaignsCount}</div>
+                <div style={{ backgroundColor: 'var(--bg-surface)', borderRadius: '6px', border: '1px solid var(--border)', padding: '12px' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>Active Campaigns</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--violet)', marginTop: '2px' }}>{activeCampaignsCount}</div>
                 </div>
-                <div style={{ backgroundColor: '#131b2e', borderRadius: '6px', border: '1px solid #1e293b', padding: '12px' }}>
-                  <div style={{ fontSize: '0.7rem', color: '#64748b' }}>VIP Threats</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#f59e0b', marginTop: '2px' }}>{vipAttacksCount}</div>
+                <div style={{ backgroundColor: 'var(--bg-surface)', borderRadius: '6px', border: '1px solid var(--border)', padding: '12px' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>VIP Threats</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--warning)', marginTop: '2px' }}>{vipAttacksCount}</div>
                 </div>
-                <div style={{ backgroundColor: '#131b2e', borderRadius: '6px', border: '1px solid #1e293b', padding: '12px' }}>
-                  <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Response Actions</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#10b981', marginTop: '2px' }}>{quarantinedCount}</div>
+                <div style={{ backgroundColor: 'var(--bg-surface)', borderRadius: '6px', border: '1px solid var(--border)', padding: '12px' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>Response Actions</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--success)', marginTop: '2px' }}>{quarantinedCount}</div>
                 </div>
               </div>
 

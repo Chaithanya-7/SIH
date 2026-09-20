@@ -916,7 +916,13 @@ app.get('/api/vips', (req, res) => {
 
 // ==================== AUDIT LOGS API ====================
 app.get('/api/audit', (req, res) => {
-    res.json({ success: true, events: auditLogger.getAllEvents() });
+    res.json({
+        success: true,
+        events: auditLogger.getAllEvents(),
+        // Surfaced with the events themselves: a log whose chain is broken
+        // should never be read as though it were trustworthy.
+        integrity: auditLogger.getIntegrityStatus()
+    });
 });
 
 // ==================== ACTIVE DISRUPTION & REMEDIATION APIs ====================

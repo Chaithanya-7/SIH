@@ -119,10 +119,10 @@ export default function AdminQuarantineQueue({ currentUser, currentOrg, onRefres
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Lock size={18} color="#ef4444" /> Admin Quarantine & Review Queue
+          <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Lock size={18} color="var(--danger)" /> Admin Quarantine & Review Queue
           </h2>
-          <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '2px' }}>
+          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
             Organization-isolated threat containment queue and evidence-backed decision center ({currentOrg?.name || 'My Org'}).
           </div>
         </div>
@@ -130,7 +130,7 @@ export default function AdminQuarantineQueue({ currentUser, currentOrg, onRefres
         <button
           onClick={fetchQueueData}
           disabled={loading}
-          style={{ backgroundColor: '#131b2e', border: '1px solid #1e293b', color: '#94a3b8', borderRadius: '4px', padding: '6px 12px', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+          style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border)', color: 'var(--text-muted)', borderRadius: '4px', padding: '6px 12px', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
         >
           <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh Queue
         </button>
@@ -138,17 +138,17 @@ export default function AdminQuarantineQueue({ currentUser, currentOrg, onRefres
 
       {/* Scope Authorization Alert Banner */}
       {!scopeStatus.hasModifyScope && scopeStatus.reauthUrl && (
-        <div style={{ backgroundColor: 'rgba(245, 158, 11, 0.12)', border: '1px solid #f59e0b', borderRadius: '6px', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ backgroundColor: 'var(--tint-warning)', border: '1px solid var(--warning)', borderRadius: '6px', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Key size={18} color="#f59e0b" />
+            <Key size={18} color="var(--warning)" />
             <div>
-              <div style={{ fontWeight: 700, fontSize: '0.82rem', color: '#f8fafc' }}>Gmail Modify Permission Required</div>
-              <div style={{ fontSize: '0.74rem', color: '#cbd5e1' }}>PhishLens needs permission to contain and restore high-risk messages in your connected Gmail mailbox.</div>
+              <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-primary)' }}>Gmail Modify Permission Required</div>
+              <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>PhishLens needs permission to contain and restore high-risk messages in your connected Gmail mailbox.</div>
             </div>
           </div>
           <a
             href={scopeStatus.reauthUrl}
-            style={{ backgroundColor: '#f59e0b', color: '#000', textDecoration: 'none', fontWeight: 700, padding: '6px 12px', borderRadius: '4px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+            style={{ backgroundColor: 'var(--warning)', color: '#000', textDecoration: 'none', fontWeight: 700, padding: '6px 12px', borderRadius: '4px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px' }}
           >
             Upgrade Scope <ArrowRight size={13} />
           </a>
@@ -156,7 +156,7 @@ export default function AdminQuarantineQueue({ currentUser, currentOrg, onRefres
       )}
 
       {/* Filter Tabs */}
-      <div style={{ display: 'flex', gap: '6px', borderBottom: '1px solid #1e293b', paddingBottom: '8px' }}>
+      <div style={{ display: 'flex', gap: '6px', borderBottom: '1px solid var(--border)', paddingBottom: '8px' }}>
         {[
           { id: 'pending', label: `Pending Review (${cases.filter(c => c.review?.status === 'PENDING_ADMIN').length})` },
           { id: 'high_risk', label: 'High Risk' },
@@ -169,9 +169,9 @@ export default function AdminQuarantineQueue({ currentUser, currentOrg, onRefres
             key={tab.id}
             onClick={() => setFilter(tab.id)}
             style={{
-              backgroundColor: filter === tab.id ? '#1e293b' : 'transparent',
-              color: filter === tab.id ? '#3b82f6' : '#94a3b8',
-              border: filter === tab.id ? '1px solid #3b82f6' : '1px solid transparent',
+              backgroundColor: filter === tab.id ? 'var(--border)' : 'transparent',
+              color: filter === tab.id ? 'var(--accent)' : 'var(--text-muted)',
+              border: filter === tab.id ? '1px solid var(--accent)' : '1px solid transparent',
               borderRadius: '4px',
               padding: '6px 12px',
               fontSize: '0.75rem',
@@ -185,10 +185,10 @@ export default function AdminQuarantineQueue({ currentUser, currentOrg, onRefres
       </div>
 
       {/* Queue Table */}
-      <div style={{ backgroundColor: '#131b2e', borderRadius: '6px', border: '1px solid #1e293b', overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.76rem', color: '#94a3b8', textAlign: 'left' }}>
+      <div style={{ backgroundColor: 'var(--bg-surface)', borderRadius: '6px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.76rem', color: 'var(--text-muted)', textAlign: 'left' }}>
           <thead>
-            <tr style={{ backgroundColor: '#0d1322', borderBottom: '1px solid #1e293b', color: '#64748b', textTransform: 'uppercase', fontSize: '0.68rem', fontWeight: 600 }}>
+            <tr style={{ backgroundColor: 'var(--bg-panel)', borderBottom: '1px solid var(--border)', color: 'var(--text-dim)', textTransform: 'uppercase', fontSize: '0.68rem', fontWeight: 600 }}>
               <th style={{ padding: '10px 14px' }}>Case ID</th>
               <th style={{ padding: '10px 14px' }}>Sender</th>
               <th style={{ padding: '10px 14px' }}>Subject</th>
@@ -202,7 +202,7 @@ export default function AdminQuarantineQueue({ currentUser, currentOrg, onRefres
           <tbody>
             {filteredCases.length === 0 ? (
               <tr>
-                <td colSpan="8" style={{ padding: '32px', textAlign: 'center', color: '#64748b' }}>
+                <td colSpan="8" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-dim)' }}>
                   No cases found in this queue section.
                 </td>
               </tr>
@@ -214,14 +214,14 @@ export default function AdminQuarantineQueue({ currentUser, currentOrg, onRefres
                 const isFailed = c.mailbox?.status === 'ACTION_FAILED';
 
                 return (
-                  <tr key={c.case_id} style={{ borderBottom: '1px solid #1e293b' }}>
-                    <td style={{ padding: '10px 14px', fontWeight: 700, color: '#3b82f6' }} className="font-mono">{c.case_id}</td>
-                    <td style={{ padding: '10px 14px', color: '#f8fafc' }}>{c.message?.sender}</td>
-                    <td style={{ padding: '10px 14px', color: '#cbd5e1' }}>{c.message?.subject}</td>
+                  <tr key={c.case_id} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '10px 14px', fontWeight: 700, color: 'var(--accent)' }} className="font-mono">{c.case_id}</td>
+                    <td style={{ padding: '10px 14px', color: 'var(--text-primary)' }}>{c.message?.sender}</td>
+                    <td style={{ padding: '10px 14px', color: 'var(--text-secondary)' }}>{c.message?.subject}</td>
                     <td style={{ padding: '10px 14px' }}>
                       <span style={{
-                        backgroundColor: c.detection?.verdict === 'HIGH_RISK' ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)',
-                        color: c.detection?.verdict === 'HIGH_RISK' ? '#ef4444' : '#f59e0b',
+                        backgroundColor: c.detection?.verdict === 'HIGH_RISK' ? 'var(--tint-danger)' : 'var(--tint-warning)',
+                        color: c.detection?.verdict === 'HIGH_RISK' ? 'var(--danger)' : 'var(--warning)',
                         fontWeight: 700, padding: '2px 6px', borderRadius: '4px', fontSize: '0.65rem'
                       }}>
                         {c.detection?.verdict}
@@ -229,20 +229,20 @@ export default function AdminQuarantineQueue({ currentUser, currentOrg, onRefres
                     </td>
                     <td style={{ padding: '10px 14px' }}>
                       <span style={{
-                        backgroundColor: isQuarantined ? 'rgba(239,68,68,0.15)' : isReleased ? 'rgba(16,185,129,0.15)' : isFailed ? 'rgba(245,158,11,0.15)' : 'rgba(100,116,139,0.15)',
-                        color: isQuarantined ? '#ef4444' : isReleased ? '#10b981' : isFailed ? '#f59e0b' : '#94a3b8',
+                        backgroundColor: isQuarantined ? 'var(--tint-danger)' : isReleased ? 'var(--tint-success)' : isFailed ? 'var(--tint-warning)' : 'var(--tint-neutral)',
+                        color: isQuarantined ? 'var(--danger)' : isReleased ? 'var(--success)' : isFailed ? 'var(--warning)' : 'var(--text-muted)',
                         fontWeight: 700, padding: '2px 6px', borderRadius: '4px', fontSize: '0.65rem'
                       }}>
                         {c.mailbox?.status || 'INBOX'}
                       </span>
                     </td>
                     <td style={{ padding: '10px 14px' }}>
-                      <span style={{ color: isConfirmed ? '#ef4444' : isReleased ? '#10b981' : '#f59e0b', fontWeight: 600 }}>
+                      <span style={{ color: isConfirmed ? 'var(--danger)' : isReleased ? 'var(--success)' : 'var(--warning)', fontWeight: 600 }}>
                         {c.review?.status}
                       </span>
                     </td>
                     <td style={{ padding: '10px 14px' }}>
-                      <span style={{ color: c.provider_action?.status === 'PROVIDER_CONFIRMED' ? '#10b981' : '#64748b', fontSize: '0.7rem' }}>
+                      <span style={{ color: c.provider_action?.status === 'PROVIDER_CONFIRMED' ? 'var(--success)' : 'var(--text-dim)', fontSize: '0.7rem' }}>
                         {c.provider_action?.status || 'NOT_REQUESTED'}
                       </span>
                     </td>
@@ -251,7 +251,7 @@ export default function AdminQuarantineQueue({ currentUser, currentOrg, onRefres
                         {!isReleased && (
                           <button
                             onClick={() => handleOpenRelease(c)}
-                            style={{ backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer' }}
+                            style={{ backgroundColor: 'var(--success)', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer' }}
                           >
                             Release
                           </button>
@@ -259,7 +259,7 @@ export default function AdminQuarantineQueue({ currentUser, currentOrg, onRefres
                         {!isConfirmed && (
                           <button
                             onClick={() => handleOpenConfirm(c)}
-                            style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer' }}
+                            style={{ backgroundColor: 'var(--danger)', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer' }}
                           >
                             Confirm Threat
                           </button>
@@ -277,20 +277,20 @@ export default function AdminQuarantineQueue({ currentUser, currentOrg, onRefres
       {/* RELEASE MODAL */}
       {releaseModalOpen && selectedCase && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div style={{ backgroundColor: '#131b2e', border: '1px solid #1e293b', borderRadius: '8px', width: '100%', maxWidth: '480px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <h3 style={{ margin: 0, fontSize: '1rem', color: '#f8fafc', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <CheckCircle size={18} color="#10b981" /> Release Quarantined Email
+          <div style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: '8px', width: '100%', maxWidth: '480px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <h3 style={{ margin: 0, fontSize: '1rem', color: 'var(--text-primary)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <CheckCircle size={18} color="var(--success)" /> Release Quarantined Email
             </h3>
-            <div style={{ fontSize: '0.76rem', color: '#94a3b8' }}>
+            <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
               This will instruct Gmail to remove the quarantine label and restore the email to the recipient's INBOX. Provider state will be verified upon completion.
             </div>
 
             <div>
-              <label style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Release Decision Reason (Required)</label>
+              <label style={{ fontSize: '0.72rem', color: 'var(--text-dim)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Release Decision Reason (Required)</label>
               <select
                 value={decisionReason}
                 onChange={(e) => setDecisionReason(e.target.value)}
-                style={{ width: '100%', backgroundColor: '#0d1322', border: '1px solid #1e293b', color: '#f8fafc', borderRadius: '4px', padding: '8px', fontSize: '0.78rem' }}
+                style={{ width: '100%', backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border)', color: 'var(--text-primary)', borderRadius: '4px', padding: '8px', fontSize: '0.78rem' }}
               >
                 <option value="FALSE_POSITIVE">False Positive - Legitimate Sender</option>
                 <option value="TRUSTED_SENDER">Trusted Partner / Sender Address</option>
@@ -300,17 +300,17 @@ export default function AdminQuarantineQueue({ currentUser, currentOrg, onRefres
             </div>
 
             <div>
-              <label style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Analyst Notes (Optional)</label>
+              <label style={{ fontSize: '0.72rem', color: 'var(--text-dim)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Analyst Notes (Optional)</label>
               <textarea
                 value={adminNote}
                 onChange={(e) => setAdminNote(e.target.value)}
                 placeholder="Enter justification notes for audit log..."
-                style={{ width: '100%', height: '60px', backgroundColor: '#0d1322', border: '1px solid #1e293b', color: '#f8fafc', borderRadius: '4px', padding: '8px', fontSize: '0.78rem' }}
+                style={{ width: '100%', height: '60px', backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border)', color: 'var(--text-primary)', borderRadius: '4px', padding: '8px', fontSize: '0.78rem' }}
               />
             </div>
 
             {actionProgress && (
-              <div style={{ fontSize: '0.74rem', fontWeight: 600, color: actionProgress === 'FAILED' ? '#ef4444' : '#3b82f6', backgroundColor: '#0d1322', padding: '8px', borderRadius: '4px' }}>
+              <div style={{ fontSize: '0.74rem', fontWeight: 600, color: actionProgress === 'FAILED' ? 'var(--danger)' : 'var(--accent)', backgroundColor: 'var(--bg-panel)', padding: '8px', borderRadius: '4px' }}>
                 {actionProgress === 'REQUESTING' && 'Sending release request to Gmail API...'}
                 {actionProgress === 'VERIFYING' && 'Verifying Gmail provider read-back state...'}
                 {actionProgress === 'SUCCESS' && '✓ Release verified! Message restored to INBOX.'}
@@ -322,14 +322,14 @@ export default function AdminQuarantineQueue({ currentUser, currentOrg, onRefres
               <button
                 onClick={() => setReleaseModalOpen(false)}
                 disabled={actionProgress === 'REQUESTING' || actionProgress === 'VERIFYING'}
-                style={{ backgroundColor: 'transparent', border: '1px solid #1e293b', color: '#94a3b8', padding: '6px 12px', borderRadius: '4px', fontSize: '0.75rem', cursor: 'pointer' }}
+                style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-muted)', padding: '6px 12px', borderRadius: '4px', fontSize: '0.75rem', cursor: 'pointer' }}
               >
                 Cancel
               </button>
               <button
                 onClick={handleExecuteRelease}
                 disabled={actionProgress === 'REQUESTING' || actionProgress === 'VERIFYING'}
-                style={{ backgroundColor: '#10b981', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                style={{ backgroundColor: 'var(--success)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
               >
                 {actionProgress ? 'Processing...' : 'Confirm & Release'}
               </button>
@@ -341,20 +341,20 @@ export default function AdminQuarantineQueue({ currentUser, currentOrg, onRefres
       {/* CONFIRM THREAT MODAL */}
       {confirmModalOpen && selectedCase && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div style={{ backgroundColor: '#131b2e', border: '1px solid #1e293b', borderRadius: '8px', width: '100%', maxWidth: '480px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <h3 style={{ margin: 0, fontSize: '1rem', color: '#f8fafc', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <ShieldAlert size={18} color="#ef4444" /> Confirm Malicious Threat
+          <div style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: '8px', width: '100%', maxWidth: '480px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <h3 style={{ margin: 0, fontSize: '1rem', color: 'var(--text-primary)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ShieldAlert size={18} color="var(--danger)" /> Confirm Malicious Threat
             </h3>
-            <div style={{ fontSize: '0.76rem', color: '#94a3b8' }}>
+            <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
               This confirms the email as a malicious threat. The message will remain in verified Gmail quarantine and review status will be updated to CONFIRMED_THREAT.
             </div>
 
             <div>
-              <label style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Threat Classification Reason</label>
+              <label style={{ fontSize: '0.72rem', color: 'var(--text-dim)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Threat Classification Reason</label>
               <select
                 value={decisionReason}
                 onChange={(e) => setDecisionReason(e.target.value)}
-                style={{ width: '100%', backgroundColor: '#0d1322', border: '1px solid #1e293b', color: '#f8fafc', borderRadius: '4px', padding: '8px', fontSize: '0.78rem' }}
+                style={{ width: '100%', backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border)', color: 'var(--text-primary)', borderRadius: '4px', padding: '8px', fontSize: '0.78rem' }}
               >
                 <option value="MALICIOUS_PHISH">Credential Phishing Attack</option>
                 <option value="BEC_EXECUTIVE_IMPERSONATION">BEC / Executive Impersonation</option>
@@ -364,17 +364,17 @@ export default function AdminQuarantineQueue({ currentUser, currentOrg, onRefres
             </div>
 
             <div>
-              <label style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, display: 'block', marginBottom: '4px' }}>SOC Notes (Optional)</label>
+              <label style={{ fontSize: '0.72rem', color: 'var(--text-dim)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>SOC Notes (Optional)</label>
               <textarea
                 value={adminNote}
                 onChange={(e) => setAdminNote(e.target.value)}
                 placeholder="Enter threat analysis summary for audit log..."
-                style={{ width: '100%', height: '60px', backgroundColor: '#0d1322', border: '1px solid #1e293b', color: '#f8fafc', borderRadius: '4px', padding: '8px', fontSize: '0.78rem' }}
+                style={{ width: '100%', height: '60px', backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border)', color: 'var(--text-primary)', borderRadius: '4px', padding: '8px', fontSize: '0.78rem' }}
               />
             </div>
 
             {actionProgress && (
-              <div style={{ fontSize: '0.74rem', fontWeight: 600, color: actionProgress === 'FAILED' ? '#ef4444' : '#10b981', backgroundColor: '#0d1322', padding: '8px', borderRadius: '4px' }}>
+              <div style={{ fontSize: '0.74rem', fontWeight: 600, color: actionProgress === 'FAILED' ? 'var(--danger)' : 'var(--success)', backgroundColor: 'var(--bg-panel)', padding: '8px', borderRadius: '4px' }}>
                 {actionProgress === 'REQUESTING' && 'Updating review status...'}
                 {actionProgress === 'SUCCESS' && '✓ Threat confirmed! Case review status updated.'}
                 {actionProgress === 'FAILED' && `✕ Action Failed: ${actionError}`}
@@ -384,13 +384,13 @@ export default function AdminQuarantineQueue({ currentUser, currentOrg, onRefres
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '10px' }}>
               <button
                 onClick={() => setConfirmModalOpen(false)}
-                style={{ backgroundColor: 'transparent', border: '1px solid #1e293b', color: '#94a3b8', padding: '6px 12px', borderRadius: '4px', fontSize: '0.75rem', cursor: 'pointer' }}
+                style={{ backgroundColor: 'transparent', border: '1px solid var(--border)', color: 'var(--text-muted)', padding: '6px 12px', borderRadius: '4px', fontSize: '0.75rem', cursor: 'pointer' }}
               >
                 Cancel
               </button>
               <button
                 onClick={handleExecuteConfirmThreat}
-                style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                style={{ backgroundColor: 'var(--danger)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
               >
                 {actionProgress ? 'Processing...' : 'Confirm Threat'}
               </button>

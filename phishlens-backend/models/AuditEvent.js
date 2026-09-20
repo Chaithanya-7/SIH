@@ -9,6 +9,12 @@ class AuditEvent {
         this.previous_state = data.previous_state || null;
         this.resulting_state = data.resulting_state || null;
         this.timestamp = data.timestamp || new Date().toISOString();
+
+        // Chain fields, assigned by auditLogger when the entry is written.
+        // Present on the model so a stored entry round-trips with them intact.
+        this.sequence = data.sequence ?? null;
+        this.previous_hash = data.previous_hash || null;
+        this.entry_hash = data.entry_hash || null;
     }
 }
 
