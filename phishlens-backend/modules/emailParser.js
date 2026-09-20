@@ -36,6 +36,13 @@ class EmailParser {
             subject: parsed.subject || '',
             date: parsed.date ? parsed.date.toISOString() : null,
             messageId: parsed.messageId || null,
+            // Thread headers (RFC 5322 §3.6.4). Parsed all along and discarded
+            // here, which meant nothing downstream could tell a genuine reply
+            // from a message that merely claims to be one.
+            inReplyTo: parsed.inReplyTo || null,
+            references: Array.isArray(parsed.references)
+                ? parsed.references
+                : (parsed.references ? [parsed.references] : []),
             textBody: parsed.text || '',
             htmlBody: typeof parsed.html === 'string' ? parsed.html : '',
             authenticationResultsRaw,

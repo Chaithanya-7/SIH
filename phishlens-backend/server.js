@@ -14,6 +14,7 @@ const mqlBridge = require('./modules/mqlBridge');
 const authAnalyzer = require('./modules/authAnalyzer');
 const arcAnalyzer = require('./modules/arcAnalyzer');
 const textDeception = require('./modules/textDeception');
+const threadIntegrity = require('./modules/threadIntegrity');
 const qrAnalyzer = require('./modules/qrAnalyzer');
 const forensicEngine = require('./modules/forensicEngine');
 const attachmentAnalyzer = require('./modules/attachmentAnalyzer');
@@ -221,6 +222,13 @@ async function processPipeline(emailContent, source = 'MANUAL_API', clientMessag
         //     not hide characters inside words.
         threatObject = textDeception.analyze(threatObject, parsedEmail);
 
+        // 6c. Conversation integrity. The one check AI fluency cannot help an
+        //     attacker with: in a hijacked thread the prose is genuinely
+        //     perfect, because it is a real conversation. What is wrong is
+        //     structural - who the reply came from, and whether the thread it
+        //     claims to continue ever happened here.
+        threatObject = threadIntegrity.analyze(threatObject, parsedEmail);
+
         // 7. Explainable NLP / social-engineering signal analysis
         threatObject = nlpAnalyzer.analyze(threatObject, parsedEmail);
 
@@ -286,6 +294,10 @@ async function processPipeline(emailContent, source = 'MANUAL_API', clientMessag
         //     adaptive model the characteristics that made this message malicious
         //     so later messages sharing them are recognised.
         behavioralAnalyzer.recordObservation(threatObject, parsedEmail);
+        // Recorded after the verdict and never for high-risk mail: indexing a
+        // hijacker's address as a legitimate thread participant would make the
+        // next message in that conversation look normal.
+        threadIntegrity.record(threatObject, parsedEmail);
         adaptiveLearning.learnFromDetection(threatObject, parsedEmail);
 
         console.log(`🎉 AUTOMATED PIPELINE COMPLETE! Case ID: ${threatObject.case_id} | Verdict: ${threatObject.detection.verdict} | Threat Confidence: ${threatObject.confidence.threat} | Remediation: ${threatObject.remediation.status}`);

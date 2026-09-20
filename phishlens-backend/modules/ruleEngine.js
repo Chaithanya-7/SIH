@@ -191,6 +191,71 @@ const RULES = [
     },
 
     // ---------------------------------------------------------------
+    // CONVERSATION INTEGRITY  (family: BEHAVIOURAL)
+    //
+    // In a hijacked thread the writing is genuinely flawless, because it is a
+    // real conversation with real history quoted underneath. No amount of
+    // language analysis will find fault with it. What is wrong is who the
+    // reply came from.
+    // ---------------------------------------------------------------
+    {
+        id: 'MQL-THREAD-101',
+        name: 'Reply arrives from a lookalike of an address already in the thread',
+        category: 'THREAD',
+        severity: 'HIGH',
+        confidence: 0.80,
+        mitre: ['T1566', 'T1586'],
+        source: 'MITRE ATT&CK T1566 (Phishing), T1586 (Compromise Accounts); RFC 5322 §3.6.4 (Identification Fields)',
+        description: 'This message continues a conversation PhishLens has seen before, and arrives from an address whose domain is a near-match for one already taking part. That is a correspondent being impersonated inside their own thread. The message text is no help here - the conversation is real, quoted underneath, with real names and real history.',
+        test: (ctx) => {
+            const finding = (ctx.thread.findings || []).find(f => f.type === 'LOOKALIKE_IDENTITY_IN_THREAD');
+            return finding && finding.detail;
+        }
+    },
+    {
+        id: 'MQL-THREAD-104',
+        name: 'New participant in a long-running conversation',
+        category: 'THREAD',
+        severity: 'MEDIUM',
+        confidence: 0.40,
+        mitre: ['T1566'],
+        source: 'MITRE ATT&CK T1566 (Phishing); RFC 5322 §3.6.4 (Identification Fields)',
+        description: 'An address that has not taken part in this conversation before has replied to it. People are added to threads constantly, so this is weak on its own and is scored accordingly - it is context for an analyst, not an accusation.',
+        test: (ctx) => {
+            const finding = (ctx.thread.findings || []).find(f => f.type === 'NEW_IDENTITY_IN_ESTABLISHED_THREAD');
+            return finding && finding.detail;
+        }
+    },
+    {
+        id: 'MQL-THREAD-102',
+        name: 'Authentication changed partway through a conversation',
+        category: 'THREAD',
+        severity: 'HIGH',
+        confidence: 0.75,
+        mitre: ['T1566', 'T1586'],
+        source: 'MITRE ATT&CK T1566 (Phishing), T1586 (Compromise Accounts); RFC 7489 (DMARC)',
+        description: 'Every earlier message in this thread authenticated correctly and this one does not. A correspondent whose mail has always passed DMARC does not usually start failing it mid-conversation; a reply injected from outside the original correspondence does exactly that. The earlier messages are what make this meaningful - they establish what this correspondent normally looks like.',
+        test: (ctx) => {
+            const finding = (ctx.thread.findings || []).find(f => f.type === 'AUTHENTICATION_CHANGED_MID_THREAD');
+            return finding && finding.detail;
+        }
+    },
+    {
+        id: 'MQL-THREAD-103',
+        name: 'Subject claims to be a reply but carries no thread headers',
+        category: 'THREAD',
+        severity: 'MEDIUM',
+        confidence: 0.55,
+        mitre: ['T1566'],
+        source: 'MITRE ATT&CK T1566 (Phishing); RFC 5322 §3.6.4 (Identification Fields)',
+        description: 'The subject begins "Re:" or "Fwd:", but the message carries neither In-Reply-To nor References. Mail clients write those headers when a person replies; a message that presents itself as part of an existing exchange without them is borrowing the credibility of a conversation that left no trace.',
+        test: (ctx) => {
+            const finding = (ctx.thread.findings || []).find(f => f.type === 'REPLY_WITHOUT_THREAD_HEADERS');
+            return finding && finding.detail;
+        }
+    },
+
+    // ---------------------------------------------------------------
     // TEXT DECEPTION  (family: LANGUAGE)
     //
     // Characters chosen so the message reads one way to a person and another
@@ -812,6 +877,7 @@ class RuleEngine {
             domainAges: threatObject.threat_intelligence?.domain_ages || [],
             qr: threatObject.qr || { codes: [], codes_found: 0, not_scanned: [] },
             deception: threatObject.text_deception || { hidden_characters: [], mixed_script_words: [] },
+            thread: threatObject.thread || { findings: [] },
             arc: threatObject.forensics?.arc || { status: 'ABSENT' }
         };
     }

@@ -1229,3 +1229,73 @@ and zero-width injection through the body, run through the real pipeline:
   CREDENTIAL_REQUEST both fired, which they could not have done before
 
 **200 backend tests** (was 186).
+
+## 2026-09-20 — Thread hijacking: the case where reading the message cannot help
+
+The strongest remaining gap, and the clearest answer to "attackers use AI to
+write convincingly". In a hijacked thread the prose is genuinely flawless,
+because it is a real conversation — quoted underneath, real names, real history.
+No language model finds fault with it and no urgency heuristic applies. What is
+wrong is who replied.
+
+### The headers were parsed and thrown away
+
+`mailparser` supplies `inReplyTo` and `references`; `emailParser` mapped neither
+through. Nothing downstream could tell a genuine reply from a message that
+merely claims to be one.
+
+### Four shapes, weighted by how often they are what they look like
+
+**A reply from a lookalike of an address already in the thread** (HIGH). A
+correspondent being impersonated inside their own conversation.
+
+**Authentication that changes partway through** (HIGH). Mail from this sender in
+this thread has passed DMARC before and this message does not. The earlier
+messages are what make it meaningful — they establish what this correspondent
+normally looks like.
+
+**"Re:" with no thread headers at all** (MEDIUM). Clients write In-Reply-To when
+a person replies; presenting a message as part of an exchange without them
+borrows the credibility of a conversation that left no trace.
+
+**A new participant in a long-running thread** (MEDIUM, confidence 0.40).
+Deliberately weak.
+
+### Two bugs my own test found, not code review
+
+**It accused a supplier of hijacking their own reply.** The first version
+flagged any participant not seen before. In a two-party exchange the *second
+message is always from somebody new* — so the rule fired on Sam's perfectly
+ordinary first reply. What matters is not that a participant is new but which
+one. Reworked so a new address only matters when it resembles one already
+present, or when the thread is genuinely established.
+
+**The lookalike comparison missed the most obvious hijack there is.** Comparing
+whole domains, `supplier.example` and `supplier-invoices.test` are eleven edits
+apart — the entire suffix differs — so it scored below every threshold. The
+impersonation lives in the *label*, and comparing `supplier` against
+`supplier-invoices` makes it plain. That fix depends on the Public Suffix List
+added earlier, which is what resolves the label correctly.
+
+Three lookalike shapes now caught: a domain built around a participant's name
+(`supplier-invoices.test`), a single-character substitution (`suppiier`), and
+the same name on a different suffix (`supplier.test`).
+
+### Never learn from the attack
+
+A high-risk message is never recorded as a thread participant. Indexing a
+hijacker's address as legitimate would make the *next* message in that
+conversation look entirely normal — the attack would teach the system to accept
+it. Asserted by a test rather than left to comment.
+
+### What the index holds
+
+Message ids, the sending identity, and how each message authenticated. No
+subjects and no bodies. It answers "has this conversation happened here", and is
+not a second copy of the mail. Oldest threads are dropped past five thousand.
+
+Its limitation is reported on every case: thread history covers only what this
+installation has observed, so a newly deployed system knows no conversations and
+these signals strengthen over time.
+
+**212 backend tests** (was 200).
