@@ -15,6 +15,13 @@ import GlobalThreatMap from './GlobalThreatMap';
  * rather than rendering an impressive-looking chart of nothing.
  */
 
+const VERDICT_STYLE = {
+    HIGH_RISK: { label: 'Dangerous', colour: 'var(--danger)', tint: 'var(--tint-danger)' },
+    SUSPICIOUS: { label: 'Suspicious', colour: 'var(--warning)', tint: 'var(--tint-warning)' },
+    SAFE: { label: 'Looks fine', colour: 'var(--success)', tint: 'var(--tint-success)' },
+    UNKNOWN: { label: 'Not classified', colour: 'var(--text-dim)', tint: 'var(--tint-neutral)' }
+};
+
 const SEVERITY_COLOUR = {
     CRITICAL: 'var(--danger)',
     HIGH: 'var(--danger)',
@@ -55,7 +62,122 @@ function Panel({ title, subtitle, children, padded = true }) {
     );
 }
 
-export default function OperationsOverview() {
+/**
+ * Every message that has been examined, on the page that claims to be the
+ * overview.
+ *
+ * The overview reported six totals and then moved on to charts, so the one
+ * question those totals invite - which emails are they? - was the one thing it
+ * would not show. The counts and this list now come from the same cases.
+ */
+function EveryEmail({ cases, onOpenCase }) {
+    const [filter, setFilter] = useState('ALL');
+
+    const ordered = React.useMemo(() => {
+        const matching = filter === 'ALL'
+            ? cases
+            : cases.filter(c => (c.detection?.verdict || 'UNKNOWN') === filter);
+        return matching.slice().sort((a, b) =>
+            new Date(b.timestamps?.ingested_at || 0) - new Date(a.timestamps?.ingested_at || 0));
+    }, [cases, filter]);
+
+    const tabs = [
+        { id: 'ALL', label: 'All' },
+        { id: 'HIGH_RISK', label: 'Dangerous' },
+        { id: 'SUSPICIOUS', label: 'Suspicious' },
+        { id: 'SAFE', label: 'Looks fine' }
+    ];
+
+    return (
+        <Panel
+            title="Every email examined"
+            subtitle={cases.length + ' in total \u00b7 click any one to see what was found'}
+            padded={false}
+        >
+            <div style={{ display: 'flex', gap: '6px', padding: '10px 16px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
+                {tabs.map(tab => {
+                    const count = tab.id === 'ALL'
+                        ? cases.length
+                        : cases.filter(c => (c.detection?.verdict || 'UNKNOWN') === tab.id).length;
+                    const active = filter === tab.id;
+                    return (
+                        <button
+                            key={tab.id}
+                            onClick={() => setFilter(tab.id)}
+                            style={{
+                                background: active ? 'var(--accent)' : 'var(--bg-surface)',
+                                color: active ? 'var(--text-on-accent)' : 'var(--text-muted)',
+                                border: '1px solid ' + (active ? 'var(--accent)' : 'var(--border)'),
+                                borderRadius: '999px', padding: '4px 12px',
+                                fontSize: '0.73rem', fontWeight: active ? 600 : 500, cursor: 'pointer'
+                            }}
+                        >
+                            {tab.label} ({count})
+                        </button>
+                    );
+                })}
+            </div>
+
+            {ordered.length === 0 ? (
+                <div style={{ padding: '28px 18px', textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.79rem' }}>
+                    {cases.length === 0
+                        ? 'No emails have been examined yet. Connect a mailbox, or use "Check an email" to try one.'
+                        : 'No email has that result.'}
+                </div>
+            ) : (
+                <div style={{ maxHeight: '340px', overflowY: 'auto' }}>
+                    {ordered.map(item => {
+                        const meta = VERDICT_STYLE[item.detection?.verdict] || VERDICT_STYLE.UNKNOWN;
+                        return (
+                            <div
+                                key={item.case_id}
+                                onClick={() => onOpenCase && onOpenCase(item.case_id)}
+                                title="Open the full examination of this email"
+                                style={{
+                                    padding: '10px 16px', borderBottom: '1px solid var(--border)',
+                                    display: 'flex', alignItems: 'center', gap: '12px',
+                                    cursor: onOpenCase ? 'pointer' : 'default'
+                                }}
+                            >
+                                <span style={{
+                                    width: '8px', height: '8px', borderRadius: '50%',
+                                    backgroundColor: meta.colour, flexShrink: 0
+                                }} />
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{
+                                        fontSize: '0.82rem', color: 'var(--text-primary)', fontWeight: 500,
+                                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                                    }}>
+                                        {item.message?.subject || '(no subject)'}
+                                    </div>
+                                    <div style={{
+                                        fontSize: '0.72rem', color: 'var(--text-muted)',
+                                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                                    }}>
+                                        from {item.message?.sender || '(unknown sender)'}
+                                    </div>
+                                </div>
+                                <span style={{
+                                    fontSize: '0.68rem', fontWeight: 700, padding: '3px 9px', borderRadius: '999px',
+                                    background: meta.tint, color: meta.colour, whiteSpace: 'nowrap', flexShrink: 0
+                                }}>
+                                    {meta.label}
+                                </span>
+                                <span style={{ fontSize: '0.7rem', color: 'var(--text-dim)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                                    {item.timestamps?.ingested_at
+                                        ? new Date(item.timestamps.ingested_at).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                                        : ''}
+                                </span>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+        </Panel>
+    );
+}
+
+export default function OperationsOverview({ cases = [], onOpenCase }) {
     const [data, setData] = useState(null);
     const [error, setError] = useState(null);
 
@@ -91,13 +213,15 @@ export default function OperationsOverview() {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                <StatCard label="Messages analysed" value={counts.total} tone="accent" />
-                <StatCard label="High risk" value={counts.high_risk} tone="danger" />
+                <StatCard label="Emails examined" value={counts.total} tone="accent" />
+                <StatCard label="Dangerous" value={counts.high_risk} tone="danger" />
                 <StatCard label="Suspicious" value={counts.suspicious} tone="warning" />
-                <StatCard label="Legitimate" value={counts.safe} tone="success" />
-                <StatCard label="Quarantined" value={counts.quarantined} sub={`${counts.awaiting_review} awaiting review`} />
-                <StatCard label="Campaigns" value={counts.campaigns} sub={`${counts.executive_incidents} executive incident(s)`} />
+                <StatCard label="Looks fine" value={counts.safe} tone="success" />
+                <StatCard label="Held back" value={counts.quarantined} sub={`${counts.awaiting_review} waiting for a decision`} />
+                <StatCard label="Linked attacks" value={counts.campaigns} sub={`${counts.executive_incidents} aimed at a protected person`} />
             </div>
+
+            <EveryEmail cases={cases} onOpenCase={onOpenCase} />
 
             <GlobalThreatMap points={points} coverage={coverage} />
 

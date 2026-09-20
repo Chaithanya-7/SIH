@@ -15,14 +15,16 @@ import AuthModal from './AuthModal';
 import AdminQuarantineQueue from './AdminQuarantineQueue';
 import IngestionCoverageView from './IngestionCoverageView';
 import OperationsOverview from './OperationsOverview';
+import CheckAnEmail from './CheckAnEmail';
+import ReportsView from './ReportsView';
 import IntelligenceStateView from './IntelligenceStateView';
 import ThemeToggle from './ThemeToggle';
 import { useTheme } from '../hooks/useTheme';
-import { User, Building, Mail, Lock, Inbox, Brain } from 'lucide-react';
+import { User, Building, Mail, Lock, Inbox, Brain, Upload, Radar } from 'lucide-react';
 
 export default function Dashboard() {
   const { theme, toggleTheme } = useTheme();
-  const [activeNav, setActiveNav] = useState('investigations');
+  const [activeNav, setActiveNav] = useState('overview');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [cases, setCases] = useState([]);
   const [selectedCase, setSelectedCase] = useState(null);
@@ -138,28 +140,63 @@ export default function Dashboard() {
     }
   }, [cases, deepLinkCaseId]);
 
-  const totalThreats = cases.length;
-  const highRiskCount = cases.filter(c => c.detection?.verdict === 'HIGH_RISK').length;
-  const vipAttacksCount = cases.filter(c => c.executive_context?.is_targeted || c.executive_context?.is_impersonated).length;
-  // Counts where the message actually is, not what was decided about it, so a
-  // simulated run can never inflate it.
-  const quarantinedCount = cases.filter(c => c.mailbox?.status === 'QUARANTINED').length;
-  const activeCampaignsCount = Array.from(new Set(cases.map(c => c.campaign?.campaign_id).filter(Boolean))).length;
+  /**
+   * Open one message from anywhere in the console.
+   *
+   * Selecting a case used to set state that only the page you were already on
+   * could see, so clicking a message on the overview, or a marker on the map,
+   * appeared to do nothing at all. Selecting and navigating together is what
+   * makes those clicks lead somewhere.
+   */
+  const openCase = (caseOrId) => {
+    const id = typeof caseOrId === 'string' ? caseOrId : caseOrId?.case_id;
+    const match = cases.find(c => c.case_id === id);
+    if (match) setSelectedCase(match);
+    else if (id) setDeepLinkCaseId(id);
+    setActiveNav('investigations');
+  };
 
-  const navItems = [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { id: 'connections', label: 'Mailboxes', icon: Inbox },
-    { id: 'investigations', label: 'Investigations', icon: ShieldAlert },
-    { id: 'coverage', label: 'Mail Coverage', icon: Inbox },
-    { id: 'intelligence', label: 'Intelligence State', icon: Brain },
-    { id: 'quarantine', label: 'Quarantine Queue', icon: Lock },
-    { id: 'campaigns', label: 'Campaigns', icon: Network },
-    { id: 'graph', label: 'Intelligence Graph', icon: Network },
-    { id: 'executive', label: 'Executive Protection', icon: UserCheck },
-    { id: 'remediation', label: 'Response', icon: Zap },
-    { id: 'reports', label: 'Reports', icon: FileText },
-    { id: 'audit', label: 'Audit', icon: History }
+  // Grouped, and in the words somebody would use for the thing itself.
+  //
+  // Twelve flat entries, most of them named after the machinery behind them
+  // ("Intelligence State", "Mail Coverage"), gave no sense of what the product
+  // does or where to start. Two of them - Campaigns and Intelligence Graph -
+  // rendered exactly the same component with the same props.
+  const navGroups = [
+    {
+      heading: null,
+      items: [{ id: 'overview', label: 'Overview', icon: LayoutDashboard }]
+    },
+    {
+      heading: 'Your mail',
+      items: [
+        { id: 'upload', label: 'Check an email', icon: Upload },
+        { id: 'connections', label: 'Mailboxes', icon: Inbox },
+        { id: 'investigations', label: 'All emails', icon: Mail },
+        { id: 'coverage', label: 'What is being watched', icon: Radar }
+      ]
+    },
+    {
+      heading: 'What was found',
+      items: [
+        { id: 'campaigns', label: 'Linked attacks', icon: Network },
+        { id: 'intelligence', label: 'Threat data', icon: Brain },
+        { id: 'executive', label: 'Protected people', icon: UserCheck }
+      ]
+    },
+    {
+      heading: 'What was done',
+      items: [
+        { id: 'quarantine', label: 'Held messages', icon: Lock },
+        { id: 'remediation', label: 'Actions taken', icon: Zap },
+        { id: 'reports', label: 'Reports', icon: FileText },
+        { id: 'audit', label: 'Activity log', icon: History }
+      ]
+    }
   ];
+
+  const navItems = navGroups.flatMap(group => group.items);
+  const activeLabel = navItems.find(item => item.id === activeNav)?.label || 'Overview';
 
   return (
     <div className="dashboard-container">
@@ -207,35 +244,53 @@ export default function Dashboard() {
 
         {/* Sidebar Items */}
         <nav style={{ padding: '10px 8px', flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-          {navItems.map(item => {
-            const Icon = item.icon;
-            const isActive = activeNav === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveNav(item.id)}
-                title={sidebarCollapsed ? item.label : undefined}
-                style={{
-                  backgroundColor: isActive ? 'var(--border)' : 'transparent',
-                  color: isActive ? 'var(--accent)' : 'var(--text-muted)',
-                  border: 'none',
-                  borderRadius: '5px',
-                  padding: sidebarCollapsed ? '10px' : '8px 10px',
-                  fontSize: '0.8rem',
-                  fontWeight: isActive ? 600 : 500,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                <Icon size={16} color={isActive ? 'var(--accent)' : 'var(--text-muted)'} />
-                {!sidebarCollapsed && <span>{item.label}</span>}
-              </button>
-            );
-          })}
+          {navGroups.map((group, groupIndex) => (
+            <div key={group.heading || 'primary'} style={{ marginBottom: '6px' }}>
+              {group.heading && !sidebarCollapsed && (
+                <div style={{
+                  fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.07em',
+                  textTransform: 'uppercase', color: 'var(--text-dim)',
+                  padding: '12px 10px 5px'
+                }}>
+                  {group.heading}
+                </div>
+              )}
+              {group.heading && sidebarCollapsed && groupIndex > 0 && (
+                <div style={{ height: '1px', background: 'var(--border)', margin: '8px 6px' }} />
+              )}
+              {group.items.map(item => {
+                const Icon = item.icon;
+                const isActive = activeNav === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveNav(item.id)}
+                    title={sidebarCollapsed ? item.label : undefined}
+                    style={{
+                      width: '100%',
+                      backgroundColor: isActive ? 'var(--border)' : 'transparent',
+                      color: isActive ? 'var(--accent)' : 'var(--text-muted)',
+                      border: 'none',
+                      borderRadius: '5px',
+                      padding: sidebarCollapsed ? '10px' : '8px 10px',
+                      marginBottom: '2px',
+                      fontSize: '0.8rem',
+                      fontWeight: isActive ? 600 : 500,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <Icon size={16} color={isActive ? 'var(--accent)' : 'var(--text-muted)'} />
+                    {!sidebarCollapsed && <span>{item.label}</span>}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         {/* Footer: status and appearance */}
@@ -262,7 +317,7 @@ export default function Dashboard() {
           <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ color: 'var(--text-dim)' }}>PhishLens</span>
             <span style={{ color: 'var(--border-strong)' }}>/</span>
-            <span style={{ color: 'var(--text-primary)', fontWeight: 600, textTransform: 'capitalize' }}>{activeNav}</span>
+            <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{activeLabel}</span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
@@ -285,7 +340,7 @@ export default function Dashboard() {
           {/* OVERVIEW NAV */}
           {activeNav === 'overview' && (
             <div className="animate-fade-in">
-              <OperationsOverview />
+              <OperationsOverview cases={cases} onOpenCase={openCase} />
             </div>
           )}
 
@@ -294,6 +349,12 @@ export default function Dashboard() {
             <div className="desktop-grid animate-fade-in" style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '20px' }}>
               <ThreatFeed cases={cases} selectedCase={selectedCase} onSelectCase={setSelectedCase} />
               <CaseInvestigationView selectedCase={selectedCase} onOpenReport={() => setIsReportModalOpen(true)} />
+            </div>
+          )}
+
+          {activeNav === 'upload' && (
+            <div className="animate-fade-in">
+              <CheckAnEmail onOpenCase={openCase} />
             </div>
           )}
 
@@ -313,13 +374,6 @@ export default function Dashboard() {
 
           {/* CAMPAIGNS NAV */}
           {activeNav === 'campaigns' && (
-            <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <EvidenceGraphView graphData={graphData} currentCaseId={selectedCase?.case_id} />
-            </div>
-          )}
-
-          {/* GRAPH NAV */}
-          {activeNav === 'graph' && (
             <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <EvidenceGraphView graphData={graphData} currentCaseId={selectedCase?.case_id} />
             </div>
@@ -348,8 +402,8 @@ export default function Dashboard() {
 
           {/* REPORTS NAV */}
           {activeNav === 'reports' && (
-            <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <CaseInvestigationView selectedCase={selectedCase} onOpenReport={() => setIsReportModalOpen(true)} />
+            <div className="animate-fade-in">
+              <ReportsView cases={cases} onOpenCase={openCase} />
             </div>
           )}
 

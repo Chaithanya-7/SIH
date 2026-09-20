@@ -1556,3 +1556,131 @@ would risk locking the operator out. It should not ship to anyone.
 hardening suite flagged a `typeof timer.unref === 'function'` guard, the same
 shape that once let a missing method hide silently. Node's timers always carry
 `unref`, so the guard is gone rather than the test weakened.
+
+## 2026-09-20 — Giving the console a shape, and a way to submit an email
+
+Feedback after using the installed application: the interface was "messed up,
+with highly technical terms, no proper arrangements, no proper structure", the
+reports could not be downloaded, and clicking things led nowhere. Behind that
+impression were defects, not only taste.
+
+### There was no way to hand it an email
+
+The first question was how to test it on real mail, and the honest answer was
+that you could not. Live mail arrives through a connected mailbox and everything
+else went through the HTTP API; the console had no upload control at all. A
+search of the whole dashboard for the ingestion endpoint, for a form upload, or
+even for the string `.eml` returned nothing.
+
+There is now a **Check an email** page: drop one or more saved messages, see the
+verdict, the confidence, and the reasons, and click through to the full
+examination. It also explains where a `.eml` file comes from in Gmail, Outlook,
+Apple Mail and Thunderbird, because "export it as .eml" is obvious only to
+people who already knew — and notes that a forwarded copy is not the same
+message, since forwarding rewrites the sender and the delivery records that most
+of the analysis depends on.
+
+### An upload that would have quietly answered SAFE
+
+`/api/ingest/file` takes the raw message as the request body, which is right:
+the bytes that were on disk are the bytes that get hashed. But a file input
+posts `multipart/form-data`, and that envelope *parses* — as a message with no
+headers carrying a single attachment. So the wrong shape did not fail. It
+succeeded, reported `(No Subject)` from `unknown@domain.com`, found nothing to
+object to, and returned **SAFE**.
+
+I walked into this myself while testing, which is the reason to take it
+seriously: a detector that answers SAFE because it was handed the wrong shape is
+worse than one that errors, because nothing downstream can tell the difference.
+The endpoint now recognises a form envelope by its own signature as well as by
+the header and refuses it with a 415 that says what to send instead. Verified
+both ways: 415 for the form, HTTP 200 and HIGH_RISK at 0.99 for the same message
+sent raw.
+
+A second trap sat next to it. The browser sends `Content-Type: message/rfc822`,
+which is not CORS-safelisted and therefore triggers a preflight, so a path that
+works from curl can still fail from a page. Tested from the running console:
+200, HIGH_RISK, sender and subject parsed correctly.
+
+### A correction
+
+While investigating the above I reported that the parser could not read a plain
+`.eml` at all — that it returned SAFE for textbook phishing. That was wrong. The
+second request carried the same `Message-ID` as the first, so deduplication
+correctly returned the case the first, malformed request had created. With a
+fresh `Message-ID` the same message came back HIGH_RISK at 0.91: SPF failure,
+DMARC failure, urgency, account threat, generic greeting, and an infrastructure
+link to the earlier case. The detection engine was working the whole time; the
+idempotency I had built was what disguised my own bad request.
+
+### Two menu entries leading to the same page
+
+`Campaigns` and `Intelligence Graph` rendered the identical component with
+identical props. Twelve flat entries, most named after the machinery behind them
+rather than the thing itself — `Intelligence State`, `Mail Coverage` — gave no
+sense of what the product does or where to begin.
+
+The navigation is now grouped under **Your mail**, **What was found** and **What
+was done**, named in the words somebody would use for the thing itself: "Check
+an email", "All emails", "What is being watched", "Linked attacks", "Held
+messages", "Actions taken", "Activity log". The duplicate is gone. The console
+also opens on the Overview rather than on a case list, and the breadcrumb shows
+the page's name instead of its internal route id.
+
+### Reports that could not be reached
+
+Separately from the download itself, the Reports page rendered the single-case
+detail view bound to whatever had been selected somewhere else. Arriving from
+the sidebar — the ordinary way to arrive — meant nothing was selected, so the
+page was empty and there was no report to download. The reports existed the
+whole time; there was no way to reach one.
+
+Reports is now a list of every examined message, searchable, each with its own
+download button. Confirmed by clicking one in the running console: HTTP 200.
+
+### An overview that would not show what it was counting
+
+The overview reported six totals and moved on to charts, so the one question
+those totals invite — *which emails are they?* — was the one thing it would not
+show. `OperationsOverview` did not even accept the case list.
+
+It now lists every examined email beneath the counts, filterable by result, each
+row clickable. The counts and the list come from the same cases. The headline
+labels are in plain words too: "Emails examined", "Dangerous", "Looks fine",
+"Held back", "Linked attacks".
+
+### Clicks that led nowhere
+
+Selecting a case set state only the current page could read, so clicking a
+message on the overview, or a marker on the map, appeared to do nothing.
+Selecting and navigating are now one action, so a click from anywhere opens that
+message. Verified end to end: clicking an email on the Overview switches to All
+emails, highlights it in the sidebar, updates the breadcrumb and opens the case
+with its evidence.
+
+### Five numbers computed and shown nowhere
+
+`totalThreats`, `highRiskCount`, `vipAttacksCount`, `quarantinedCount` and
+`activeCampaignsCount` were each recomputed on every render and referenced
+exactly once — at their own declaration. Removed; the space they occupied now
+holds the cross-page open.
+
+### Verified, not assumed
+
+Everything above was checked against a running console with real cases in it,
+after a build that succeeded and told me nothing about whether the page drew.
+One reading in the middle of this was a stale screenshot I briefly took for a
+blank page; reading the DOM showed it fully populated. **212 backend tests, 212
+passing.** One earlier run failed on a locked SQLite file — my own test server
+still holding it, not a defect.
+
+### Still true
+
+The sign-in modal still offers a "Demo Identity" that mints a fake Google
+account id. It is the one genuinely fake thing left and it should not ship; it
+stays only because it may be the sole way into the web console and removing it
+blindly risks locking the operator out.
+
+A CORS rejection is returned as a 500 rather than a 403, because the origin
+check signals refusal by throwing. Misleading, but cosmetic, and left alone
+rather than changed in passing.

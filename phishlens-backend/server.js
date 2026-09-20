@@ -760,6 +760,27 @@ app.post('/api/ingest/file', express.text({ type: '*/*', limit: '30mb' }), async
         if (!rawMessage.trim()) {
             return res.status(400).json({ success: false, error: 'Request body must contain the raw message file content' });
         }
+        // A multipart form is refused rather than analysed.
+        //
+        // This endpoint takes the raw message, but a file input posts
+        // multipart/form-data by default, and that envelope *parses* - as a
+        // message with no headers carrying one attachment. So it does not
+        // fail: it succeeds, reports "(No Subject)" from "unknown@domain.com",
+        // finds nothing to object to, and returns SAFE. A phishing detector
+        // that answers SAFE because it was handed the wrong shape is worse
+        // than one that errors, because nothing downstream can tell the
+        // difference. Recognised by the envelope's own signature as well as by
+        // the header, so a caller that sets neither is still caught.
+        const contentType = String(req.headers['content-type'] || '');
+        const looksLikeFormEnvelope = /^--\S+\r?\nContent-Disposition:\s*form-data/i.test(rawMessage);
+        if (contentType.includes('multipart/form-data') || looksLikeFormEnvelope) {
+            return res.status(415).json({
+                success: false,
+                error: 'This endpoint takes the raw message, not a multipart form upload.',
+                hint: 'Send the bytes of the .eml file as the request body with Content-Type: message/rfc822. Posting it as a form field would mean the form envelope is analysed instead of the message inside it.'
+            });
+        }
+
         // A .msg (Outlook OLE) file is a compound binary document, not MIME.
         if (rawMessage.startsWith('\xD0\xCF\x11\xE0')) {
             return res.status(415).json({

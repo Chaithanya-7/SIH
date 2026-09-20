@@ -158,6 +158,25 @@ export const api = {
     const res = await axios.post(`${API_BASE}/remediate/rollback`, { actionId, reason });
     return res.data;
   },
+  /**
+   * Submit a saved message file for analysis.
+   *
+   * The bytes are sent as the request body rather than as a form field,
+   * because the server hashes exactly what it is given. Posted as a form, the
+   * multipart envelope is what would be parsed - which yields a message with
+   * no headers and one attachment, and a confident verdict of SAFE. The server
+   * refuses that shape now, and this is the shape it wants.
+   */
+  uploadMessageFile: async (file) => {
+    const text = await file.text();
+    const res = await axios.post(
+      `${API_BASE}/ingest/file?filename=${encodeURIComponent(file.name)}`,
+      text,
+      { headers: { 'Content-Type': 'message/rfc822' } }
+    );
+    return res.data;
+  },
+
   getConnections: async () => {
     const res = await axios.get(`${API_BASE}/connections`);
     return res.data;
