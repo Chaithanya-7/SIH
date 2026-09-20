@@ -1,9 +1,104 @@
+/**
+ * PhishLens extension theme.
+ *
+ * The same two themes as the desktop console, with the same token names, so a
+ * colour is defined once per theme and the two surfaces stay in step. Dark is
+ * the default; light is there because a popup opens over whatever the person is
+ * already reading, and a near-black panel over a white webpage in daylight is
+ * the one place a dark-only UI is most jarring.
+ *
+ * Status colours are not inverted between themes. A red that reads correctly on
+ * near-black is too light on white, so each theme carries its own ramp chosen
+ * for contrast against that theme's surfaces.
+ */
+
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg-app: #0a0a0f;
+  --bg-surface: #12121f;
+  --bg-raised: #1f1f38;
+  --bg-raised-hover: #2a2a45;
+
+  --border: #1f1f38;
+  --border-strong: #334155;
+
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  /* 4.65:1 on the app background. #64748b, inherited from the dark-only
+     design, measured 4.15:1 - and the two things that use it, section headings
+     and the footer link, are 9.6-10.9px, so the large-text exemption does not
+     apply to either. */
+  --text-dim: #6c7c93;
+
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --success: #10b981;
+  --neutral: #475569;
+
+  --tint-danger: rgba(239, 68, 68, 0.18);
+  --tint-warning: rgba(245, 158, 11, 0.18);
+  --tint-success: rgba(16, 185, 129, 0.18);
+
+  /* Text sitting on a tint, which has to stay legible on that tint. */
+  /* 4.65:1 on the danger tint; the plain --danger red measured 4.45:1 there. */
+  --on-tint-danger: #f34848;
+  --on-tint-warning: #fcd34d;
+  --on-tint-success: #6ee7b7;
+
+  --brand-from: #667eea;
+  --brand-to: #ec4899;
+  --btn-from: #667eea;
+  --btn-to: #764ba2;
+  --btn-text: #ffffff;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --bg-app: #ffffff;
+  --bg-surface: #f4f7fb;
+  --bg-raised: #e8eef6;
+  --bg-raised-hover: #dae3ef;
+
+  --border: #dbe3ec;
+  --border-strong: #b6c2d1;
+
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #4b5a6d;
+  /* 4.64:1 on white; #6b7a8d measured 4.38:1. */
+  --text-dim: #677689;
+
+  /* Darkened so each still meets contrast on light surfaces. */
+  --danger: #c02626;
+  --warning: #a35a06;
+  --success: #07734f;
+  --neutral: #94a3b8;
+
+  --tint-danger: rgba(192, 38, 38, 0.10);
+  --tint-warning: rgba(163, 90, 6, 0.12);
+  --tint-success: rgba(7, 115, 79, 0.10);
+
+  --on-tint-danger: #a01e1e;
+  --on-tint-warning: #7c4404;
+  --on-tint-success: #055c3f;
+
+  --brand-from: #4f46e5;
+  --brand-to: #be1d63;
+  --btn-from: #4f46e5;
+  --btn-to: #6d28d9;
+  --btn-text: #ffffff;
+}
+
 body {
   margin: 0;
   padding: 0;
   width: 320px;
-  background-color: #0a0a0f;
-  color: #ffffff;
+  background-color: var(--bg-app);
+  color: var(--text-primary);
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
@@ -20,7 +115,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #1f1f38;
+  border-bottom: 1px solid var(--border);
   padding-bottom: 10px;
   margin-bottom: 12px;
 }
@@ -35,10 +130,16 @@ body {
   font-size: 22px;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
 h2 {
   margin: 0;
   font-size: 1.05rem;
-  background: linear-gradient(90deg, #667eea, #ec4899);
+  background: linear-gradient(90deg, var(--brand-from), var(--brand-to));
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -46,22 +147,23 @@ h2 {
 
 .sub {
   font-size: 0.68rem;
-  color: #94a3b8;
+  color: var(--text-muted);
 }
 
 .icon-btn {
   background: transparent;
   border: none;
-  color: #94a3b8;
+  color: var(--text-muted);
   font-size: 1rem;
   cursor: pointer;
   padding: 2px 6px;
   border-radius: 4px;
+  line-height: 1.4;
 }
 
 .icon-btn:hover {
-  background-color: #1f1f38;
-  color: #f8fafc;
+  background-color: var(--bg-raised);
+  color: var(--text-primary);
 }
 
 /* ---------- compact counts ---------- */
@@ -77,23 +179,23 @@ h2 {
   align-items: center;
   padding: 8px 10px;
   border-radius: 6px;
-  background-color: #12121f;
-  border-left: 3px solid #475569;
+  background-color: var(--bg-surface);
+  border-left: 3px solid var(--neutral);
 }
 
-.count-row.high { border-left-color: #ef4444; }
-.count-row.suspicious { border-left-color: #f59e0b; }
-.count-row.safe { border-left-color: #10b981; }
+.count-row.high { border-left-color: var(--danger); }
+.count-row.suspicious { border-left-color: var(--warning); }
+.count-row.safe { border-left-color: var(--success); }
 
 .count-label {
   font-size: 0.78rem;
-  color: #cbd5e1;
+  color: var(--text-secondary);
 }
 
 .count-value {
   font-size: 1rem;
   font-weight: 700;
-  color: #f8fafc;
+  color: var(--text-primary);
 }
 
 .meta-row {
@@ -101,17 +203,36 @@ h2 {
   justify-content: space-between;
   margin-top: 10px;
   font-size: 0.7rem;
-  color: #94a3b8;
+  color: var(--text-muted);
 }
 
 .meta-row strong {
-  color: #f8fafc;
+  color: var(--text-primary);
+}
+
+/* States what the quarantine count above it actually means. */
+.mode-note {
+  margin-top: 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 0.66rem;
+  line-height: 1.45;
+}
+
+.mode-note.live {
+  background: var(--tint-success);
+  color: var(--on-tint-success);
+}
+
+.mode-note.simulated {
+  background: var(--tint-warning);
+  color: var(--on-tint-warning);
 }
 
 /* ---------- recent detections ---------- */
 .recent-section {
   margin-top: 12px;
-  border-top: 1px solid #1f1f38;
+  border-top: 1px solid var(--border);
   padding-top: 10px;
 }
 
@@ -119,7 +240,7 @@ h2 {
   font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #64748b;
+  color: var(--text-dim);
   margin-bottom: 6px;
 }
 
@@ -138,7 +259,7 @@ h2 {
   align-items: center;
   gap: 8px;
   font-size: 0.72rem;
-  color: #cbd5e1;
+  color: var(--text-secondary);
 }
 
 .recent-subject {
@@ -150,7 +271,7 @@ h2 {
 
 .recent-list .empty {
   font-size: 0.72rem;
-  color: #64748b;
+  color: var(--text-dim);
   font-style: italic;
 }
 
@@ -162,18 +283,18 @@ h2 {
   white-space: nowrap;
 }
 
-.badge.high { background-color: rgba(239, 68, 68, 0.18); color: #ef4444; }
-.badge.suspicious { background-color: rgba(245, 158, 11, 0.18); color: #f59e0b; }
-.badge.safe { background-color: rgba(16, 185, 129, 0.18); color: #10b981; }
+.badge.high { background-color: var(--tint-danger); color: var(--on-tint-danger); }
+.badge.suspicious { background-color: var(--tint-warning); color: var(--on-tint-warning); }
+.badge.safe { background-color: var(--tint-success); color: var(--on-tint-success); }
 
 /* ---------- notices & footer ---------- */
 .notice {
-  background-color: #12121f;
-  border: 1px solid #334155;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-strong);
   border-radius: 6px;
   padding: 10px;
   font-size: 0.73rem;
-  color: #cbd5e1;
+  color: var(--text-secondary);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -181,7 +302,7 @@ h2 {
 
 .footer {
   margin-top: 12px;
-  border-top: 1px solid #1f1f38;
+  border-top: 1px solid var(--border);
   padding-top: 10px;
   display: flex;
   flex-direction: column;
@@ -190,8 +311,8 @@ h2 {
 
 .btn-primary {
   padding: 9px;
-  background: linear-gradient(90deg, #667eea, #764ba2);
-  color: #fff;
+  background: linear-gradient(90deg, var(--btn-from), var(--btn-to));
+  color: var(--btn-text);
   border: none;
   border-radius: 6px;
   font-weight: 600;
@@ -203,29 +324,29 @@ h2 {
 
 .btn-secondary {
   padding: 8px;
-  background-color: #1f1f38;
-  color: #cbd5e1;
-  border: 1px solid #334155;
+  background-color: var(--bg-raised);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-strong);
   border-radius: 6px;
   cursor: pointer;
   font-size: 0.75rem;
 }
 
-.btn-secondary:hover { background-color: #2a2a45; }
+.btn-secondary:hover { background-color: var(--bg-raised-hover); }
 
 .full { width: 100%; }
 
 .link-btn {
   background: none;
   border: none;
-  color: #64748b;
+  color: var(--text-dim);
   font-size: 0.68rem;
   cursor: pointer;
   text-decoration: underline;
   padding: 0;
 }
 
-.link-btn:hover { color: #94a3b8; }
+.link-btn:hover { color: var(--text-muted); }
 
 /* ---------- options page ---------- */
 .options-body {
@@ -238,15 +359,22 @@ h2 {
   margin: 0 auto;
 }
 
+.options-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
 .options-container h1 {
   font-size: 1.2rem;
   margin: 0 0 8px 0;
-  color: #f8fafc;
+  color: var(--text-primary);
 }
 
 .options-intro {
   font-size: 0.8rem;
-  color: #94a3b8;
+  color: var(--text-muted);
   line-height: 1.5;
   margin-bottom: 20px;
 }
@@ -257,20 +385,20 @@ h2 {
   gap: 5px;
   margin-bottom: 16px;
   font-size: 0.78rem;
-  color: #cbd5e1;
+  color: var(--text-secondary);
 }
 
 .field input {
   padding: 8px 10px;
   border-radius: 5px;
-  border: 1px solid #334155;
-  background-color: #12121f;
-  color: #f8fafc;
+  border: 1px solid var(--border-strong);
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
   font-size: 0.8rem;
 }
 
 .field small {
-  color: #64748b;
+  color: var(--text-dim);
   font-size: 0.7rem;
   line-height: 1.4;
 }
@@ -287,22 +415,5 @@ h2 {
   min-height: 18px;
 }
 
-.status.ok { color: #10b981; }
-.status.error { color: #ef4444; }
-
-/* States what the quarantine count above it actually means. */
-.mode-note {
-  margin: 6px 12px 0;
-  padding: 6px 8px;
-  border-radius: 4px;
-  font-size: 10.5px;
-  line-height: 1.4;
-}
-.mode-note.live {
-  background: rgba(16, 185, 129, 0.14);
-  color: #6ee7b7;
-}
-.mode-note.simulated {
-  background: rgba(245, 158, 11, 0.14);
-  color: #fcd34d;
-}
+.status.ok { color: var(--success); }
+.status.error { color: var(--danger); }

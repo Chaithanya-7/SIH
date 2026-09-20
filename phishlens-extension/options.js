@@ -1,6 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
   const ext = globalThis.browser || globalThis.chrome;
 
+  globalThis.PhishLensTheme?.attach(document.getElementById('btn-theme'));
+
   const apiBaseInput = document.getElementById('api-base-url');
   const dashboardInput = document.getElementById('dashboard-url');
   const apiKeyInput = document.getElementById('api-key');

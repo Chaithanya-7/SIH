@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <title>PhishLens Shield</title>
   <link rel="stylesheet" href="styles.css">
+  <!-- Applied before the body renders, so opening the popup never flashes the
+       wrong theme. -->
+  <script src="theme.js"></script>
 </head>
 <body>
   <div class="container">
@@ -15,7 +18,10 @@
           <span class="sub" id="connection-state">Connecting…</span>
         </div>
       </div>
-      <button id="btn-settings" class="icon-btn" title="Settings">⚙</button>
+      <div class="header-actions">
+        <button id="btn-theme" class="icon-btn" type="button"></button>
+        <button id="btn-settings" class="icon-btn" title="Settings">⚙</button>
+      </div>
     </header>
 
     <!-- Connection problem / setup needed -->

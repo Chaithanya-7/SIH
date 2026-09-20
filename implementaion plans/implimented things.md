@@ -657,3 +657,81 @@ regressions for the defects above; the rest guard the shapes that produced them.
 The audit run wrote to its own data directory and left the real one untouched —
 the `PHISHLENS_DATA_DIR` change from the previous chunk paying for itself
 immediately.
+
+## 2026-09-20 — The extension gets the two themes the console already had
+
+The light/dark theming asked for at the UI overhaul reached the desktop console
+and stopped there. The extension — the surface most people actually look at,
+opened dozens of times a day — stayed dark-only with 308 lines of hard-coded
+colours.
+
+That is the one place a dark-only UI is most jarring: a popup opens *over*
+whatever the person is already reading, so a near-black panel appears on top of
+a white webpage in daylight.
+
+### What it now does
+
+Same two themes as the console, using the same token names, so a colour is
+defined once per theme and the two surfaces cannot drift apart. The toggle sits
+beside the settings gear in the popup header and beside the heading on the
+settings page, matching the existing icon placement rather than introducing a
+new control style.
+
+Behaviour matches the console exactly: an explicit choice always wins; with no
+choice stored the operating system preference is followed, and it keeps being
+followed if the OS switches — until the person picks a theme themselves.
+
+`theme.js` runs from `<head>`, not on `DOMContentLoaded`, and reads the
+preference from `localStorage` rather than the extension storage API. Both
+decisions are forced by the same constraint: the attribute has to be on `<html>`
+before the first paint or the popup flashes the wrong theme on every single
+open, and extension storage is asynchronous so it cannot be read in time.
+Extension pages share one origin, so the popup and the settings page see the
+same value.
+
+### Contrast was measured, not eyeballed
+
+The popup's text runs from 9.6px to 12.5px, so nothing in it qualifies for the
+WCAG large-text exemption. Fifteen text-on-background pairs were measured in
+both themes by flattening every translucent layer down to the page background
+and computing the real ratio.
+
+Three failed 4.5:1 — and two of them failed in the **dark** theme, meaning they
+had been failing since before this change:
+
+| | was | now |
+|---|---|---|
+| `--text-dim` on the app background (dark) | 4.15 | **4.65** |
+| `--text-dim` on white (light) | 4.38 | **4.64** |
+| HIGH badge on its own tint (dark) | 4.45 | **4.65** |
+
+`--text-dim` is used by the section headings and the footer link. The
+replacement values were computed by walking each colour towards white or black
+until it cleared the threshold, not chosen by eye. All fifteen pairs now pass in
+both themes.
+
+The first measurement run was itself wrong and reported nonsense — it read the
+page background once before switching themes, so every dark colour was scored
+against a white backdrop, and `.recent-subject` came out at 1.48:1 while plainly
+legible on screen. The screenshot disagreeing with the number is what caught it.
+
+### One defect found in the process
+
+The toggle rendered its label once, on attach. Any route to changing the theme
+other than clicking it left the label stale — most realistically the
+system-preference listener firing while the popup is open, which would leave the
+button offering to switch to the theme already showing. Every route now goes
+through one `apply()`, which notifies whatever is displaying the current theme,
+so the label cannot disagree with the screen.
+
+### Verified
+
+| Check | Result |
+|---|---|
+| 15 text/background pairs, dark | all ≥ 4.5:1 |
+| 15 text/background pairs, light | all ≥ 4.5:1 |
+| Choice survives reopening the popup | dark → light → still light |
+| No stored choice, OS set to light | light applied |
+| No stored choice, OS set to dark | dark applied |
+| Label after a theme change that was not a click | tracks correctly |
+| Settings page | themed, toggle present |

@@ -9,6 +9,8 @@
 document.addEventListener('DOMContentLoaded', () => {
   const ext = globalThis.browser || globalThis.chrome;
 
+  globalThis.PhishLensTheme?.attach(document.getElementById('btn-theme'));
+
   const connectionState = document.getElementById('connection-state');
   const setupNotice = document.getElementById('setup-notice');
   const setupMessage = document.getElementById('setup-message');
