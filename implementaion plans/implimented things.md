@@ -528,3 +528,132 @@ dashboard builds clean.
 OAuth client (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GMAIL_REDIRECT_URI`),
 a connected mailbox, and `REMEDIATION_MODE=live`. Until then every action is
 reported as simulated, and the console says so at the top of the Response view.
+
+## 2026-09-20 — Hardening audit: seven silent defects in code that already worked
+
+No new features. The Phase 6 audit found five real defects in one pass by
+looking for a specific shape — code that reads as protection and provides none —
+so the same pass was run across the rest of the system. Everything below was
+already shipped, already tested, and reported success while being wrong.
+
+### A guard that hid a missing method
+
+`gmailIngestionAdapter.preflight()` called
+`mailboxConnectionManager.getAllConnections()`, which did not exist, behind a
+`typeof === 'function'` check that substituted an empty list when it was
+missing. The guard did its job perfectly: nothing ever threw, and readiness
+reported **zero connected mailboxes for ever**.
+
+`reportState()` feeds that straight into the ingestion registry, so the Mail
+Coverage view — the one whose entire purpose is answering *could a message reach
+someone without being examined* — would have shown Gmail as `NOT_CONFIGURED`
+while it was actively ingesting mail.
+
+The method was added and the guard removed. A defensive `typeof` on another
+module's method converts a loud, once-only failure into permanently wrong
+behaviour, so a test now fails if one reappears anywhere.
+
+### A function that fabricated an audit record
+
+`notificationAdapter.dispatchRecipientWarning()` composed a message, wrote an
+audit entry reading `Recipient <address> notified: "..."`, and returned
+`{ success: true }` — without sending anything to anyone. No email, no API call.
+
+Nothing called it, which is the only reason the tamper-evident ledger was not
+already carrying permanent false records of people being warned. It is removed
+rather than repaired: warning a recipient is done by marking the message where
+they will see it, which the remediation gateway does and reports as visible only
+on provider read-back.
+
+The same file's `dispatchSocAlert()` was real but had never been wired up, so an
+operator who set `SOC_WEBHOOK_URL` got nothing. It is now called on containment,
+awaited so a delivery failure is recorded as a failure rather than vanishing
+into an unhandled rejection, and the audit entry distinguishes delivered from
+failed.
+
+### Authentication that defaulted open
+
+`GET /api/overview` had **no authentication at all**. Its own isolation logic
+keys off `req.user` — filtering by organisation, restricting employees to their
+own mail — and `req.user` was never populated, so with no user it applied no
+filter and returned every case in every organisation to anyone who asked:
+senders, recipients, subjects, origin IPs, geolocation.
+
+It was the third instance of one bug. Authentication was an allowlist of
+protected prefixes, and Express matches mount paths on segment boundaries, so
+`/api/ingest` did not cover `/api/ingestion` and `/api/remediate` did not cover
+`/api/remediation`. Each was one forgotten line.
+
+The default is now inverted: everything under `/api` is authenticated unless it
+appears in `PUBLIC_API_ROUTES`, which holds three entries — liveness, sign-in,
+and Google's push endpoint, the last separately verified by its Pub/Sub JWT.
+Forgetting a line is now the safe outcome. Adding one is a visible edit to a
+list of three.
+
+While making that change the Gmail *connect* endpoints were briefly exempted by
+mistake; they read `req.user.id`, so the exemption turned an authorization check
+into a `TypeError` on undefined. Caught by testing every route in both states
+rather than by reading the diff.
+
+### Three identifier spaces that collide
+
+| Identifier | Space | Collision by | Consequence |
+|---|---|---|---|
+| `campaign_id` | 900 | **48.8% at 35 campaigns**, 99.7% at 100 | PRIMARY KEY violation; the insert callback discarded its error |
+| `action_id` | 90,000 | 99.6% at 1,000 actions | Map key — silently overwrites the record of something done to mail |
+| `case_id` | 16.7M | 94.9% at 10,000 cases | Map key — silently replaces an investigation |
+
+The campaign one is the worst, because `createCampaign` ended
+`() => resolve(campaign)` — the callback ignored its error argument entirely. On
+collision nothing was written, the function resolved as though it had succeeded,
+and the case was filed under a `campaign_id` belonging to somebody else's
+attack. Every later update then poured this case's indicators into that
+campaign, silently merging two unrelated attacks in the graph an analyst uses to
+understand what is happening to them.
+
+Ten thousand cases is a few weeks of one corporate mailbox. All three now draw
+six bytes from `crypto.randomBytes`; 100,000 generated ids of each kind are
+distinct in the test.
+
+### An enrichment failure that killed the detection
+
+`updateCampaign` resolves `null` when its row has gone or the query errored, and
+the very next line read `campaignRecord.campaign_id`. A storage problem in an
+enrichment step would have taken the whole detection down with it — verdict,
+evidence, remediation decision and all — for a message that had already been
+correctly identified as malicious.
+
+Campaign correlation is enrichment. Losing it must not lose the detection, so a
+failed or absent campaign record is now recorded on the case as `UNAVAILABLE`
+with the reason, and the message stays protected.
+
+### What was checked and found clean
+
+- **102 call sites** from `server.js` into modules: every method exists
+- **68 cross-module call sites**: one missing method, fixed above
+- **59 files** scanned for assignments to undeclared identifiers: none remain
+  (`totalWeight` was the only one)
+- **60 files** scanned for branches comparing against values nothing produces:
+  none remain (the dead `DEVELOPMENT` guard was the only one)
+- **58 routes** checked against the authentication mount in both states
+
+Two of the scans produced false positives worth recording, because a check that
+cries wolf is worse than no check: a parameter with a default value
+(`evaluateRelayHops(hops = [], …)`) is a declaration, and an apostrophe inside a
+comment broke a naive read of a quoted list. Both were the tooling being wrong,
+not the code, and both were confirmed by hand before anything was changed.
+
+### Also
+
+`/api/summary` now carries the response posture, and the extension popup states
+it. "Quarantined: 0" is ambiguous on its own — it reads as *nothing was
+malicious* when it may mean *this installation does not move mail*, and a reader
+should not have to infer which.
+
+**151 backend tests** (up from 139), 9 desktop tests, dashboard builds clean,
+full suite stable across consecutive runs. Twelve of the new tests are
+regressions for the defects above; the rest guard the shapes that produced them.
+
+The audit run wrote to its own data directory and left the real one untouched —
+the `PHISHLENS_DATA_DIR` change from the previous chunk paying for itself
+immediately.

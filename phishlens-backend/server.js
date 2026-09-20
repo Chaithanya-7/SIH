@@ -273,36 +273,43 @@ async function processPipeline(emailContent, source = 'MANUAL_API', clientMessag
 mailIngestionAdapter.startIngestion(processPipeline);
 gmailIngestionAdapter.setPipelineHandler(processPipeline);
 
-// Protect sensitive SOC administration and data APIs
-app.use([
-    '/api/analyze',
-    // Covers every /api/ingest/* path, so a new ingestion route can never be
-    // added unauthenticated by omission. '/api/ingestion' is listed separately
-    // because Express prefix matching requires a path boundary.
-    '/api/ingest',
-    '/api/ingestion',
-    '/api/cases',
-    '/api/summary',
-    '/api/learning',
-    '/api/threat-intelligence',
-    '/api/detection-config',
-    '/api/graph',
-    '/api/vips',
-    '/api/audit',
-    '/api/remediate',
-    // Listed separately for the same reason as '/api/ingestion': Express
-    // prefix matching needs a path boundary, so '/api/remediate' does not
-    // cover '/api/remediation'. Without this line the posture and
-    // domain-hardening endpoints would be readable without authenticating,
-    // and the admin ones would 401 with no req.user to check.
-    '/api/remediation',
-    '/api/reports',
-    '/api/auth/me',
-    '/api/auth/gmail',
-    '/api/org',
-    '/api/mailbox',
-    '/api/admin'
-], requireAuth);
+/**
+ * Everything under /api requires authentication unless it is named below.
+ *
+ * This used to be the other way round: a list of protected prefixes, with
+ * anything unlisted open. That shape has now failed three times. Express
+ * matches mount paths on segment boundaries, so '/api/ingest' did not cover
+ * '/api/ingestion' and '/api/remediate' did not cover '/api/remediation'; and
+ * '/api/overview' was simply never added, so it returned every case in every
+ * organisation to anyone who asked - its own isolation logic keys off req.user,
+ * which nothing had populated.
+ *
+ * Each of those was one forgotten line. Inverting the default makes forgetting
+ * the safe outcome: a new route is authenticated until somebody deliberately
+ * exempts it here, and an exemption is a visible edit in a list of six rather
+ * than an omission nobody can see.
+ */
+const PUBLIC_API_ROUTES = new Set([
+    // Liveness. Deliberately answerable without a credential so the desktop
+    // supervisor can tell a starting backend from an occupied port.
+    '/api/health',
+    // Signing in to PhishLens itself, which cannot require being signed in.
+    // Note that /api/auth/gmail/* is deliberately NOT here: those connect a
+    // mailbox to an existing account and read req.user.id, so they need a
+    // session. Exempting them would have turned an authorization check into a
+    // TypeError on undefined.
+    '/api/auth/google/verify',
+    // Google's push endpoint. It cannot carry our session token, and is
+    // separately verified by checking the Pub/Sub JWT in verifyPubSubRequest.
+    '/api/webhooks/gmail'
+]);
+
+app.use('/api', (req, res, next) => {
+    // req.path here is relative to the '/api' mount point.
+    const fullPath = '/api' + (req.path === '/' ? '' : req.path);
+    if (PUBLIC_API_ROUTES.has(fullPath)) return next();
+    return requireAuth(req, res, next);
+});
 
 // ==================== GOOGLE AUTHENTICATION ENDPOINTS ====================
 app.post('/api/auth/google/verify', (req, res) => {
@@ -803,6 +810,11 @@ app.get('/api/summary', (req, res) => {
         total: allCases.length,
         quarantined,
         awaiting_review: awaitingReview,
+        // Carried alongside the count, because "Quarantined: 0" is ambiguous on
+        // its own: it reads as "nothing was malicious" when it may mean "this
+        // installation does not move mail". A reader should not have to infer
+        // which.
+        remediation: remediationGateway.capability(),
         recent: latest,
         generated_at: new Date().toISOString()
     });

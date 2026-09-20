@@ -90,6 +90,24 @@ class MailboxConnectionManager {
         return Array.from(this.connections.values()).find(c => c.provider_account.toLowerCase() === clean) || null;
     }
 
+    /**
+     * Every connected mailbox, across organisations.
+     *
+     * Added because the Gmail adapter's readiness check called it, found it
+     * absent, and had a `typeof === 'function'` guard that quietly substituted
+     * an empty list. The guard meant the check could never see a connected
+     * mailbox: it reported "not configured" permanently, and the Mail Coverage
+     * view - whose entire job is answering whether mail could arrive
+     * unexamined - said Gmail was not being watched while it was.
+     *
+     * Callers that must respect organisation isolation use
+     * getAllConnectionsInOrg. This one is for asking about the installation as
+     * a whole.
+     */
+    getAllConnections() {
+        return Array.from(this.connections.values());
+    }
+
     getAllConnectionsInOrg(orgId) {
         if (!orgId) return [];
         return Array.from(this.connections.values()).filter(c => c.organization_id === orgId);

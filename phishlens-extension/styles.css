@@ -289,3 +289,20 @@ h2 {
 
 .status.ok { color: #10b981; }
 .status.error { color: #ef4444; }
+
+/* States what the quarantine count above it actually means. */
+.mode-note {
+  margin: 6px 12px 0;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+.mode-note.live {
+  background: rgba(16, 185, 129, 0.14);
+  color: #6ee7b7;
+}
+.mode-note.simulated {
+  background: rgba(245, 158, 11, 0.14);
+  color: #fcd34d;
+}

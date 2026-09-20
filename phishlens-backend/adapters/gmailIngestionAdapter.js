@@ -29,9 +29,10 @@ class GmailIngestionAdapter {
         if (!this.clientId) missing.push('GOOGLE_CLIENT_ID');
         if (!this.clientSecret) missing.push('GOOGLE_CLIENT_SECRET');
 
-        const connections = typeof mailboxConnectionManager.getAllConnections === 'function'
-            ? mailboxConnectionManager.getAllConnections()
-            : [];
+        // Called directly. The defensive typeof check that used to wrap this is
+        // what hid the method being missing, so readiness silently answered
+        // "no mailbox" forever instead of failing loudly once.
+        const connections = mailboxConnectionManager.getAllConnections();
         const connected = connections.filter(c => c.status === 'CONNECTED');
 
         return {

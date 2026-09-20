@@ -57,6 +57,18 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('count-quarantined').textContent = data.quarantined;
     document.getElementById('count-review').textContent = data.awaiting_review;
 
+    // Said plainly rather than left to be inferred from a zero: a quarantine
+    // count of nought means something quite different when the installation is
+    // not configured to move mail at all.
+    const modeNote = document.getElementById('mode-note');
+    if (modeNote) {
+      const acting = data.remediation?.can_act_on_mail;
+      modeNote.textContent = acting
+        ? 'Live: confirmed high-risk mail is moved out of the inbox.'
+        : 'Simulation: threats are detected and recorded, but no mail is moved.';
+      modeNote.className = acting ? 'mode-note live' : 'mode-note simulated';
+    }
+
     recentList.innerHTML = '';
     if (!data.recent.length) {
       const li = document.createElement('li');

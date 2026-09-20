@@ -5,6 +5,7 @@ const remediationGateway = require('./remediationGateway');
 const containmentGuard = require('./containmentGuard');
 const campaignResponsePlanner = require('./campaignResponsePlanner');
 const iocResponseManager = require('./iocResponseManager');
+const notificationAdapter = require('../adapters/notificationAdapter');
 const auditLogger = require('./auditLogger');
 const caseManager = require('./caseManager');
 const { dataFile } = require('./dataPaths');
@@ -345,6 +346,14 @@ class RemediationEngine {
         if (result.outcome === OUTCOME.CONTAINED) {
             containmentGuard.recordAutomaticAction();
         }
+
+        // Tell the SOC, if the operator has said where. Awaited rather than
+        // fired and forgotten so a failed delivery is recorded as a failure
+        // instead of vanishing into an unhandled rejection - the operator needs
+        // to find out that their alerting is broken from the ledger, not from
+        // the alert that never arrived.
+        await notificationAdapter.dispatchSocAlert(threatObject, policyDecision.policy_id)
+            .catch(e => console.error('[RemediationEngine] SOC alert dispatch failed:', e.message));
 
         auditLogger.log({
             case_id: threatObject.case_id,

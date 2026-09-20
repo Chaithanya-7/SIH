@@ -1,6 +1,12 @@
+const crypto = require('crypto');
+
 class RemediationAction {
     constructor(data = {}) {
-        this.action_id = data.action_id || `ACT-2026-${Math.floor(10000 + Math.random() * 90000)}`;
+        // Drawn from 90,000 values previously, which collides with near-certainty
+        // by the thousandth action. Actions are held in a Map keyed by this id,
+        // so a collision silently overwrote the record of something that had
+        // been done to somebody's mail.
+        this.action_id = data.action_id || `ACT-${new Date().getFullYear()}-${crypto.randomBytes(6).toString('hex').toUpperCase()}`;
         this.case_id = data.case_id || null;
         this.organization_id = data.organization_id || null;
         this.mailbox_connection_id = data.mailbox_connection_id || null;

@@ -3,7 +3,11 @@ const crypto = require('crypto');
 class ThreatObject {
     constructor(data = {}) {
         const year = new Date().getFullYear();
-        const suffix = crypto.randomBytes(3).toString('hex').toUpperCase();
+        // Six bytes, not three. Three gives roughly a 95% chance of a collision
+        // by the ten-thousandth case - a few weeks of one corporate mailbox -
+        // and cases are held in a Map keyed by this id, so a collision silently
+        // replaced an existing investigation.
+        const suffix = crypto.randomBytes(6).toString('hex').toUpperCase();
         this.case_id = data.case_id || `SM-${year}-${suffix}`;
         this.org_id = data.org_id || data.mailbox_provenance?.organization_id || null;
         

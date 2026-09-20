@@ -1,9 +1,30 @@
 const axios = require('axios');
 const auditLogger = require('../modules/auditLogger');
 
+/**
+ * Tells a SOC that something happened, where the operator has said where to
+ * send it.
+ *
+ * This file previously also carried a `dispatchRecipientWarning` that built a
+ * message, wrote an audit entry reading "Recipient <address> notified", and
+ * returned success - without sending anything to anyone. Nothing called it,
+ * which is the only reason the ledger was not already carrying permanent false
+ * records of people being warned. It is removed rather than fixed: warning a
+ * recipient is done by marking the message where they will see it, which the
+ * remediation gateway does and reports as visible only when a provider confirms
+ * it on read-back.
+ */
 class NotificationAdapter {
+    /** Whether anywhere has been configured to send to. */
+    isConfigured() {
+        return !!process.env.SOC_WEBHOOK_URL;
+    }
+
     async dispatchSocAlert(threatObject, policyId) {
-        console.log(`[NotificationAdapter] 🔔 Dispatching SOC Alert for Case ${threatObject.case_id} (Policy: ${policyId})...`);
+        if (!this.isConfigured()) {
+            return { success: false, skipped: true, reason: 'No SOC_WEBHOOK_URL is configured, so there is nowhere to send an alert.' };
+        }
+        console.log(`[NotificationAdapter] Dispatching SOC alert for case ${threatObject.case_id} (policy: ${policyId})...`);
 
         const alertPayload = {
             event: 'SOC_THREAT_ALERT',
@@ -16,43 +37,32 @@ class NotificationAdapter {
             timestamp: new Date().toISOString()
         };
 
-        // Webhook integration if configured
-        if (process.env.SOC_WEBHOOK_URL) {
-            try {
-                await axios.post(process.env.SOC_WEBHOOK_URL, alertPayload, { timeout: 5000 });
-                console.log(`[NotificationAdapter] Webhook notification delivered to ${process.env.SOC_WEBHOOK_URL}`);
-            } catch (e) {
-                console.error('[NotificationAdapter] Webhook delivery failed:', e.message);
-            }
+        // The audit entry records what actually happened, including a failure.
+        // An alert nobody received must not be logged as one that was sent.
+        let delivered = false;
+        let failure = null;
+        try {
+            await axios.post(process.env.SOC_WEBHOOK_URL, alertPayload, { timeout: 5000 });
+            delivered = true;
+        } catch (e) {
+            failure = e.message;
+            console.error('[NotificationAdapter] SOC webhook delivery failed:', e.message);
         }
 
         auditLogger.log({
             case_id: threatObject.case_id,
-            event_type: 'SOC_ALERT_DISPATCHED',
+            org_id: threatObject.org_id,
+            event_type: delivered ? 'SOC_ALERT_DELIVERED' : 'SOC_ALERT_FAILED',
             source: 'NOTIFICATION_ADAPTER',
-            description: `SOC Alert dispatched for High-Risk Incident ${threatObject.case_id}`,
+            description: delivered
+                ? `SOC alert delivered to the configured webhook for case ${threatObject.case_id} under policy ${policyId}.`
+                : `SOC alert could not be delivered for case ${threatObject.case_id}: ${failure}`,
             confidence: threatObject.confidence?.threat
         });
 
-        return { success: true, payload: alertPayload };
+        return { success: delivered, payload: alertPayload, error: failure };
     }
 
-    async dispatchRecipientWarning(threatObject, isContained) {
-        console.log(`[NotificationAdapter] 📩 Dispatching Recipient Notification for Case ${threatObject.case_id}...`);
-
-        const messageText = isContained
-            ? `Security Alert: PhishLens detected a high-risk email (Case ${threatObject.case_id}). The message has been safely contained. Do not click links or respond.`
-            : `Security Notice: A suspicious message (Case ${threatObject.case_id}) was detected and is under investigation by security team.`;
-
-        auditLogger.log({
-            case_id: threatObject.case_id,
-            event_type: 'RECIPIENT_NOTIFIED',
-            source: 'NOTIFICATION_ADAPTER',
-            description: `Recipient ${threatObject.message?.recipient} notified: "${messageText}"`
-        });
-
-        return { success: true, recipient: threatObject.message?.recipient, message: messageText };
-    }
 }
 
 module.exports = new NotificationAdapter();

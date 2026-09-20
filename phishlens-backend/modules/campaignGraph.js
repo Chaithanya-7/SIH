@@ -6,6 +6,7 @@ const ipUtils = require('../utils/ipUtils');
 const correlationGuard = require('./correlationGuard');
 const semanticCorrelation = require('./semanticCorrelation');
 const { dataFile } = require('./dataPaths');
+const crypto = require('crypto');
 
 class CampaignGraph {
     constructor() {
@@ -359,7 +360,27 @@ class CampaignGraph {
                     targets: recipient ? [recipient] : [],
                     executives_targeted: isExecutiveAttack && targetedExec ? [targetedExec] : [],
                     association_confidence: finalConfidence
+                }).catch(e => {
+                    console.error(`[CampaignGraph] Campaign creation failed for case ${caseId}: ${e.message}`);
+                    return null;
                 });
+            }
+
+            // updateCampaign resolves null when its row has gone or the query
+            // errored, and the next line dereferences campaignRecord - so a
+            // storage problem in an enrichment step used to take the whole
+            // detection down with it. The verdict, the evidence and the
+            // remediation decision are all still valid without a campaign
+            // association, so the message stays protected and the absence is
+            // recorded rather than thrown.
+            if (!campaignRecord) {
+                threatObject.campaign = null;
+                threatObject.campaign_association = {
+                    ...(threatObject.campaign_association || {}),
+                    status: 'UNAVAILABLE',
+                    reason: 'Related cases were found, but the campaign record could not be stored or read. The detection result is unaffected; only the campaign link is missing.'
+                };
+                return threatObject;
             }
 
             threatObject.campaign = campaignRecord;
@@ -450,9 +471,21 @@ class CampaignGraph {
         });
     }
 
+    /**
+     * A campaign identifier has to be unique or the graph merges unrelated
+     * attacks.
+     *
+     * The previous form drew from 900 possible values, which gives roughly an
+     * even chance of a collision by the thirty-fifth campaign and near-certainty
+     * by the hundredth. campaign_id is the table's PRIMARY KEY, so a collision
+     * fails the INSERT - and the callback below discarded its error, resolving
+     * as though the write had succeeded. The case would then be filed under a
+     * campaign belonging to somebody else's attack, and every later update
+     * would pour its indicators into that one.
+     */
     createCampaign(data) {
-        return new Promise((resolve) => {
-            const campaignId = `CMP-2026-${Math.floor(100 + Math.random() * 900)}`;
+        return new Promise((resolve, reject) => {
+            const campaignId = `CMP-${new Date().getFullYear()}-${crypto.randomBytes(6).toString('hex').toUpperCase()}`;
             const now = new Date().toISOString();
 
             const campaign = {
@@ -485,7 +518,15 @@ class CampaignGraph {
                     JSON.stringify(campaign.executives_targeted),
                     campaign.association_confidence
                 ],
-                () => resolve(campaign)
+                (err) => {
+                    if (err) {
+                        // Reported rather than swallowed. A campaign that was
+                        // not stored must not be returned as though it had been.
+                        console.error(`[CampaignGraph] Could not store campaign ${campaignId}: ${err.message}`);
+                        return reject(new Error(`Campaign ${campaignId} could not be stored: ${err.message}`));
+                    }
+                    resolve(campaign);
+                }
             );
         });
     }
