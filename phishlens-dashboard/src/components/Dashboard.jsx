@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Shield, ShieldAlert, Network, UserCheck, Zap, History, FileText, Activity, LayoutDashboard, Menu, ChevronLeft, Search, RefreshCw, AlertTriangle, CheckCircle2, Sliders } from 'lucide-react';
-import { api } from '../services/api';
+import { api, desktopReady } from '../services/api';
 
 import ThreatFeed from './ThreatFeed';
 import CaseInvestigationView from './CaseInvestigationView';
@@ -95,9 +95,19 @@ export default function Dashboard() {
   const [deepLinkCaseId, setDeepLinkCaseId] = useState(null);
 
   useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, 4000);
-    return () => clearInterval(interval);
+    // In the desktop app the API key arrives asynchronously from the main
+    // process, so the first load waits for it rather than firing
+    // unauthenticated requests and rendering an empty console.
+    let interval;
+    let cancelled = false;
+
+    desktopReady.catch(() => false).then(() => {
+      if (cancelled) return;
+      loadData();
+      interval = setInterval(loadData, 4000);
+    });
+
+    return () => { cancelled = true; if (interval) clearInterval(interval); };
   }, []);
 
   // When running inside the installed PhishLens desktop application, a

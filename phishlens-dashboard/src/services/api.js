@@ -4,6 +4,26 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL ? `${import.meta.env.VITE_API
 
 let currentSessionToken = localStorage.getItem('sm_session_token') || '';
 
+/**
+ * Inside the installed desktop application the backend is started by the app
+ * itself, which owns a locally generated key. Adopting it here is what lets a
+ * desktop install work without asking the user to invent and paste a secret.
+ * In a browser this does nothing and the normal session token is used.
+ */
+export const desktopReady = (async () => {
+  if (!window.phishlens?.getConfig) return false;
+  try {
+    const config = await window.phishlens.getConfig();
+    if (config?.apiKey) {
+      currentSessionToken = config.apiKey;
+      return true;
+    }
+  } catch (e) {
+    // Fall back to whatever token the browser already had.
+  }
+  return false;
+})();
+
 axios.interceptors.request.use((config) => {
   if (currentSessionToken) {
     config.headers['Authorization'] = `Bearer ${currentSessionToken}`;

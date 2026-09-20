@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>PhishLens — Starting</title>
+  <style>
+    :root {
+      --bg: #0a0a0f; --panel: #131b2e; --border: #1e293b; --code: #090d16;
+      --text: #f8fafc; --muted: #94a3b8; --dim: #64748b;
+      --accent: #3b82f6; --danger: #ef4444; --warning: #f59e0b; --success: #10b981;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      background: var(--bg); color: var(--text); padding: 28px;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .card { width: 100%; max-width: 680px; }
+    .head { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+    .mark {
+      width: 34px; height: 34px; border-radius: 8px; background: var(--accent);
+      display: flex; align-items: center; justify-content: center; font-size: 17px;
+    }
+    h1 { margin: 0; font-size: 1.15rem; }
+    .sub { color: var(--dim); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; }
+
+    .status {
+      background: var(--panel); border: 1px solid var(--border); border-left-width: 3px;
+      border-radius: 8px; padding: 16px 18px; margin-bottom: 14px;
+    }
+    .status-line { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 0.95rem; }
+    .detail { color: var(--muted); font-size: 0.82rem; margin-top: 6px; line-height: 1.55; }
+
+    .spinner {
+      width: 14px; height: 14px; border: 2px solid var(--border);
+      border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+
+    .logs {
+      background: var(--code); border: 1px solid var(--border); border-radius: 8px;
+      padding: 12px 14px; font-family: ui-monospace, Consolas, monospace;
+      font-size: 0.7rem; color: var(--muted); max-height: 230px; overflow-y: auto;
+      white-space: pre-wrap; word-break: break-word; line-height: 1.6;
+    }
+    .logs:empty::after { content: 'Waiting for the backend to report…'; color: var(--dim); font-style: italic; }
+    .actions { margin-top: 14px; display: flex; gap: 9px; }
+    button {
+      background: var(--accent); color: #fff; border: none; border-radius: 6px;
+      padding: 8px 14px; font-size: 0.78rem; font-weight: 600; cursor: pointer; font-family: inherit;
+    }
+    button.secondary { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    button:disabled { opacity: 0.5; cursor: default; }
+    .hint { margin-top: 12px; color: var(--dim); font-size: 0.72rem; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="head">
+      <div class="mark">🛡️</div>
+      <div>
+        <h1>PhishLens</h1>
+        <div class="sub">Enterprise SOC</div>
+      </div>
+    </div>
+
+    <div class="status" id="status-card" style="border-left-color: var(--accent)">
+      <div class="status-line">
+        <span id="indicator" class="spinner"></span>
+        <span id="headline">Starting…</span>
+      </div>
+      <div class="detail" id="detail">Preparing the PhishLens backend.</div>
+    </div>
+
+    <div class="logs" id="logs"></div>
+
+    <div class="actions">
+      <button id="retry" style="display:none">Try again</button>
+      <button id="copy" class="secondary">Copy log</button>
+    </div>
+
+    <div class="hint" id="hint"></div>
+  </div>
+
+  <script>
+    const headline = document.getElementById('headline');
+    const detail = document.getElementById('detail');
+    const logs = document.getElementById('logs');
+    const card = document.getElementById('status-card');
+    const indicator = document.getElementById('indicator');
+    const retry = document.getElementById('retry');
+    const hint = document.getElementById('hint');
+
+    const PRESENTATION = {
+      STARTING:   { title: 'Starting the PhishLens backend…', colour: 'var(--accent)',  spin: true },
+      RESTARTING: { title: 'Backend stopped — restarting…',   colour: 'var(--warning)', spin: true },
+      READY:      { title: 'Backend ready',                   colour: 'var(--success)', spin: false },
+      FAILED:     { title: 'The backend could not be started', colour: 'var(--danger)',  spin: false },
+      STOPPED:    { title: 'Backend stopped',                 colour: 'var(--dim)',     spin: false }
+    };
+
+    function render(state) {
+      const view = PRESENTATION[state.status] || PRESENTATION.STARTING;
+      headline.textContent = view.title;
+      detail.textContent = state.detail || '';
+      card.style.borderLeftColor = view.colour;
+      headline.style.color = view.colour;
+
+      indicator.className = view.spin ? 'spinner' : 'dot';
+      if (!view.spin) indicator.style.background = view.colour;
+
+      retry.style.display = state.status === 'FAILED' ? 'inline-block' : 'none';
+
+      // Only worth saying when something is actually wrong.
+      hint.textContent = state.status === 'FAILED'
+        ? 'If the port is already in use, close the other PhishLens instance or whatever is holding it. The log above shows exactly what the backend reported.'
+        : state.attached_to_existing
+          ? 'Attached to a backend that was already running; this app did not start a second one.'
+          : '';
+
+      if (Array.isArray(state.logs) && state.logs.length && !logs.textContent) {
+        logs.textContent = state.logs.join('\n');
+        logs.scrollTop = logs.scrollHeight;
+      }
+    }
+
+    function appendLog(line) {
+      logs.textContent += (logs.textContent ? '\n' : '') + line;
+      logs.scrollTop = logs.scrollHeight;
+    }
+
+    if (window.phishlens) {
+      window.phishlens.getBackendStatus().then(render).catch(() => {});
+      window.phishlens.onBackendStatus(render);
+      window.phishlens.onBackendLog(appendLog);
+
+      retry.addEventListener('click', async () => {
+        retry.disabled = true;
+        logs.textContent = '';
+        try { render(await window.phishlens.restartBackend()); } finally { retry.disabled = false; }
+      });
+
+      document.getElementById('copy').addEventListener('click', () => {
+        navigator.clipboard?.writeText(logs.textContent || '').catch(() => {});
+      });
+    } else {
+      headline.textContent = 'Running outside the PhishLens desktop application';
+      detail.textContent = 'This screen only functions inside the installed application.';
+    }
+  </script>
+</body>
+</html>

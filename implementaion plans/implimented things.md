@@ -322,6 +322,38 @@ Network-dependent stages are injected in the validation so it runs deterministic
 
 **92 tests passing, 0 npm vulnerabilities, dashboard builds clean.**
 
+## 2026-09-20 — Desktop app supervises the backend: one install, one thing to launch
+
+Previously the desktop app was a shell that expected the backend to already be running, so a "single install" still meant starting services by hand.
+
+- **`phishlens-desktop/backendSupervisor.js`** — starts, watches and stops the backend:
+  - **Attaches rather than duplicates.** If a backend is already listening and healthy, the app uses it instead of starting a second. Two backends over one data directory would corrupt the case store and sever the audit chain, so this is a safety rule, not an optimisation.
+  - **Owns a key, not a password.** A desktop install has no operator to invent a secret, so one is generated on first run, stored owner-only in the per-user application data directory, and passed to both the backend it starts and the console it loads. This is what makes the app work with no setup.
+  - **Restarts a crash, gives up on a loop.** Three attempts, with the restart budget reset for a process that ran normally before exiting. Repeated immediate failures mean something is really wrong and silently restarting forever would hide it.
+  - **Never orphans the backend.** The child is stopped on every exit path, since an orphaned server holding the port would block the next launch. A backend it merely attached to is left alone.
+  - **Health probe checks for PhishLens specifically** — an occupied port answering 404 is not a working backend.
+- **Startup screen replaces the blank window.** Live status, the backend's own captured log, a retry button, and a plain statement of what went wrong. The console is not loaded until the backend genuinely answers, because a dashboard rendering empty panels is indistinguishable from a healthy one with no mail.
+- **Console authenticates itself** in the desktop app: the key arrives from the main process over the preload bridge, and the first data load waits for it rather than firing unauthenticated requests and rendering an empty console.
+- **Installer now bundles the backend** as well as the dashboard build.
+
+### Verified by actually running it, with nothing pre-started
+
+| Test | Result |
+|---|---|
+| Launch app alone, nothing running | Backend went from HTTP 000 to HTTP 200; console loaded |
+| Ownership | Backend pid 14396 confirmed as a child of the Electron main process |
+| Generated key | Persisted (64 bytes); authenticated request 200, unauthenticated 401 |
+| Close the app | Backend stopped, 0 processes left holding the port |
+| Launch with a backend already running | Stayed at 1 listener, 0 spawned children — it attached |
+| Close app that attached | Pre-existing backend still HTTP 200 — correctly left alone |
+| Port blocked by a decoy | Stayed on the startup screen rather than showing a blank console |
+
+9 supervisor tests added (`npm test` in `phishlens-desktop`) covering attach-not-duplicate, leaving a borrowed backend alone, rejecting a non-PhishLens listener, the restart-loop limit, the restart-budget reset, and key persistence.
+
+**Honest caveat documented in the README**: the backend's `sqlite3` is a native module, so a packaged build must rebuild it for Electron's ABI (or point `PHISHLENS_BACKEND_NODE` at a system Node). A packaged build that skips this starts and then fails when the campaign graph opens its database.
+
+**92 backend tests + 9 desktop tests passing.**
+
 ### Next architectural gap (not yet started)
 
 - `DETECTION_PROVIDER` is still hardcoded to `sublime` with no local Sublime service in this repository — every ingestion path still calls out to an external, unconfigured detection dependency for MQL/rule matching (`mqlBridge.js` only normalizes a Sublime response; it does not run its own rules). This is the single largest remaining gap against the master plan's Phase 3 (Detection Engine): a native, source-cited MQL/rule engine (MITRE ATT&CK, APWG, CISA, OWASP, abuse.ch/OpenPhish/PhishTank-seeded rules per the compact plan) is not yet implemented, so the platform has no working detection path without an external Sublime instance.

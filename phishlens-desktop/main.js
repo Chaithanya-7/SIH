@@ -1,34 +1,36 @@
 const { app, BrowserWindow, shell, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const BackendSupervisor = require('./backendSupervisor');
 
 /**
  * PhishLens desktop application.
  *
  * This is the installed counterpart to the browser extension. The extension
  * popup shows only headline counts; its "More info" button opens a
- * phishlens:// deep link, which the operating system routes to this
- * application, which then presents the full SOC investigation console.
+ * phishlens:// deep link, which the operating system routes here, and this
+ * window presents the full SOC console.
  *
- * The console itself is the same PhishLens dashboard build - the desktop app
- * is a shell around it, not a second implementation of it.
+ * The application also runs and watches the backend, so installing PhishLens
+ * means one thing to launch rather than a set of services to start by hand.
+ * The console is not shown until the backend is actually answering, because a
+ * dashboard rendering empty panels is indistinguishable from a healthy one
+ * with no mail in it.
  */
 
 const PROTOCOL = 'phishlens';
 const DEV_DASHBOARD_URL = process.env.PHISHLENS_DASHBOARD_URL || 'http://localhost:3005';
-const BACKEND_URL = process.env.PHISHLENS_API_URL || 'http://localhost:3001';
+const BACKEND_PORT = parseInt(process.env.PHISHLENS_API_PORT || '3001', 10);
 const DEV_MODE = process.env.PHISHLENS_DEV === '1' || process.argv.includes('--dev');
 
 let mainWindow = null;
-/** Route requested by a deep link before the window existed, replayed once it is ready. */
 let pendingRoute = null;
+const supervisor = new BackendSupervisor({ port: BACKEND_PORT });
 
-/** Packaged builds ship the dashboard build output in resources/dashboard. */
 function packagedDashboardIndex() {
     const packaged = path.join(process.resourcesPath || '', 'dashboard', 'index.html');
     if (fs.existsSync(packaged)) return packaged;
 
-    // Running unpackaged from the repo: use the dashboard's local build output.
     const local = path.join(__dirname, '..', 'phishlens-dashboard', 'dist', 'index.html');
     return fs.existsSync(local) ? local : null;
 }
@@ -44,8 +46,6 @@ function parseDeepLink(url) {
     const withoutScheme = url.slice(`${PROTOCOL}://`.length).replace(/\/+$/, '');
     const [route, ...rest] = withoutScheme.split('/');
     if (route === 'case' && rest[0]) {
-        // Only allow the known case-id shape through; never interpolate arbitrary
-        // deep-link text into the loaded URL.
         const caseId = rest[0];
         return /^[A-Za-z0-9-]{1,64}$/.test(caseId) ? { route: 'case', caseId } : { route: 'dashboard' };
     }
@@ -57,12 +57,20 @@ function deepLinkFromArgv(argv) {
     return match ? parseDeepLink(match) : null;
 }
 
-function sendRoute(target) {
-    if (!target) return;
-    if (mainWindow && !mainWindow.webContents.isLoading()) {
-        mainWindow.webContents.send('phishlens:navigate', target);
+function showStartupScreen() {
+    if (!mainWindow) return;
+    mainWindow.loadFile(path.join(__dirname, 'startup.html'));
+}
+
+/** Loads the console itself, once the backend can answer it. */
+function loadConsole() {
+    if (!mainWindow) return;
+
+    const dashboardIndex = packagedDashboardIndex();
+    if (DEV_MODE || !dashboardIndex) {
+        mainWindow.loadURL(DEV_DASHBOARD_URL).catch(() => showStartupScreen());
     } else {
-        pendingRoute = target;
+        mainWindow.loadFile(dashboardIndex);
     }
 }
 
@@ -83,25 +91,21 @@ function createWindow(initialRoute) {
     });
 
     pendingRoute = initialRoute || null;
-
-    const dashboardIndex = packagedDashboardIndex();
-    if (DEV_MODE || !dashboardIndex) {
-        mainWindow.loadURL(DEV_DASHBOARD_URL).catch(() => mainWindow.loadFile(path.join(__dirname, 'setup.html')));
-    } else {
-        mainWindow.loadFile(dashboardIndex);
-    }
+    showStartupScreen();
 
     mainWindow.webContents.on('did-finish-load', () => {
-        if (pendingRoute) {
+        // The startup screen is told where things stand as soon as it can listen.
+        mainWindow.webContents.send('phishlens:backend-status', supervisor.state());
+
+        if (pendingRoute && supervisor.status === 'READY') {
             mainWindow.webContents.send('phishlens:navigate', pendingRoute);
             pendingRoute = null;
         }
     });
 
     mainWindow.webContents.on('did-fail-load', (_event, _code, description) => {
-        mainWindow.loadFile(path.join(__dirname, 'setup.html'), {
-            query: { reason: description || 'unreachable', dashboard: DEV_DASHBOARD_URL, backend: BACKEND_URL }
-        });
+        supervisor.record(`The console failed to load: ${description}`);
+        showStartupScreen();
     });
 
     // The console only ever renders its own content; anything else opens in the
@@ -126,11 +130,31 @@ function focusExistingWindow(route) {
     if (!mainWindow) return;
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.focus();
-    sendRoute(route);
+
+    if (supervisor.status === 'READY') mainWindow.webContents.send('phishlens:navigate', route);
+    else pendingRoute = route;
 }
 
-// A second launch (which is what a deep link from the browser triggers) must
-// surface the window already running rather than starting a second instance.
+// Status changes are pushed to whichever screen is showing, and the console is
+// loaded the moment the backend can actually answer it.
+supervisor.on('status', state => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('phishlens:backend-status', state);
+    }
+    if (state.status === 'READY' && mainWindow && !mainWindow.isDestroyed()) {
+        loadConsole();
+    }
+});
+
+supervisor.on('log', line => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('phishlens:backend-log', line);
+    }
+});
+
+// A deep link from the browser launches a second copy of the app; that copy
+// must hand its request to the running window rather than start a second
+// backend over the same data directory.
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 if (!gotSingleInstanceLock) {
     app.quit();
@@ -139,7 +163,6 @@ if (!gotSingleInstanceLock) {
         focusExistingWindow(deepLinkFromArgv(argv) || { route: 'dashboard' });
     });
 
-    // macOS delivers deep links as an event rather than through argv.
     app.on('open-url', (event, url) => {
         event.preventDefault();
         const target = parseDeepLink(url);
@@ -147,15 +170,15 @@ if (!gotSingleInstanceLock) {
         else pendingRoute = target;
     });
 
-    app.whenReady().then(() => {
+    app.whenReady().then(async () => {
         if (process.defaultApp && process.argv.length >= 2) {
-            // Unpackaged dev run: the executable is electron itself.
             app.setAsDefaultProtocolClient(PROTOCOL, process.execPath, [path.resolve(process.argv[1])]);
         } else {
             app.setAsDefaultProtocolClient(PROTOCOL);
         }
 
         createWindow(deepLinkFromArgv(process.argv) || { route: 'dashboard' });
+        await supervisor.start();
 
         app.on('activate', () => {
             if (BrowserWindow.getAllWindows().length === 0) createWindow({ route: 'dashboard' });
@@ -167,8 +190,27 @@ if (!gotSingleInstanceLock) {
     });
 }
 
+// An orphaned backend would hold the port and stop the app starting next time,
+// so every exit path stops the child this process started.
+app.on('before-quit', () => supervisor.stop());
+process.on('exit', () => supervisor.stop());
+process.on('SIGINT', () => { supervisor.stop(); app.quit(); });
+process.on('SIGTERM', () => { supervisor.stop(); app.quit(); });
+
 ipcMain.handle('phishlens:get-config', () => ({
-    backendUrl: BACKEND_URL,
+    backendUrl: supervisor.baseUrl,
+    // Supplied to the console so a desktop install authenticates without the
+    // user being asked to invent and paste a key.
+    apiKey: supervisor.apiKey,
     dashboardUrl: DEV_DASHBOARD_URL,
     version: app.getVersion()
 }));
+
+ipcMain.handle('phishlens:get-backend-status', () => supervisor.state());
+ipcMain.handle('phishlens:restart-backend', async () => {
+    supervisor.stop();
+    supervisor.stopping = false;
+    supervisor.restarts = 0;
+    await supervisor.start();
+    return supervisor.state();
+});

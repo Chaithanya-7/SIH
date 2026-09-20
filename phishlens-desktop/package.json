@@ -6,6 +6,7 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
+    "test": "node --test tests/*.test.js",
     "build": "electron-builder"
   },
   "license": "ISC",
@@ -19,13 +20,25 @@
     "files": [
       "main.js",
       "preload.js",
-      "setup.html",
-      "renderer/**"
+      "backendSupervisor.js",
+      "startup.html"
     ],
     "extraResources": [
       {
         "from": "../phishlens-dashboard/dist",
         "to": "dashboard"
+      },
+      {
+        "from": "../phishlens-backend",
+        "to": "backend",
+        "filter": [
+          "**/*",
+          "!data/**",
+          "!scratch/**",
+          "!tests/**",
+          "!.env",
+          "!**/*.log"
+        ]
       }
     ],
     "protocols": [
