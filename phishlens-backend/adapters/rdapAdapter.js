@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 const { dataFile } = require('../modules/dataPaths');
+const publicSuffix = require('../modules/publicSuffix');
 
 /**
  * Domain age via RDAP (RFC 7483 / RFC 9083), the IANA-bootstrapped successor
@@ -48,19 +49,19 @@ class RdapAdapter {
     }
 
     /** Reduces a hostname to the registrable domain RDAP will answer for. */
+    /**
+     * Delegated to the Public Suffix List.
+     *
+     * This method used to treat the last two labels as the registrable domain,
+     * with a hardcoded allowance for co.uk and six similar cases. It got 7 of
+     * 10 realistic hosts wrong, and the wrong ones were free hosting platforms:
+     * `evil-bank-login.github.io` reduced to `github.io`, so this lookup
+     * returned GitHub's registration date and a page created that morning
+     * scored as a sixteen-year-old domain. The newly-registered-domain signal
+     * could not fire anywhere an attacker gets a free subdomain.
+     */
     registrableDomain(host) {
-        if (!host) return null;
-        const clean = host.toLowerCase().replace(/\.$/, '');
-        if (/^\d{1,3}(\.\d{1,3}){3}$/.test(clean)) return null;
-        const parts = clean.split('.');
-        if (parts.length < 2) return null;
-
-        // Handles common two-label public suffixes (co.uk, com.au, co.in, ...).
-        const twoLevel = ['co', 'com', 'net', 'org', 'gov', 'edu', 'ac'];
-        if (parts.length >= 3 && twoLevel.includes(parts[parts.length - 2]) && parts[parts.length - 1].length === 2) {
-            return parts.slice(-3).join('.');
-        }
-        return parts.slice(-2).join('.');
+        return publicSuffix.registrableDomain(host);
     }
 
     fetchRdap(domain, timeoutMs = 6000) {

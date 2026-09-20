@@ -1069,3 +1069,88 @@ points at a deleted executable. The practical impact is a dead deep link to an
 application that is gone, and the reinstall case is covered by the claim fix
 above. Removing it would mean dropping the runtime registration entirely, which
 breaks running from source.
+
+## 2026-09-20 — The Public Suffix List, and a false negative it was hiding
+
+Continuing from the source research: of the sources verified, the Public Suffix
+List was the one already needed by code that did not have it.
+
+### The heuristic got 7 of 10 hosts wrong
+
+`rdapAdapter.registrableDomain` treated the last two labels as the registrable
+domain, with a hardcoded allowance for `co.uk` and six similar second-level
+labels. Tested against ten realistic hosts, seven were wrong - and the wrong
+ones were not obscure:
+
+| Host | Heuristic said | Correct |
+|---|---|---|
+| `evil-bank-login.github.io` | `github.io` | `evil-bank-login.github.io` |
+| `secure-login.pages.dev` | `pages.dev` | `secure-login.pages.dev` |
+| `phish.workers.dev` | `workers.dev` | `phish.workers.dev` |
+| `fake.web.app` | `web.app` | `fake.web.app` |
+| `lure.blogspot.com` | `blogspot.com` | `lure.blogspot.com` |
+| `x.netlify.app` | `netlify.app` | `x.netlify.app` |
+| `trust.nhs.uk` | `nhs.uk` | `trust.nhs.uk` |
+
+The consequence was concrete and exploitable. A domain-age lookup for a phishing
+page on `evil-bank-login.github.io` queried `github.io` and got GitHub's own
+registration date - **9,929 days, verified** - so a page created that morning
+scored as a well-established domain. The newly-registered-domain signal could
+not fire anywhere an attacker obtains a free subdomain, which is where phishing
+pages actually live.
+
+No pattern derives this. `co.uk` is a public suffix and `co.com` is not; only
+the list knows.
+
+### Verified against the list's own conformance suite
+
+Not against cases chosen by whoever wrote the implementation - that is exactly
+how the heuristic passed review while being wrong. The official
+`test_psl.txt` was fetched and run: 82 cases, all passing.
+
+The first run failed six of them, revealing two real bugs:
+
+1. **A leading dot was silently accepted.** `.example.com` should have no
+   registrable domain; `filter(Boolean)` dropped the empty label and turned it
+   into `example.com`, answering a question that was never valid. Empty labels
+   now make a host invalid.
+2. **Punycode hosts never matched.** The list is published with unicode labels
+   (`公司.cn`) while hosts arrive from mail headers already in punycode
+   (`xn--55qx5d.cn`). The rule simply never matched and the host fell through to
+   its last two labels - silently, with no error. Rules are now stored in ASCII
+   form.
+
+A third thing looked like a bug and was not: the ASCII-range check appeared in
+the editor as `[^ -]`. The shell that wrote the file had turned the escape
+sequence into literal control bytes, which JavaScript reads as the correct
+range. It was unreadable rather than broken, and has been replaced with a form
+no quoting layer can mangle.
+
+### Correct extraction is not yet a detection
+
+Fixing it only turns a wrong answer into an honest one: RDAP for
+`evil-bank-login.github.io` returns 404, because nobody registered it. That is
+better than a false reassurance, but it detects nothing.
+
+The useful fact is the one the list supplies: the parent is a suffix **anyone
+can obtain a subdomain of**. The attacker inherits a sixteen-year-old reputable
+domain and valid TLS for the price of signing up. An organisation asking a
+customer to sign in does not do so on one.
+
+`MQL-URL-110` acts on that, and is deliberately a MEDIUM at 0.50 - these
+platforms are entirely legitimate and heavily used, so it corroborates rather
+than convicts. Verified to fire on github.io, pages.dev, workers.dev and
+blogspot.com subdomains, and not on `login.paypal.com`, `www.bbc.co.uk`,
+`example.com` or the bare suffix.
+
+### Kept current, safely
+
+The list is bundled in `reference/` rather than fetched during analysis - a
+detection must not depend on a network call - and refreshable, because new
+platforms are added regularly and a missing platform is precisely the blind spot
+this closes. A refresh is sanity-checked before it replaces a working list: a
+captive portal or error page returning 200 with HTML would otherwise silently
+disable registrable-domain extraction for every host. Both failure paths are
+tested.
+
+**186 backend tests** (was 175).

@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { dataFile } = require('./dataPaths');
+const publicSuffix = require('./publicSuffix');
 
 /**
  * Protection for the people an attacker most wants to impersonate or reach.

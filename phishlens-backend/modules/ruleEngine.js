@@ -45,6 +45,7 @@ const EXECUTIVE_TITLE_TERMS = [
 ];
 
 const customDetectionConfig = require('./customDetectionConfig');
+const publicSuffix = require('./publicSuffix');
 
 const URL_SHORTENERS = new Set([
     'bit.ly', 'tinyurl.com', 't.co', 'goo.gl', 'ow.ly', 'is.gd', 'buff.ly',
@@ -187,6 +188,37 @@ const RULES = [
         source: 'CISA / APWG IDN homograph attack guidance',
         description: 'The sending domain is encoded as punycode (xn--), which can be used to visually impersonate a Latin-script brand domain using look-alike Unicode characters.',
         test: (ctx) => ctx.fromDomain && ctx.fromDomain.includes('xn--')
+    },
+
+    // ---------------------------------------------------------------
+    // HOSTING PROVENANCE  (family: URL_RISK)
+    // ---------------------------------------------------------------
+    {
+        id: 'MQL-URL-110',
+        name: 'Link is hosted on a subdomain anyone can register',
+        category: 'URL',
+        severity: 'MEDIUM',
+        confidence: 0.50,
+        mitre: ['T1566.002', 'T1583.001'],
+        source: 'MITRE ATT&CK T1566.002 (Spearphishing Link), T1583.001 (Acquire Infrastructure: Domains); Public Suffix List',
+        description: 'The link sits directly under a public suffix that anyone can obtain a subdomain of - a code-hosting, static-site or edge platform. Those platforms are entirely legitimate and widely used, which is the point: the parent domain is old and reputable, it carries valid TLS, and the attacker inherits all of that for the cost of signing up. An organisation asking a customer to sign in does not do so on one.',
+        test: (ctx) => {
+            for (const url of (ctx.urls || [])) {
+                let host;
+                try { host = new URL(url).hostname.toLowerCase(); } catch (e) { continue; }
+
+                const parent = host.split('.').slice(1).join('.');
+                if (!parent || !publicSuffix.isPublicSuffix(parent)) continue;
+
+                // A bare ICANN suffix like "co.uk" is not what this is about -
+                // only the multi-label private suffixes that platforms register
+                // so their customers get a subdomain each.
+                if (parent.split('.').length < 2) continue;
+
+                return `Link is hosted at ${host}, a subdomain of ${parent} - a platform where anyone can obtain a subdomain, inheriting the parent's age and reputation.`;
+            }
+            return false;
+        }
     },
 
     // ---------------------------------------------------------------
