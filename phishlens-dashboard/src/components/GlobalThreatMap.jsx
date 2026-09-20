@@ -247,11 +247,23 @@ export default function GlobalThreatMap({ points = [], coverage }) {
                     // Deep enough for individual streets and buildings. OpenStreetMap
                     // publishes tiles to zoom 19; asking for more only stretches the
                     // last real tile and invents detail that is not there.
-                    // One level beyond the deepest real imagery. Leaflet
-                    // scales the last genuine tile to fill it, which is a
-                    // slightly soft picture of something real rather than a
-                    // request for a tile that does not exist.
-                    maxZoom={21}
+                    // The ceiling follows whichever basemap is showing.
+                    //
+                    // A fixed 21 let the map zoom two levels past what
+                    // OpenStreetMap publishes, and combined with detectRetina -
+                    // which asks for one level deeper again - it requested
+                    // tiles that do not exist. OpenStreetMap answers those with
+                    // an error rather than a blank, so the map went empty:
+                    // "no map data" at exactly the zoom somebody was trying to
+                    // look closely.
+                    //
+                    // detectRetina is gone with it. At a device ratio near 1
+                    // the sharpness it buys is slight, it doubles every tile
+                    // request, and it moves the real ceiling down a level for
+                    // any source without headroom above it - all three of which
+                    // were working against what was asked for here.
+                    key={basemap.id}
+                    maxZoom={basemap.maxZoom + 1}
                     scrollWheelZoom
                     // The world is not repeated sideways.
                     //
@@ -283,20 +295,24 @@ export default function GlobalThreatMap({ points = [], coverage }) {
                         // stretches the last real tile and invents detail that is
                         // not there; maxNativeZoom lets the map keep zooming while
                         // reusing the deepest tile that actually exists.
-                        maxZoom={21}
+                        // The map stops where the imagery does, plus one.
+                        //
+                        // Leaflet fills a level past maxNativeZoom by scaling
+                        // the deepest real tile. Beyond that there is nothing
+                        // to scale.
+                        maxZoom={basemap.maxZoom + 1}
                         maxNativeZoom={basemap.maxZoom}
-                        // On a high-density display Leaflet fetches the next
-                        // zoom level's tiles and draws them at half size, so a
-                        // screen with more pixels than CSS points gets an image
-                        // matched to it rather than one stretched to fit.
-                        detectRetina
                         // Tiles stop at the edge of the world rather than repeating.
                         noWrap
                         bounds={[[-85, -180], [85, 180]]}
-                        // Nothing is requested mid-gesture. Panning across a
-                        // continent used to fire a request for every tile it
-                        // crossed and then throw them away on arrival.
-                        updateWhenIdle
+                        // Tiles load while the map is still moving.
+                        //
+                        // updateWhenIdle held every request until panning
+                        // stopped, which is a real saving on a slow connection
+                        // and reads as the map refusing to show where you just
+                        // went. Waiting to be certain what to fetch is the
+                        // wrong trade when somebody is looking for a street.
+                        updateWhenIdle={false}
                         updateWhenZooming={false}
                         // One ring of tiles beyond the viewport, not two.
                         //
@@ -319,12 +335,11 @@ export default function GlobalThreatMap({ points = [], coverage }) {
                         <TileLayer
                             key={`${basemap.id}-${overlay.id}`}
                             url={overlay.url}
-                            maxZoom={21}
+                            maxZoom={basemap.maxZoom + 1}
                             maxNativeZoom={overlay.maxZoom}
-                            detectRetina
                             noWrap
                             bounds={[[-85, -180], [85, 180]]}
-                            updateWhenIdle
+                            updateWhenIdle={false}
                             updateWhenZooming={false}
                             keepBuffer={2}
                         />
