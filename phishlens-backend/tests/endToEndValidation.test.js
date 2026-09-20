@@ -73,7 +73,18 @@ const PHISHING_EMAIL = [
 
 test('the complete pipeline runs end to end and every stage contributes', async (t) => {
     const saved = snapshot();
-    ISOLATED.forEach(n => { const f = path.join(DATA, n); if (fs.existsSync(f)) fs.unlinkSync(f); });
+    ISOLATED.forEach(n => {
+        const f = path.join(DATA, n);
+        // Checked and removed in one attempt rather than two: the runner runs
+        // test files in parallel, so another suite clearing the same store
+        // between an existsSync and an unlinkSync makes this throw for a file
+        // that is already gone - the outcome it wanted anyway.
+        try {
+            fs.unlinkSync(f);
+        } catch (e) {
+            if (e.code !== 'ENOENT' && e.code !== 'EPERM') throw e;
+        }
+    });
     fs.writeFileSync(path.join(DATA, 'cases.json'), '[]');
 
     // Load fresh module instances against the now-empty state.
@@ -247,7 +258,18 @@ test('the complete pipeline runs end to end and every stage contributes', async 
 
 test('an ordinary business message survives the same pipeline without being flagged', async () => {
     const saved = snapshot();
-    ISOLATED.forEach(n => { const f = path.join(DATA, n); if (fs.existsSync(f)) fs.unlinkSync(f); });
+    ISOLATED.forEach(n => {
+        const f = path.join(DATA, n);
+        // Checked and removed in one attempt rather than two: the runner runs
+        // test files in parallel, so another suite clearing the same store
+        // between an existsSync and an unlinkSync makes this throw for a file
+        // that is already gone - the outcome it wanted anyway.
+        try {
+            fs.unlinkSync(f);
+        } catch (e) {
+            if (e.code !== 'ENOENT' && e.code !== 'EPERM') throw e;
+        }
+    });
     fs.writeFileSync(path.join(DATA, 'cases.json'), '[]');
 
     const moduleNames = [
