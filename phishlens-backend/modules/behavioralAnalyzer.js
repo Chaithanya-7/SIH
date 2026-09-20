@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { dataFile } = require('./dataPaths');
 
 /**
  * Behavioural analysis branch.
@@ -21,7 +22,7 @@ const path = require('path');
  */
 class BehavioralAnalyzer {
     constructor() {
-        this.storageFile = path.join(__dirname, '../data/sender_baselines.json');
+        this.storageFile = dataFile('sender_baselines.json');
         /** address -> { first_seen, last_seen, message_count, clean_count, display_names[], origin_ips[], send_hours[] } */
         this.senders = new Map();
         /** normalized display name -> [addresses that have used it] */

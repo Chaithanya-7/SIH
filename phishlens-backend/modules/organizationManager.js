@@ -2,10 +2,11 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const userManager = require('./userManager');
+const { dataFile } = require('./dataPaths');
 
 class OrganizationManager {
     constructor() {
-        this.storageFile = path.join(__dirname, '../data/organizations.json');
+        this.storageFile = dataFile('organizations.json');
         this.organizations = new Map();
         this.loadStorage();
     }

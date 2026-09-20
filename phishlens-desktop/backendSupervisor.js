@@ -183,6 +183,13 @@ class BackendSupervisor extends EventEmitter {
                 ...env,
                 PORT: String(this.port),
                 PHISHLENS_API_KEY: this.apiKey,
+                // Cases, tokens and the audit ledger belong with the user, not
+                // inside the installation. A packaged app's own directory is
+                // read-only on Windows and macOS, so a backend writing there
+                // would start and then fail at the first thing it tried to
+                // remember - and on an upgrade or uninstall that history would
+                // be sitting in a directory the installer replaces.
+                PHISHLENS_DATA_DIR: process.env.PHISHLENS_DATA_DIR || path.join(app.getPath('userData'), 'data'),
                 // The console is loaded from a file:// page or the dev server,
                 // so browser-origin CORS is not what authenticates it; the key is.
                 ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS || 'http://localhost:3005',

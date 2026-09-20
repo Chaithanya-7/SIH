@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { dataFile } = require('./dataPaths');
 
 /**
  * Adaptive, real-time learning from confirmed verdicts.
@@ -52,7 +53,7 @@ const MAX_TOKENS_PER_MESSAGE = 150;
 
 class AdaptiveLearning {
     constructor() {
-        this.storageFile = path.join(__dirname, '../data/learned_model.json');
+        this.storageFile = dataFile('learned_model.json');
         /** feature -> { malicious: n, benign: n } */
         this.features = new Map();
         this.totals = { malicious: 0, benign: 0 };

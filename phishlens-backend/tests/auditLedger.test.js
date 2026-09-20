@@ -3,27 +3,27 @@ const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
 
-const LOG_FILE = path.join(__dirname, '../data/audit_log.json');
-const ARCHIVE_FILE = path.join(__dirname, '../data/audit_log_archive.jsonl');
+const os = require('os');
 
-/** Runs against an isolated ledger so the operator's real audit log is untouched. */
+/**
+ * Runs against its own data directory rather than moving the real ledger aside.
+ * `node --test` runs test files concurrently, so relocating a shared file
+ * relocates it for every other test file too.
+ */
 async function withIsolatedLedger(run) {
-    const saved = {};
-    [LOG_FILE, ARCHIVE_FILE].forEach(f => {
-        saved[f] = fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : null;
-        if (saved[f] !== null) fs.unlinkSync(f);
-    });
+    const previous = process.env.PHISHLENS_DATA_DIR;
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'phishlens-ledger-'));
+    process.env.PHISHLENS_DATA_DIR = dir;
     delete require.cache[require.resolve('../modules/auditLogger')];
     const auditLogger = require('../modules/auditLogger');
 
     try {
         return await run(auditLogger);
     } finally {
-        Object.entries(saved).forEach(([f, content]) => {
-            if (content === null) { if (fs.existsSync(f)) fs.unlinkSync(f); }
-            else fs.writeFileSync(f, content);
-        });
+        if (previous === undefined) delete process.env.PHISHLENS_DATA_DIR;
+        else process.env.PHISHLENS_DATA_DIR = previous;
         delete require.cache[require.resolve('../modules/auditLogger')];
+        try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { /* best effort */ }
     }
 }
 
@@ -133,8 +133,10 @@ test('overflowing entries are archived rather than destroyed', async () => {
         assert.ok(before < ACTIVE_LIMIT, 'sanity: still under the limit');
 
         // Archive explicitly and confirm nothing is lost.
-        fs.appendFileSync(ARCHIVE_FILE, JSON.stringify({ description: firstDescription }) + '\n');
-        const archived = fs.readFileSync(ARCHIVE_FILE, 'utf8').split('\n').filter(Boolean);
+        // The path is read off the logger so it follows the isolated data directory.
+        const archiveFile = auditLogger.archiveFile;
+        fs.appendFileSync(archiveFile, JSON.stringify({ description: firstDescription }) + '\n');
+        const archived = fs.readFileSync(archiveFile, 'utf8').split('\n').filter(Boolean);
         assert.ok(archived.length >= 1, 'archived history must be retrievable');
         assert.ok(archived[0].includes(firstDescription));
         void overflowCount;

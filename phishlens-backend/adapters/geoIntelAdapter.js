@@ -2,6 +2,7 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const ipUtils = require('../utils/ipUtils');
+const { dataFile } = require('../modules/dataPaths');
 
 /**
  * IP geolocation.
@@ -26,7 +27,7 @@ const MAX_CACHE_ENTRIES = 20000;
 
 class GeoIntelAdapter {
     constructor() {
-        this.cacheFile = path.join(__dirname, '../data/geo_cache.json');
+        this.cacheFile = dataFile('geo_cache.json');
         this.cache = new Map();
         this.loadCache();
     }

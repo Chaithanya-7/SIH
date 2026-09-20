@@ -105,3 +105,16 @@ to the user's normal browser.
 | `PHISHLENS_DASHBOARD_URL` | `http://localhost:3005` | Console URL used in dev mode |
 | `PHISHLENS_BACKEND_NODE` | unset | Path to a Node binary to run the backend with, instead of Electron's |
 | `PHISHLENS_DEV` / `--dev` | unset | Load the live dev console instead of the bundled build |
+| `PHISHLENS_DATA_DIR` | `<userData>/data` | Where cases, tokens and the audit ledger are kept |
+
+### Where your data lives
+
+Cases, tokens, the campaign graph and the audit ledger are written to
+`PHISHLENS_DATA_DIR`, which the app sets to a `data` folder inside the per-user
+application data directory.
+
+They are deliberately not kept inside the installation. A packaged app's own
+directory is read-only on Windows and macOS, so a backend writing there would
+start and then fail the first time it tried to remember anything — and on an
+upgrade or uninstall that history would be sitting in a directory the installer
+replaces.

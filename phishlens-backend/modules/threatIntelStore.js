@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
+const { dataFile } = require('./dataPaths');
 
 /**
  * Local threat-intelligence store.
@@ -154,7 +155,7 @@ function hostOf(url) {
 
 class ThreatIntelStore {
     constructor() {
-        this.storageFile = path.join(__dirname, '../data/threat_intel.json');
+        this.storageFile = dataFile('threat_intel.json');
         this.urls = new Set();
         /** Hosts observed serving malicious/phishing content, from URL feeds. */
         this.urlHosts = new Map();

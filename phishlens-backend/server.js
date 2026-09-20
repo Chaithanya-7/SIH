@@ -34,6 +34,9 @@ const campaignGraph = require('./modules/campaignGraph');
 const executiveGuard = require('./modules/executiveGuard');
 const policyEngine = require('./modules/policyEngine');
 const remediationEngine = require('./modules/remediationEngine');
+const remediationGateway = require('./modules/remediationGateway');
+const containmentGuard = require('./modules/containmentGuard');
+const dmarcAdvisor = require('./modules/dmarcAdvisor');
 const campaignResponsePlanner = require('./modules/campaignResponsePlanner');
 const iocResponseManager = require('./modules/iocResponseManager');
 const pdfReportGenerator = require('./modules/pdfReportGenerator');
@@ -80,7 +83,18 @@ console.log(`🛡️ Remediation Mode: ${process.env.REMEDIATION_MODE || 'simula
 console.log('='.repeat(70));
 
 // ==================== CORE AUTOMATED PIPELINE EXECUTION ====================
-async function processPipeline(emailContent, source = 'MANUAL_API', clientMessageKey = null) {
+/**
+ * `provenance` is how the pipeline learns that a message can be acted on.
+ *
+ * It used to be absent, so every case defaulted to provider GMAIL with a null
+ * provider_message_id, and remediation could never resolve a target: each
+ * HIGH_RISK case ended ACTION_FAILED whether or not anything was wrong. The
+ * ingestion adapters had the identifiers all along - the Gmail loop held the
+ * message id and mailbox, and the IMAP poller was already passing its UID into
+ * an argument the pipeline did not accept - they simply were not carried
+ * through to the object that needed them.
+ */
+async function processPipeline(emailContent, source = 'MANUAL_API', clientMessageKey = null, provenance = null) {
     console.log(`\n📨 ===== AUTOMATED FORENSIC PIPELINE TRIGGERED (${source}) =====`);
     let messageKey = null;
     try {
@@ -135,6 +149,22 @@ async function processPipeline(emailContent, source = 'MANUAL_API', clientMessag
 
         // 3. Canonical ThreatObject Initialization from PhishLens' own parsed email
         let threatObject = mqlBridge.normalize(parsedEmail, detectionResult, emailContent);
+
+        // Recorded before anything else reads it, so containment resolves a real
+        // target rather than the ThreatObject's defaults. A message with no
+        // provenance is one PhishLens was handed rather than fetched, and saying
+        // so plainly is what lets the remediation layer report it as
+        // "not actionable" instead of "action failed".
+        threatObject.message.source = source;
+        if (provenance) {
+            threatObject.mailbox_provenance = {
+                ...threatObject.mailbox_provenance,
+                ...provenance
+            };
+        } else {
+            threatObject.mailbox_provenance.provider = 'NONE';
+            threatObject.mailbox_provenance.provider_message_id = null;
+        }
 
         // Audit ingestion
         auditLogger.log({
@@ -260,6 +290,12 @@ app.use([
     '/api/vips',
     '/api/audit',
     '/api/remediate',
+    // Listed separately for the same reason as '/api/ingestion': Express
+    // prefix matching needs a path boundary, so '/api/remediate' does not
+    // cover '/api/remediation'. Without this line the posture and
+    // domain-hardening endpoints would be readable without authenticating,
+    // and the admin ones would 401 with no req.user to check.
+    '/api/remediation',
     '/api/reports',
     '/api/auth/me',
     '/api/auth/gmail',
@@ -1083,25 +1119,38 @@ app.get('/api/remediate/actions', (req, res) => {
     res.json({ success: true, actions: remediationEngine.getAllActions() });
 });
 
+/**
+ * Approve a containment a policy raised but deliberately did not carry out.
+ *
+ * The acting analyst is taken from the authenticated session. It used to be
+ * read out of the request body, which let a caller name anybody as the
+ * approver of an action that moves somebody's mail - the one field in an audit
+ * record that has to be trustworthy.
+ */
 app.post('/api/remediate/approve', requireRole('ADMIN'), async (req, res) => {
     try {
-        const { actionId, analystUser, reason } = req.body;
+        const { actionId, reason } = req.body;
         if (!actionId) return res.status(400).json({ success: false, error: 'actionId is required' });
-        const updatedAction = await remediationEngine.approveAction(actionId, analystUser || 'SOC_ANALYST', reason);
+        const updatedAction = await remediationEngine.approveAction(actionId, req.user, reason || 'Analyst approved');
         res.json({ success: true, action: updatedAction });
     } catch (e) {
-        res.status(500).json({ success: false, error: e.message });
+        res.status(400).json({ success: false, error: e.message });
     }
+});
+
+/** Containment requests raised by policy and waiting on a person. */
+app.get('/api/remediate/pending', requireRole('ADMIN'), (req, res) => {
+    res.json({ success: true, actions: remediationEngine.getPendingApprovals() });
 });
 
 app.post('/api/remediate/rollback', requireRole('ADMIN'), async (req, res) => {
     try {
-        const { actionId, analystUser, reason } = req.body;
+        const { actionId, reason } = req.body;
         if (!actionId) return res.status(400).json({ success: false, error: 'actionId is required' });
-        const updatedAction = await remediationEngine.rollbackAction(actionId, analystUser || 'SOC_ANALYST', reason);
+        const updatedAction = await remediationEngine.rollbackAction(actionId, req.user, reason || 'Analyst rollback');
         res.json({ success: true, action: updatedAction });
     } catch (e) {
-        res.status(500).json({ success: false, error: e.message });
+        res.status(400).json({ success: false, error: e.message });
     }
 });
 
@@ -1118,10 +1167,92 @@ app.get('/api/remediate/campaign/:id', async (req, res) => {
 });
 
 app.post('/api/remediate/override', requireRole('ADMIN'), async (req, res) => {
-    const { caseId, action, adminUser } = req.body;
-    if (!caseId || !action) return res.status(400).json({ success: false, error: 'caseId and action are required' });
-    const result = await remediationEngine.adminOverride(caseId, action, adminUser || 'SOC_ADMIN');
-    res.json({ success: true, result });
+    try {
+        const { caseId, action } = req.body;
+        if (!caseId || !action) return res.status(400).json({ success: false, error: 'caseId and action are required' });
+        const result = await remediationEngine.adminOverride(caseId, action, req.user);
+        res.json({ success: true, result });
+    } catch (e) {
+        res.status(400).json({ success: false, error: e.message });
+    }
+});
+
+// ==================== REMEDIATION POSTURE & SAFETY CONTROLS ====================
+
+/**
+ * What this installation can and cannot do to mail, stated without overstating.
+ *
+ * An operator should be able to answer "is anything actually being contained?"
+ * from one request, rather than inferring it from a boot log.
+ */
+app.get('/api/remediation/posture', (req, res) => {
+    res.json({
+        success: true,
+        capability: remediationGateway.capability(),
+        guard: containmentGuard.state(),
+        pending_approvals: remediationEngine.getPendingApprovals().length
+    });
+});
+
+/** What would happen to one case, without anything happening. */
+app.get('/api/remediation/preview/:caseId', requireRole('ADMIN'), (req, res) => {
+    const threatObject = caseManager.getCase(req.params.caseId);
+    if (!threatObject) return res.status(404).json({ success: false, error: 'Case not found' });
+    res.json({ success: true, preview: remediationGateway.preview(threatObject) });
+});
+
+/**
+ * The never-contain list: senders PhishLens must not move automatically.
+ * The realistic failure it prevents is a detection change quarantining payroll
+ * or the service desk - mail whose delay costs more than the phishing it might
+ * occasionally carry.
+ */
+app.get('/api/remediation/never-contain', requireRole('ADMIN'), (req, res) => {
+    res.json({ success: true, entries: containmentGuard.state().never_contain });
+});
+
+app.post('/api/remediation/never-contain', requireRole('ADMIN'), (req, res) => {
+    try {
+        const entries = containmentGuard.addNeverContain(req.body?.entry);
+        auditLogger.log({
+            org_id: req.user.organization_id, user_id: req.user.id,
+            event_type: 'NEVER_CONTAIN_ADDED', source: `ADMIN:${req.user.email}`,
+            description: `Added '${req.body.entry}' to the never-contain list.`
+        });
+        res.json({ success: true, entries });
+    } catch (e) {
+        res.status(400).json({ success: false, error: e.message });
+    }
+});
+
+/**
+ * The only control here that stops a phishing message being deliverable at all,
+ * rather than catching it after it arrives: what your own domains publish.
+ */
+app.get('/api/remediation/domain-posture', async (req, res) => {
+    try {
+        res.json({ success: true, ...(await dmarcAdvisor.assessOwnDomains()) });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+app.get('/api/remediation/domain-posture/:domain', async (req, res) => {
+    try {
+        res.json({ success: true, assessment: await dmarcAdvisor.assess(req.params.domain) });
+    } catch (e) {
+        res.status(400).json({ success: false, error: e.message });
+    }
+});
+
+app.delete('/api/remediation/never-contain/:entry', requireRole('ADMIN'), (req, res) => {
+    const entries = containmentGuard.removeNeverContain(decodeURIComponent(req.params.entry));
+    auditLogger.log({
+        org_id: req.user.organization_id, user_id: req.user.id,
+        event_type: 'NEVER_CONTAIN_REMOVED', source: `ADMIN:${req.user.email}`,
+        description: `Removed '${req.params.entry}' from the never-contain list.`
+    });
+    res.json({ success: true, entries });
 });
 
 // ==================== FORENSIC PDF REPORT GENERATOR API ====================

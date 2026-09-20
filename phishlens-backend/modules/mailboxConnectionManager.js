@@ -1,10 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { dataFile } = require('./dataPaths');
 
 class MailboxConnectionManager {
     constructor() {
-        this.storageFile = path.join(__dirname, '../data/mailbox_connections.json');
+        this.storageFile = dataFile('mailbox_connections.json');
         this.connections = new Map(); // id -> connection
         this.loadStorage();
     }

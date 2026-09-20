@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const AuditEvent = require('../models/AuditEvent');
+const { dataFile } = require('./dataPaths');
 
 /**
  * Tamper-evident audit ledger.
@@ -30,8 +31,8 @@ const ACTIVE_LIMIT = 2000;
 
 class AuditLogger {
     constructor() {
-        this.logFile = path.join(__dirname, '../data/audit_log.json');
-        this.archiveFile = path.join(__dirname, '../data/audit_log_archive.jsonl');
+        this.logFile = dataFile('audit_log.json');
+        this.archiveFile = dataFile('audit_log_archive.jsonl');
         this.events = [];
         this.initStorage();
     }

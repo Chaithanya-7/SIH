@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { dataFile } = require('./dataPaths');
 
 /**
  * Operator-supplied detection content.
@@ -80,7 +81,7 @@ function asList(value) {
 
 class CustomDetectionConfig {
     constructor() {
-        this.configFile = path.join(__dirname, '../data/custom_detection.json');
+        this.configFile = dataFile('custom_detection.json');
         this.rules = [];
         this.nlpPatterns = [];
         this.indicators = { urls: [], domains: [], ips: [] };

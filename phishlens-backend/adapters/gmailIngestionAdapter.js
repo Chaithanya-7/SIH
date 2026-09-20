@@ -312,7 +312,13 @@ class GmailIngestionAdapter {
                 }
 
                 if (this.pipelineHandler) {
-                    await this.pipelineHandler(rawMime, 'GMAIL_PUSH', messageKey);
+                    await this.pipelineHandler(rawMime, 'GMAIL_PUSH', messageKey, {
+                        provider: 'GMAIL',
+                        provider_account: mailboxEmail,
+                        provider_message_id: msgId,
+                        mailbox_connection_id: mailboxConnection.connection_id || null,
+                        organization_id: mailboxConnection.organization_id || null
+                    });
                     processedCount++;
                 }
 

@@ -7,6 +7,7 @@ import CaseInvestigationView from './CaseInvestigationView';
 import EvidenceGraphView from './EvidenceGraphView';
 import ExecutiveView from './ExecutiveView';
 import RemediationTimeline from './RemediationTimeline';
+import ResponsePosture from './ResponsePosture';
 import AuditTimeline from './AuditTimeline';
 import ForensicReportModal from './ForensicReportModal';
 import AuthModal from './AuthModal';
@@ -139,7 +140,9 @@ export default function Dashboard() {
   const totalThreats = cases.length;
   const highRiskCount = cases.filter(c => c.detection?.verdict === 'HIGH_RISK').length;
   const vipAttacksCount = cases.filter(c => c.executive_context?.is_targeted || c.executive_context?.is_impersonated).length;
-  const quarantinedCount = cases.filter(c => c.remediation?.status === 'QUARANTINED').length;
+  // Counts where the message actually is, not what was decided about it, so a
+  // simulated run can never inflate it.
+  const quarantinedCount = cases.filter(c => c.mailbox?.status === 'QUARANTINED').length;
   const activeCampaignsCount = Array.from(new Set(cases.map(c => c.campaign?.campaign_id).filter(Boolean))).length;
 
   const navItems = [
@@ -330,6 +333,7 @@ export default function Dashboard() {
           {/* RESPONSE NAV */}
           {activeNav === 'remediation' && (
             <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <ResponsePosture />
               <RemediationTimeline selectedCase={selectedCase} onRefresh={loadData} />
             </div>
           )}

@@ -5,10 +5,11 @@ const GraphEdge = require('../models/GraphEdge');
 const ipUtils = require('../utils/ipUtils');
 const correlationGuard = require('./correlationGuard');
 const semanticCorrelation = require('./semanticCorrelation');
+const { dataFile } = require('./dataPaths');
 
 class CampaignGraph {
     constructor() {
-        const dbPath = path.join(__dirname, '../data/knowledge_graph.sqlite');
+        const dbPath = dataFile('knowledge_graph.sqlite');
         this.db = new sqlite3.Database(dbPath, (err) => {
             if (err) console.error('[CampaignGraph] SQLite connection error:', err.message);
             else console.log('[CampaignGraph] Connected to persistent SQLite Knowledge Graph.');
@@ -169,7 +170,6 @@ class CampaignGraph {
                     weight: 0.30,
                     evidence: `Attachment SHA-256 payload hash (${h.substring(0, 12)}...) matches cases: ${sharedCases.join(', ')}`
                 });
-                totalWeight += 0.30;
             }
         }
 
@@ -226,7 +226,6 @@ class CampaignGraph {
                     weight: 0.25,
                     evidence: `Identical URL (${u}) detected in cases: ${sharedUrlCases.join(', ')}`
                 });
-                totalWeight += 0.25;
             }
         }
 
@@ -241,7 +240,6 @@ class CampaignGraph {
                     weight: 0.20,
                     evidence: `Sender address ${sender} observed in cases: ${sharedSenderCases.join(', ')}`
                 });
-                totalWeight += 0.20;
             }
         }
 
@@ -256,7 +254,6 @@ class CampaignGraph {
                     weight: 0.15,
                     evidence: `Targeted VIP executive (${targetedExec}) also targeted in cases: ${sharedExecCases.join(', ')}`
                 });
-                totalWeight += 0.15;
             }
         }
 

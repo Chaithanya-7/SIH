@@ -357,3 +357,174 @@ Previously the desktop app was a shell that expected the backend to already be r
 ### Next architectural gap (not yet started)
 
 - `DETECTION_PROVIDER` is still hardcoded to `sublime` with no local Sublime service in this repository — every ingestion path still calls out to an external, unconfigured detection dependency for MQL/rule matching (`mqlBridge.js` only normalizes a Sublime response; it does not run its own rules). This is the single largest remaining gap against the master plan's Phase 3 (Detection Engine): a native, source-cited MQL/rule engine (MITRE ATT&CK, APWG, CISA, OWASP, abuse.ch/OpenPhish/PhishTank-seeded rules per the compact plan) is not yet implemented, so the platform has no working detection path without an external Sublime instance.
+
+## 2026-09-20 — Phase 6: making the response layer real, and honest about what it is not
+
+Detection was finished and the response layer behind it was not. What was there
+looked complete from the outside — a mode switch, a quarantine queue, approve
+and rollback endpoints — and four separate parts of it did nothing at all.
+
+### What was actually wrong
+
+**The simulation switch decided nothing.** `REMEDIATION_MODE` was read by
+`mailboxActionAdapter`, which had **zero callers**. The remediation engine
+imported the Gmail adapter and called it directly. The server printed
+`Remediation Mode: simulation` at boot and `/api/summary` reported `SIMULATION`
+to the console, while the code underneath would have issued a real Gmail modify
+call. The only thing preventing live mail from being touched was that no mailbox
+had been connected yet; connecting one would have turned a setting that reads as
+a safety switch into a label on a live wire.
+
+**Every high-risk case was recorded as a failure.** Nothing ever wrote
+`mailbox_provenance`, so every case carried the object's defaults — provider
+`GMAIL`, `provider_message_id: null` — and containment could not resolve a
+target. Verified by running it: a HIGH_RISK case came back
+`remediation.status = FAILED`, `mailbox.status = ACTION_FAILED`. The console
+would have shown a wall of action failures for messages that were never
+actionable, with genuine provider failures indistinguishable among them. The
+identifiers existed the whole time: the Gmail loop held the message id and
+mailbox and handed them to the dedup store, and the IMAP poller was already
+passing its UID into a fourth argument `processPipeline` did not accept.
+
+**The safety guard could never fire.** It refused containment when
+`detection.is_dev_fallback` was set or `verification_status` contained
+`DEVELOPMENT` — fields from the era when detection was delegated to an external
+service. `mqlBridge` assigns `is_dev_fallback` the literal value `false` and the
+rule engine always sets `verification_status` to `PHISHLENS_NATIVE_MQL_VERIFIED`.
+The condition was unsatisfiable. To anyone auditing the file it read as a safety
+interlock; it was inert.
+
+**Three endpoints called methods that did not exist.**
+`/api/remediate/approve`, `/rollback` and `/override` called `approveAction`,
+`rollbackAction` and `adminOverride`. None were defined on the engine. An
+approval-gated policy could never be approved, and no action could be undone.
+
+**A 0.95-confidence HIGH_RISK message got `NO_ACTION`.** Found by running a BEC
+message through the live API. Every quarantine policy carried its own extra
+condition — executive context, a Return-Path mismatch, campaign correlation —
+and the warning policy only fired between 0.40 and 0.60. A message matching none
+of them fell through to `DEFAULT_ALLOW`. Detection reached the right conclusion
+and the response layer did nothing with it.
+
+### What replaces it
+
+**One chokepoint** (`modules/remediationGateway.js`). Every change to a real
+mailbox goes through it and nothing else reaches Gmail or IMAP. It distinguishes
+five outcomes, because conflating them is how a system ends up lying about
+itself: `CONTAINED`/`RELEASED` mean a provider confirmed the change on read-back;
+`WARNED` means marked and deliberately left delivered; `SIMULATED` means decided
+and not carried out; `NOT_ACTIONABLE` means there is no mailbox to reach into — a
+normal result for a message handed to us as bytes; `FAILED` means a real attempt
+against a real mailbox failed, and is the only one worth an alarm.
+
+`mailbox.status` now answers only the physical question — where is the message.
+In simulation the answer is `INBOX`, so the dashboard's quarantine count stays
+correct without knowing anything about modes.
+
+**Guards that can actually refuse** (`modules/containmentGuard.js`), each naming
+itself in the audit trail: a confidence floor above the HIGH_RISK line, because a
+human reviewing a queue and a machine moving mail unasked are different risks;
+two independent evidence families or one decisive finding, with `LEARNED_PATTERN`
+excluded so a mistaken lesson cannot be a leg the decision stands on; an operator
+never-contain list for mail whose delay costs more than the phishing it might
+carry; and a burst ceiling so a misfiring rule cannot empty an inbox before
+anyone notices.
+
+**Provenance carried from ingestion**, so containment resolves a real target and
+a file upload is reported as not actionable — naming the source — rather than as
+a failure.
+
+**IMAP containment** (`adapters/imapActionAdapter.js`), because remediation was
+Gmail-only: a message could be analysed, scored and correlated and then not acted
+on. Containment is a move into a folder, never a delete. Verification cannot
+follow the UID — a moved message gets a new one — so it searches by the RFC 5322
+Message-ID, which meant carrying that field through from parsing.
+
+**Recipient warnings, described accurately.** PhishLens does not rewrite the body
+of a delivered message. No provider permits editing mail already in a mailbox,
+and a tool claiming to inject a banner into delivered mail is either rewriting at
+the gateway before delivery or not doing it. What it does is apply a visible
+provider label — a Gmail label, an IMAP keyword — and `recipient_visible` is true
+only where a provider confirmed it on read-back.
+
+**Policy coverage closed.** Every verdict now maps to a response; the specific
+policies still take precedence because they explain themselves better. A test
+walks confidence from 0.35 to 0.99 and asserts nothing falls through.
+
+**Prevention, not just reaction** (`modules/dmarcAdvisor.js`). Everything else
+here reacts to a message already sent. A domain published with DMARC `p=reject`
+cannot be spoofed outright, which pushes an attacker onto a lookalike domain —
+something detection catches far more reliably. The advisor assesses the
+operator's own domains and returns the DNS record to publish, a staged rollout
+rather than a jump to reject, and the consequence of leaving it. Checked against
+real DNS: `gmail.com` correctly reported HIGH on its published `p=none`,
+`paypal.com` OK on `p=reject`.
+
+### Two defects found while verifying, outside Phase 6
+
+**`campaignGraph.js` crashed the entire pipeline.** `totalWeight` is incremented
+in four places and declared nowhere; a class method is strict mode, so each
+assignment threw `ReferenceError`. The pipeline died the moment a case shared a
+hash, URL, sender or executive target with an earlier one — precisely when
+correlation becomes useful. The lines were also dead: scoring moved to
+`correlationGuard.scoreFactors()`, which groups correlated indicators instead of
+summing them. Removed.
+
+**`/api/remediation/*` was unauthenticated.** The authenticated prefix list
+contained `/api/remediate`, and Express prefix matching needs a path boundary, so
+it did not cover `/api/remediation`. The admin routes failed closed with 401, but
+posture and domain-hardening were publicly readable. Same class of bug as the
+earlier `/api/ingest/email` vs `/api/ingest/file` gap; the file already carried a
+comment explaining exactly this hazard.
+
+### Where data lives
+
+Twenty-one storage paths across eighteen modules resolved to a `data` folder
+beside their own source. That is wrong twice over: a packaged desktop app's
+directory is read-only on Windows and macOS, so the install shipped in the
+previous chunk would have started and then failed at the first thing it tried to
+remember; and in the test suite every module resolved to the same fixed folder,
+so a test isolating its own state by moving those files aside did it to every
+other test file running concurrently. That is not hypothetical — it is how it was
+found, with the end-to-end test losing its own case mid-run.
+
+All of them now go through `modules/dataPaths.js`, honouring
+`PHISHLENS_DATA_DIR`. The desktop supervisor points it at the per-user
+application data directory. Unset, the behaviour is exactly as before. A test
+asserts no module has slipped back to a hard-coded path.
+
+### Verified
+
+| Check | Result |
+|---|---|
+| Simulation reaches the provider | 0 calls |
+| Simulated case counted as quarantined | 0 of 3 |
+| Live containment on confirmed read-back | reported CONTAINED |
+| Provider that does not confirm | FAILED, not contained |
+| File-uploaded HIGH_RISK case | NOT_ACTIONABLE, source named |
+| Guard refusals (confidence, corroboration, list, burst) | each blocked, provider untouched |
+| Burst limit of 3 across 5 messages | 3 contained, 2 held, 3 provider calls |
+| Approval-gated policy | 0 provider calls until approved |
+| Rollback of a simulated action | refused, with the reason |
+| `/api/remediation/*` without a key | 401 on every route |
+| Two related messages through the live API | both complete (crashed before) |
+| Full suite, three consecutive runs | 139 / 139 each time |
+
+**139 backend tests** (up from 92 — remediation had none), **9 desktop tests**,
+dashboard builds clean.
+
+### Still not built, and why
+
+- **URL rewriting / click-time re-verification** needs a click-through endpoint
+  the user hosts. Buildable locally, but it is a service with its own
+  availability story, not a module.
+- **Attachment sandbox detonation** needs an isolated VM or container.
+  `attachmentAnalyzer` does static metadata and hash analysis with no execution;
+  calling that detonation would be false.
+- **IOC sharing to PhishTank/APWG** sends the operator's data to a third party.
+  That is their decision to make, not a default.
+
+**Phase 6 remains blocked on one thing only for live operation**: a Google Cloud
+OAuth client (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GMAIL_REDIRECT_URI`),
+a connected mailbox, and `REMEDIATION_MODE=live`. Until then every action is
+reported as simulated, and the console says so at the top of the Response view.

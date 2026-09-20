@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { dataFile } = require('./dataPaths');
 
 /**
  * Protection for the people an attacker most wants to impersonate or reach.
@@ -34,8 +35,8 @@ const MAX_TARGETING_HISTORY = 500;
 
 class ExecutiveGuard {
     constructor() {
-        this.configFile = path.join(__dirname, '../data/executive_directory.json');
-        this.historyFile = path.join(__dirname, '../data/executive_targeting.json');
+        this.configFile = dataFile('executive_directory.json');
+        this.historyFile = dataFile('executive_targeting.json');
         this.people = [];
         this.organizationDomains = [];
         /** person id -> [{ case_id, at }] */

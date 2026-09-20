@@ -485,6 +485,30 @@ class PDFReportGenerator {
         this.kv(doc, 'Policy matched', threatObject.remediation?.policy_matched || 'None');
         this.kv(doc, 'Provider action state', threatObject.provider_action?.status);
 
+        // The three facts a reader of this report most needs and is least able
+        // to infer: whether this installation acts on mail at all, where the
+        // message physically is now, and - if nothing was done - which control
+        // decided that. A report that states a status without them invites the
+        // reader to assume the message was contained.
+        this.kv(doc, 'Response mode', (threatObject.remediation?.mode || threatObject.remediation?.capability?.mode || 'unknown').toUpperCase());
+        this.kv(doc, 'Message location now', threatObject.mailbox?.status === 'QUARANTINED'
+            ? 'Quarantined - removed from the inbox'
+            : threatObject.mailbox?.status === 'RELEASED'
+                ? 'Restored to the inbox'
+                : 'Still in the recipient inbox');
+        if (threatObject.remediation?.blocked_by) {
+            this.kv(doc, 'Held back by', threatObject.remediation.blocked_by);
+        }
+        if (threatObject.remediation?.detail) {
+            this.body(doc, threatObject.remediation.detail, COLORS.muted, 8);
+        }
+        if (threatObject.remediation?.warning) {
+            doc.moveDown(0.2);
+            this.kv(doc, 'Recipient warned', threatObject.remediation.warning.recipient_visible
+                ? 'Yes - the warning is visible to the recipient'
+                : 'No - the warning is recorded on this case only');
+        }
+
         let actions = [];
         try {
             actions = (remediationEngine.getAllActions() || []).filter(a => a.case_id === threatObject.case_id);

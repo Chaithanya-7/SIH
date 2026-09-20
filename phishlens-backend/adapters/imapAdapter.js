@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const Imap = require('imap');
 const ingestionRegistry = require('../modules/ingestionRegistry');
+const { dataFile } = require('../modules/dataPaths');
 
 class IMAPAdapter {
     constructor() {
@@ -18,7 +19,7 @@ class IMAPAdapter {
             tlsOptions: { rejectUnauthorized: process.env.IMAP_ALLOW_INVALID_CERT !== 'true' }
         };
         this.onMailReceived = null;
-        this.stateFile = path.join(__dirname, '../data/imap_state.json');
+        this.stateFile = dataFile('imap_state.json');
         this.lastProcessedUid = this.loadLastUid();
         this.isProcessing = false;
         this.pollInterval = null;
@@ -139,7 +140,13 @@ class IMAPAdapter {
                                 stream.once('end', async () => {
                                     try {
                                         if (this.onMailReceived) {
-                                            await this.onMailReceived(rawMessage, 'IMAP_INBOX', null, currentUid);
+                                            await this.onMailReceived(rawMessage, 'IMAP_INBOX', null, {
+                                                provider: 'IMAP',
+                                                provider_account: this.config.user,
+                                                provider_message_id: String(currentUid),
+                                                uid: currentUid,
+                                                folder: 'INBOX'
+                                            });
                                             ingestionRegistry.recordMessage('imap_poller');
                                             if (currentUid > 0) {
                                                 this.saveLastUid(currentUid);

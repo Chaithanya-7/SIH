@@ -1,9 +1,10 @@
 const fs = require('fs');
 const path = require('path');
+const { dataFile } = require('./dataPaths');
 
 class TokenStore {
     constructor() {
-        this.storageFile = path.join(__dirname, '../data/tokens.json');
+        this.storageFile = dataFile('tokens.json');
         this.tokens = new Map(); // userId -> tokenData
         this.loadStorage();
     }

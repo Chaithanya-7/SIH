@@ -12,6 +12,13 @@ class ThreatObject {
             recipient: data.message?.recipient || '',
             subject: data.message?.subject || '',
             raw_hash: data.message?.raw_hash || '',
+            // Carried because it is the only handle that survives a mailbox
+            // move: an IMAP message gets a new UID in its destination folder,
+            // so a release has nothing else to search for.
+            message_id: data.message?.message_id || '',
+            // The ingestion path this message arrived on, so an explanation can
+            // name it rather than saying "unknown source".
+            source: data.message?.source || '',
             delivered_at: data.message?.delivered_at || new Date().toISOString()
         };
 

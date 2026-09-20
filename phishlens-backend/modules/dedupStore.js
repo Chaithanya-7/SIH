@@ -1,10 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { dataFile } = require('./dataPaths');
 
 class DedupStore {
     constructor() {
-        this.storageFile = path.join(__dirname, '../data/processed_messages.json');
+        this.storageFile = dataFile('processed_messages.json');
         this.records = new Map();
         this.loadStorage();
     }

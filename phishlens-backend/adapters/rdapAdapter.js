@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
+const { dataFile } = require('../modules/dataPaths');
 
 /**
  * Domain age via RDAP (RFC 7483 / RFC 9083), the IANA-bootstrapped successor
@@ -17,7 +18,7 @@ const https = require('https');
  */
 class RdapAdapter {
     constructor() {
-        this.cacheFile = path.join(__dirname, '../data/domain_age_cache.json');
+        this.cacheFile = dataFile('domain_age_cache.json');
         this.cache = new Map();
         this.negativeTtlMs = 7 * 24 * 3600 * 1000;
         this.loadCache();

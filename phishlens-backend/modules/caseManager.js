@@ -3,11 +3,12 @@ const path = require('path');
 const crypto = require('crypto');
 const executiveGuard = require('./executiveGuard');
 const policyEngine = require('./policyEngine');
+const { dataFile } = require('./dataPaths');
 
 class CaseManager {
     constructor() {
         this.cases = new Map();
-        this.storageFile = path.join(__dirname, '../data/cases.json');
+        this.storageFile = dataFile('cases.json');
         this.initStorage();
     }
 

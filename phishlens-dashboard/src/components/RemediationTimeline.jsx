@@ -27,7 +27,7 @@ export default function RemediationTimeline({ selectedCase, onRefresh }) {
     return () => clearInterval(interval);
   }, []);
 
-  const pendingApprovals = actionsList.filter(a => a.status === 'ACTION_REQUESTED' || a.authorization?.mode === 'REQUIRE_APPROVAL');
+  const pendingApprovals = actionsList.filter(a => a.status === 'REQUESTED');
   const succeededActions = actionsList.filter(a => a.status === 'ACTION_SUCCEEDED');
   const failedActions = actionsList.filter(a => a.status === 'ACTION_FAILED' || a.status === 'VERIFICATION_FAILED');
   const reversedActions = actionsList.filter(a => a.status === 'REVERSED');
@@ -35,7 +35,7 @@ export default function RemediationTimeline({ selectedCase, onRefresh }) {
   const handleApprove = async (actionId) => {
     setLoading(true);
     try {
-      await api.approveRemediationAction(actionId, 'SOC_ANALYST', approvalReason || 'Analyst approval');
+      await api.approveRemediationAction(actionId, approvalReason || 'Analyst approval');
       alert(`Action ${actionId} approved and executed.`);
       setApprovalReason('');
       loadRemediationData();
@@ -51,7 +51,7 @@ export default function RemediationTimeline({ selectedCase, onRefresh }) {
     if (!window.confirm(`Are you sure you want to restore the message for Action ${actionId}? This will move the message back to INBOX.`)) return;
     setLoading(true);
     try {
-      await api.rollbackRemediationAction(actionId, 'SOC_ANALYST', 'False positive rollback requested');
+      await api.rollbackRemediationAction(actionId, 'False positive rollback requested');
       alert(`Action ${actionId} rolled back successfully.`);
       loadRemediationData();
       if (onRefresh) onRefresh();

@@ -32,6 +32,7 @@ class MQLBridge {
                 recipient: recipients,
                 subject: parsedEmail.subject || '(No Subject)',
                 raw_hash: rawHash,
+                message_id: parsedEmail.messageId || '',
                 delivered_at: parsedEmail.date || new Date().toISOString()
             },
             detection: {

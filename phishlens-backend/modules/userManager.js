@@ -1,11 +1,12 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { dataFile } = require('./dataPaths');
 
 class UserManager {
     constructor() {
-        this.storageFile = path.join(__dirname, '../data/users.json');
-        this.sessionsFile = path.join(__dirname, '../data/sessions.json');
+        this.storageFile = dataFile('users.json');
+        this.sessionsFile = dataFile('sessions.json');
         this.users = new Map();
         this.sessions = new Map(); // sessionToken -> userId
         this.loadStorage();

@@ -147,12 +147,39 @@ export const api = {
     const res = await axios.get(`${API_BASE}/remediate/actions`);
     return res.data;
   },
-  approveRemediationAction: async (actionId, analystUser = 'SOC_ANALYST', reason = 'Approved') => {
-    const res = await axios.post(`${API_BASE}/remediate/approve`, { actionId, analystUser, reason });
+  // Who is acting comes from the authenticated session on the server, not from
+  // this payload. Sending a name here never determined the audit record and no
+  // longer pretends to.
+  approveRemediationAction: async (actionId, reason = 'Approved') => {
+    const res = await axios.post(`${API_BASE}/remediate/approve`, { actionId, reason });
     return res.data;
   },
-  rollbackRemediationAction: async (actionId, analystUser = 'SOC_ANALYST', reason = 'Rollback') => {
-    const res = await axios.post(`${API_BASE}/remediate/rollback`, { actionId, analystUser, reason });
+  rollbackRemediationAction: async (actionId, reason = 'Rollback') => {
+    const res = await axios.post(`${API_BASE}/remediate/rollback`, { actionId, reason });
+    return res.data;
+  },
+  getRemediationPosture: async () => {
+    const res = await axios.get(`${API_BASE}/remediation/posture`);
+    return res.data;
+  },
+  getPendingApprovals: async () => {
+    const res = await axios.get(`${API_BASE}/remediation/pending`);
+    return res.data;
+  },
+  getDomainPosture: async () => {
+    const res = await axios.get(`${API_BASE}/remediation/domain-posture`);
+    return res.data;
+  },
+  getNeverContain: async () => {
+    const res = await axios.get(`${API_BASE}/remediation/never-contain`);
+    return res.data;
+  },
+  addNeverContain: async (entry) => {
+    const res = await axios.post(`${API_BASE}/remediation/never-contain`, { entry });
+    return res.data;
+  },
+  removeNeverContain: async (entry) => {
+    const res = await axios.delete(`${API_BASE}/remediation/never-contain/${encodeURIComponent(entry)}`);
     return res.data;
   },
   getIocResponseList: async () => {
@@ -163,8 +190,8 @@ export const api = {
     const res = await axios.get(`${API_BASE}/remediate/campaign/${campaignId}`);
     return res.data;
   },
-  overrideRemediation: async (caseId, action, adminUser = 'SOC_ANALYST') => {
-    const res = await axios.post(`${API_BASE}/remediate/override`, { caseId, action, adminUser });
+  overrideRemediation: async (caseId, action) => {
+    const res = await axios.post(`${API_BASE}/remediate/override`, { caseId, action });
     return res.data;
   },
   analyzeEmail: async (emailContent) => {
