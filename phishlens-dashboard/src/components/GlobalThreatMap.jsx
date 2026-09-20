@@ -120,6 +120,10 @@ const BASEMAPS = [
 // leaves very little to read. Satellite imagery is already dark, needs no
 // filtering at all, and separates land from sea by itself. The drawn maps stay
 // one choice away for anyone who wants labels and borders.
+// One level past the deepest imagery any basemap offers. A source that stops
+// sooner says so through its own maxNativeZoom.
+const DEEPEST_ZOOM = Math.max(...BASEMAPS.map(b => b.maxZoom)) + 1;
+
 const DEFAULT_BASEMAP = 'satellite';
 const BASEMAP_STORAGE_KEY = 'phishlens.basemap';
 
@@ -262,8 +266,17 @@ export default function GlobalThreatMap({ points = [], coverage }) {
                     // request, and it moves the real ceiling down a level for
                     // any source without headroom above it - all three of which
                     // were working against what was asked for here.
-                    key={basemap.id}
-                    maxZoom={basemap.maxZoom + 1}
+                    // Fixed, and not keyed to the basemap.
+                    //
+                    // react-leaflet reads this once, at creation, so keying the
+                    // map on the basemap was what made a changed maxZoom take
+                    // effect - at the cost of rebuilding the whole map and
+                    // throwing away wherever somebody had navigated to. Each
+                    // layer's maxNativeZoom already stops it requesting tiles
+                    // its source does not publish; past that Leaflet scales the
+                    // deepest real one, which is why this can simply be the
+                    // deepest any of them reach.
+                    maxZoom={DEEPEST_ZOOM}
                     scrollWheelZoom
                     // The world is not repeated sideways.
                     //
@@ -273,11 +286,21 @@ export default function GlobalThreatMap({ points = [], coverage }) {
                     // `worldCopyJump` made it worse by teleporting the view between
                     // copies mid-drag, which is the jump that felt like a glitch.
                     worldCopyJump={false}
-                    // A firm edge, so the world cannot be dragged off into
-                    // blank space. `noWrap` on the tile layers stops the tiles
-                    // themselves repeating; this stops the view wandering past
-                    // where there are any.
-                    maxBounds={[[-85, -180], [85, 180]]}
+                    // The real edge of the projected world, not a number near it.
+                    //
+                    // These were +/-85, which reads as "the whole world" and is
+                    // not: Web Mercator ends at 85.0511287798066, so a bound of
+                    // 85 sits inside it. The same figures were also on the tile
+                    // layers, where Leaflet takes them as a filter on which
+                    // tiles may be requested - and every tile in the top and
+                    // bottom rows extends to 85.0511, so none of them were ever
+                    // fetched. At low zoom that row is the whole of Russia,
+                    // Scandinavia, Canada and Alaska, drawn as nothing at all.
+                    //
+                    // The tile layers have no bounds now: noWrap already stops
+                    // the world repeating sideways, which was the only thing
+                    // they were there for.
+                    maxBounds={[[-85.0511287798066, -180], [85.0511287798066, 180]]}
                     maxBoundsViscosity={1.0}
                     style={{ height: '100%', width: '100%', backgroundColor: 'var(--bg-code)' }}
                 >
@@ -300,11 +323,10 @@ export default function GlobalThreatMap({ points = [], coverage }) {
                         // Leaflet fills a level past maxNativeZoom by scaling
                         // the deepest real tile. Beyond that there is nothing
                         // to scale.
-                        maxZoom={basemap.maxZoom + 1}
+                        maxZoom={DEEPEST_ZOOM}
                         maxNativeZoom={basemap.maxZoom}
                         // Tiles stop at the edge of the world rather than repeating.
                         noWrap
-                        bounds={[[-85, -180], [85, 180]]}
                         // Tiles load while the map is still moving.
                         //
                         // updateWhenIdle held every request until panning
@@ -335,10 +357,9 @@ export default function GlobalThreatMap({ points = [], coverage }) {
                         <TileLayer
                             key={`${basemap.id}-${overlay.id}`}
                             url={overlay.url}
-                            maxZoom={basemap.maxZoom + 1}
+                            maxZoom={DEEPEST_ZOOM}
                             maxNativeZoom={overlay.maxZoom}
                             noWrap
-                            bounds={[[-85, -180], [85, 180]]}
                             updateWhenIdle={false}
                             updateWhenZooming={false}
                             keepBuffer={2}

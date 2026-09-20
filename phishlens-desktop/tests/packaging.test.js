@@ -272,3 +272,24 @@ test('the provisioned settings are untracked, so a key cannot be committed', () 
     assert.strictEqual(tracked, '',
         'provisioned.js is tracked - the application writes a real key into it, one git add from being published');
 });
+
+test('the extension source can be pointed at a checkout, and a bad pointer is ignored', () => {
+    // A packaged install ships its own extension and cannot know a source
+    // checkout exists, so edits to the source only reached the browser after a
+    // rebuild and reinstall. A pointer file beside the application data
+    // redirects it - but only when it names something that is really an
+    // extension, so a folder that has since moved falls back rather than
+    // leaving the console printing a path that is not there.
+    const source = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
+
+    assert.match(source, /extension-source\.txt/, 'there must be a pointer file');
+    assert.match(source, /manifest\.json/,
+        'a pointer is only honoured when it names a real extension');
+    assert.match(source, /app\.isPackaged/,
+        'and it still falls back to the bundled copy');
+
+    // Not an environment variable: it has to survive a restart and belong to
+    // this install rather than to the shell that launched it.
+    assert.doesNotMatch(source, /process\.env\.PHISHLENS_EXTENSION/,
+        'the source folder is not taken from the environment');
+});

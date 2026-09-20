@@ -285,10 +285,49 @@ process.on('SIGTERM', () => { supervisor.stop(); app.quit(); });
  */
 let publishedExtensionPath = null;
 
-function publishConfiguredExtension() {
-    const bundled = app.isPackaged
+/**
+ * Where the extension somebody loads should come from.
+ *
+ * A packaged install ships its own copy and has no idea a source checkout
+ * exists, so it configured the one it shipped - which works, and means edits to
+ * the source only reach the browser after a rebuild and reinstall. That is the
+ * wrong loop to be in while developing the thing.
+ *
+ * A file beside the application's data can point somewhere else. It holds one
+ * line, a path, and is honoured only if that path is really an extension - so a
+ * stale pointer to a folder that has been moved falls back rather than failing.
+ *
+ * Deliberately not an environment variable: this needs to survive a restart and
+ * belong to this install, not to the shell that happened to launch it. And
+ * deliberately not baked in at build time, because a path from the machine that
+ * built an installer means nothing on the machine that runs it.
+ */
+const EXTENSION_SOURCE_POINTER = 'extension-source.txt';
+
+function extensionSourceDir() {
+    const pointerFile = path.join(app.getPath('userData'), EXTENSION_SOURCE_POINTER);
+
+    try {
+        if (fs.existsSync(pointerFile)) {
+            const configured = fs.readFileSync(pointerFile, 'utf8').trim();
+            if (configured && fs.existsSync(path.join(configured, 'manifest.json'))) {
+                return configured;
+            }
+            if (configured) {
+                supervisor.record(`[Extension] ${pointerFile} points at ${configured}, which has no manifest.json - using the bundled copy.`);
+            }
+        }
+    } catch (e) {
+        supervisor.record(`[Extension] Could not read ${pointerFile}: ${e.message}`);
+    }
+
+    return app.isPackaged
         ? path.join(process.resourcesPath, 'phishlens-extension')
         : path.join(__dirname, '..', 'phishlens-extension');
+}
+
+function publishConfiguredExtension() {
+    const bundled = extensionSourceDir();
 
     try {
         publishedExtensionPath = publishExtension({
