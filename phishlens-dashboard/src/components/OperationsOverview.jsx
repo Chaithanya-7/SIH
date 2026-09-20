@@ -254,101 +254,122 @@ export default function OperationsOverview({ cases = [], onOpenCase, onNavigate 
                 </div>
             )}
 
-            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                <StatCard label="Emails examined" value={counts.total} tone="accent" />
-                <StatCard label="Dangerous" value={counts.high_risk} tone="danger" />
-                <StatCard label="Suspicious" value={counts.suspicious} tone="warning" />
-                <StatCard label="Looks fine" value={counts.safe} tone="success" />
-                <StatCard label="Held back" value={counts.quarantined} sub={`${counts.awaiting_review} waiting for a decision`} />
-                <StatCard label="Linked attacks" value={counts.campaigns} sub={`${counts.executive_incidents} aimed at a protected person`} />
+            {/*
+              * Two columns, with the map given the height it needs.
+              *
+              * This was one tall stack, so the map sat between a list and a
+              * chart and nothing could be compared without scrolling past
+              * something else. A summary screen is meant to be taken in at
+              * once: the numbers and the detail on the left, where reading
+              * starts, and the map beside them rather than below.
+              *
+              * `desktop-grid` is what collapses this to a single column under
+              * 1024px. The class used here before, `overview-split`, had no CSS
+              * rule behind it at all, so the layout never collapsed and a
+              * narrow window squeezed both columns instead of stacking them.
+              */}
+            <div
+                className="desktop-grid"
+                style={{ display: 'grid', gridTemplateColumns: '1.55fr 1fr', gap: '16px', alignItems: 'start' }}
+            >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', minWidth: 0 }}>
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                            <StatCard label="Emails examined" value={counts.total} tone="accent" />
+                            <StatCard label="Dangerous" value={counts.high_risk} tone="danger" />
+                            <StatCard label="Suspicious" value={counts.suspicious} tone="warning" />
+                            <StatCard label="Looks fine" value={counts.safe} tone="success" />
+                            <StatCard label="Held back" value={counts.quarantined} sub={`${counts.awaiting_review} waiting for a decision`} />
+                            <StatCard label="Linked attacks" value={counts.campaigns} sub={`${counts.executive_incidents} aimed at a protected person`} />
+                        </div>
+
+                    <EveryEmail cases={cases} onOpenCase={onOpenCase} />
+
+                    <Panel title="Activity over the last 24 hours" subtitle="Messages analysed per 30 minutes, by verdict">
+                        {counts.total === 0 ? (
+                            <div style={{ color: 'var(--text-dim)', fontSize: '0.78rem', fontStyle: 'italic', padding: '30px 0', textAlign: 'center' }}>
+                                No messages have been analysed yet.
+                            </div>
+                        ) : (
+                            <div style={{ height: '230px' }}>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={chartData} margin={{ top: 6, right: 8, left: -20, bottom: 0 }}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                                        <XAxis dataKey="time" tick={{ fill: 'var(--text-dim)', fontSize: 10 }} interval="preserveStartEnd" minTickGap={40} />
+                                        <YAxis tick={{ fill: 'var(--text-dim)', fontSize: 10 }} allowDecimals={false} />
+                                        <ReTooltip
+                                            contentStyle={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.75rem' }}
+                                            labelStyle={{ color: 'var(--text-primary)' }}
+                                        />
+                                        <Area type="monotone" dataKey="Safe" stackId="1" stroke="var(--success)" fill="var(--success)" fillOpacity={0.25} />
+                                        <Area type="monotone" dataKey="Suspicious" stackId="1" stroke="var(--warning)" fill="var(--warning)" fillOpacity={0.3} />
+                                        <Area type="monotone" dataKey="High risk" stackId="1" stroke="var(--danger)" fill="var(--danger)" fillOpacity={0.35} />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            </div>
+                        )}
+                    </Panel>
+
+                    <Panel title="Detections by rule" subtitle="Which rules are firing, and how often" padded={false}>
+                            {rules.length === 0 ? (
+                                <div style={{ color: 'var(--text-dim)', fontSize: '0.78rem', fontStyle: 'italic', padding: '26px', textAlign: 'center' }}>
+                                    No detection rule has matched a message yet.
+                                </div>
+                            ) : (
+                                <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.76rem' }}>
+                                        <thead>
+                                            <tr style={{ position: 'sticky', top: 0, backgroundColor: 'var(--bg-surface)' }}>
+                                                <th style={{ textAlign: 'left', padding: '9px 16px', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>Rule</th>
+                                                <th style={{ textAlign: 'left', padding: '9px 12px', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border)', width: '110px' }}>Severity</th>
+                                                <th style={{ textAlign: 'right', padding: '9px 16px', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border)', width: '90px' }}>Events</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {rules.map(rule => (
+                                                <tr key={rule.id}>
+                                                    <td style={{ padding: '8px 16px', borderBottom: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+                                                        <span className="font-mono" style={{ color: 'var(--accent)', marginRight: '8px' }}>{rule.id}</span>
+                                                        {rule.name}
+                                                    </td>
+                                                    <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', color: SEVERITY_COLOUR[rule.severity] || 'var(--text-muted)', fontWeight: 600 }}>
+                                                        {rule.severity}
+                                                    </td>
+                                                    <td style={{ padding: '8px 16px', borderBottom: '1px solid var(--border)', textAlign: 'right', color: 'var(--text-primary)', fontWeight: 600 }}>
+                                                        {rule.events}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </Panel>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', minWidth: 0 }}>
+                    <GlobalThreatMap points={points} coverage={coverage} />
+
+                    <Panel title="Where messages entered" subtitle="Ingestion path breakdown">
+                        {sources.length === 0 ? (
+                            <div style={{ color: 'var(--text-dim)', fontSize: '0.78rem', fontStyle: 'italic', padding: '30px 0', textAlign: 'center' }}>
+                                No messages have arrived through any path yet.
+                            </div>
+                        ) : (
+                            <div style={{ height: '230px' }}>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                        <Pie data={sources} dataKey="count" nameKey="source" innerRadius={48} outerRadius={80} paddingAngle={2}>
+                                            {sources.map((entry, i) => <Cell key={entry.source} fill={sourceColours[i % sourceColours.length]} />)}
+                                        </Pie>
+                                        <Legend wrapperStyle={{ fontSize: '0.68rem', color: 'var(--text-muted)' }} />
+                                        <ReTooltip contentStyle={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.75rem' }} />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            </div>
+                        )}
+                    </Panel>
+                </div>
             </div>
-
-            <EveryEmail cases={cases} onOpenCase={onOpenCase} />
-
-            <GlobalThreatMap points={points} coverage={coverage} />
-
-            <div className="overview-split" style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: '16px' }}>
-                <Panel title="Activity over the last 24 hours" subtitle="Messages analysed per 30 minutes, by verdict">
-                    {counts.total === 0 ? (
-                        <div style={{ color: 'var(--text-dim)', fontSize: '0.78rem', fontStyle: 'italic', padding: '30px 0', textAlign: 'center' }}>
-                            No messages have been analysed yet.
-                        </div>
-                    ) : (
-                        <div style={{ height: '230px' }}>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={chartData} margin={{ top: 6, right: 8, left: -20, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                                    <XAxis dataKey="time" tick={{ fill: 'var(--text-dim)', fontSize: 10 }} interval="preserveStartEnd" minTickGap={40} />
-                                    <YAxis tick={{ fill: 'var(--text-dim)', fontSize: 10 }} allowDecimals={false} />
-                                    <ReTooltip
-                                        contentStyle={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.75rem' }}
-                                        labelStyle={{ color: 'var(--text-primary)' }}
-                                    />
-                                    <Area type="monotone" dataKey="Safe" stackId="1" stroke="var(--success)" fill="var(--success)" fillOpacity={0.25} />
-                                    <Area type="monotone" dataKey="Suspicious" stackId="1" stroke="var(--warning)" fill="var(--warning)" fillOpacity={0.3} />
-                                    <Area type="monotone" dataKey="High risk" stackId="1" stroke="var(--danger)" fill="var(--danger)" fillOpacity={0.35} />
-                                </AreaChart>
-                            </ResponsiveContainer>
-                        </div>
-                    )}
-                </Panel>
-
-                <Panel title="Where messages entered" subtitle="Ingestion path breakdown">
-                    {sources.length === 0 ? (
-                        <div style={{ color: 'var(--text-dim)', fontSize: '0.78rem', fontStyle: 'italic', padding: '30px 0', textAlign: 'center' }}>
-                            No messages have arrived through any path yet.
-                        </div>
-                    ) : (
-                        <div style={{ height: '230px' }}>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                    <Pie data={sources} dataKey="count" nameKey="source" innerRadius={48} outerRadius={80} paddingAngle={2}>
-                                        {sources.map((entry, i) => <Cell key={entry.source} fill={sourceColours[i % sourceColours.length]} />)}
-                                    </Pie>
-                                    <Legend wrapperStyle={{ fontSize: '0.68rem', color: 'var(--text-muted)' }} />
-                                    <ReTooltip contentStyle={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.75rem' }} />
-                                </PieChart>
-                            </ResponsiveContainer>
-                        </div>
-                    )}
-                </Panel>
-            </div>
-
-            <Panel title="Detections by rule" subtitle="Which rules are firing, and how often" padded={false}>
-                {rules.length === 0 ? (
-                    <div style={{ color: 'var(--text-dim)', fontSize: '0.78rem', fontStyle: 'italic', padding: '26px', textAlign: 'center' }}>
-                        No detection rule has matched a message yet.
-                    </div>
-                ) : (
-                    <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.76rem' }}>
-                            <thead>
-                                <tr style={{ position: 'sticky', top: 0, backgroundColor: 'var(--bg-surface)' }}>
-                                    <th style={{ textAlign: 'left', padding: '9px 16px', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>Rule</th>
-                                    <th style={{ textAlign: 'left', padding: '9px 12px', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border)', width: '110px' }}>Severity</th>
-                                    <th style={{ textAlign: 'right', padding: '9px 16px', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border)', width: '90px' }}>Events</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {rules.map(rule => (
-                                    <tr key={rule.id}>
-                                        <td style={{ padding: '8px 16px', borderBottom: '1px solid var(--border)', color: 'var(--text-primary)' }}>
-                                            <span className="font-mono" style={{ color: 'var(--accent)', marginRight: '8px' }}>{rule.id}</span>
-                                            {rule.name}
-                                        </td>
-                                        <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', color: SEVERITY_COLOUR[rule.severity] || 'var(--text-muted)', fontWeight: 600 }}>
-                                            {rule.severity}
-                                        </td>
-                                        <td style={{ padding: '8px 16px', borderBottom: '1px solid var(--border)', textAlign: 'right', color: 'var(--text-primary)', fontWeight: 600 }}>
-                                            {rule.events}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </Panel>
         </div>
     );
 }
