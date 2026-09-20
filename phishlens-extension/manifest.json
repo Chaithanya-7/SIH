@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "PhishLens — Threat Shield",
-  "version": "1.1.0",
-  "description": "Compact live view of PhishLens email threat detections, with one-click handoff to the full PhishLens SOC application.",
+  "name": "PhishLens \u2014 Threat Shield",
+  "version": "1.2.0",
+  "description": "Examines webmail in your browser before you open it, and shows PhishLens detections.",
   "permissions": [
     "activeTab",
     "storage",
@@ -10,7 +10,11 @@
   ],
   "host_permissions": [
     "http://localhost:3001/*",
-    "http://127.0.0.1:3001/*"
+    "http://127.0.0.1:3001/*",
+    "https://mail.google.com/*",
+    "https://outlook.live.com/*",
+    "https://outlook.office.com/*",
+    "https://outlook.office365.com/*"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -22,12 +26,28 @@
   },
   "background": {
     "service_worker": "background.js",
-    "scripts": ["background.js"]
+    "scripts": [
+      "background.js"
+    ]
   },
   "browser_specific_settings": {
     "gecko": {
       "id": "phishlens@phishlens.local",
       "strict_min_version": "115.0"
     }
-  }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://mail.google.com/*",
+        "https://outlook.live.com/*",
+        "https://outlook.office.com/*",
+        "https://outlook.office365.com/*"
+      ],
+      "js": [
+        "content-gmail.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
 }

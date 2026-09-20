@@ -45,11 +45,20 @@ class IngestionRegistry {
                 expects_heartbeat: false
             },
             {
+                id: 'browser_watch',
+                name: 'Browser (webmail)',
+                transport: 'BROWSER',
+                description: 'The PhishLens extension examines messages in Gmail and Outlook Web as they appear in the list, before they are opened. It reads the original message using the session already in the browser, so no password or token is held anywhere.',
+                enable_hint: 'Install the PhishLens browser extension and set its API key in the extension options.',
+                expects_heartbeat: true,
+                heartbeat_seconds: 900
+            },
+            {
                 id: 'imap_poller',
                 name: 'IMAP mailbox poller',
                 transport: 'IMAP',
                 description: 'Polls an IMAP mailbox for newly delivered messages.',
-                enable_hint: 'Connect a mailbox on the Mailboxes page. Gmail, Outlook and Yahoo need an app password rather than your normal one.',
+                enable_hint: 'Polling a mailbox directly is no longer the primary path; the browser extension and the SMTP gateway see mail earlier. This remains for a mailbox nothing else can reach.',
                 expects_heartbeat: true,
                 heartbeat_seconds: 60
             },
@@ -201,6 +210,12 @@ class IngestionRegistry {
                 name: s.name,
                 transport: s.transport,
                 description: s.description,
+                // Whether this path watches for mail on its own, or only ever
+                // receives what something else sends it. A console that cannot
+                // tell the two apart counts an always-open endpoint as
+                // monitoring and tells somebody they are covered when nothing
+                // is watching at all.
+                always_available: !!s.always_available,
                 configured: s.configured,
                 enabled: s.enabled,
                 status: s.status,

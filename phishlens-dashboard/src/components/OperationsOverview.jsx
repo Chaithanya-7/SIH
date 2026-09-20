@@ -236,19 +236,20 @@ export default function OperationsOverview({ cases = [], onOpenCase, onNavigate 
                             No mail is being watched yet
                         </div>
                         <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '3px', lineHeight: 1.55 }}>
-                            Connect your Gmail (or any other mailbox) and PhishLens will examine new
-                            messages as they arrive. Until then it only sees emails you hand it yourself.
+                            PhishLens can watch the ways mail reaches this computer — your browser, a
+                            desktop mail app, or mail delivered straight to it. Until one is switched on
+                            it only sees emails you hand it yourself.
                         </div>
                     </div>
                     <button
-                        onClick={() => onNavigate && onNavigate('connections')}
+                        onClick={() => onNavigate && onNavigate('sources')}
                         style={{
                             background: 'var(--accent)', color: 'var(--text-on-accent)', border: 'none',
                             borderRadius: '6px', padding: '10px 17px', fontSize: '0.83rem',
                             fontWeight: 600, cursor: 'pointer', flexShrink: 0
                         }}
                     >
-                        Connect Gmail
+                        Set up monitoring
                     </button>
                 </div>
             )}

@@ -8,18 +8,17 @@ import EvidenceGraphView from './EvidenceGraphView';
 import ExecutiveView from './ExecutiveView';
 import RemediationTimeline from './RemediationTimeline';
 import ResponsePosture from './ResponsePosture';
-import MailboxConnections from './MailboxConnections';
+import MailSources from './MailSources';
 import AuditTimeline from './AuditTimeline';
 import ForensicReportModal from './ForensicReportModal';
 import AdminQuarantineQueue from './AdminQuarantineQueue';
-import IngestionCoverageView from './IngestionCoverageView';
 import OperationsOverview from './OperationsOverview';
 import CheckAnEmail from './CheckAnEmail';
 import ReportsView from './ReportsView';
 import IntelligenceStateView from './IntelligenceStateView';
 import ThemeToggle from './ThemeToggle';
 import { useTheme } from '../hooks/useTheme';
-import { User, Building, Mail, Lock, Inbox, Brain, Upload, Radar } from 'lucide-react';
+import { User, Building, Mail, Lock, Inbox, Brain, Upload } from 'lucide-react';
 
 export default function Dashboard() {
   const { theme, toggleTheme } = useTheme();
@@ -169,9 +168,8 @@ export default function Dashboard() {
       heading: 'Your mail',
       items: [
         { id: 'upload', label: 'Check an email', icon: Upload },
-        { id: 'connections', label: 'Mailboxes', icon: Inbox },
-        { id: 'investigations', label: 'All emails', icon: Mail },
-        { id: 'coverage', label: 'What is being watched', icon: Radar }
+        { id: 'sources', label: 'Where mail arrives', icon: Inbox },
+        { id: 'investigations', label: 'All emails', icon: Mail }
       ]
     },
     {
@@ -356,13 +354,6 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* MAIL COVERAGE NAV */}
-          {activeNav === 'coverage' && (
-            <div className="animate-fade-in">
-              <IngestionCoverageView />
-            </div>
-          )}
-
           {/* INTELLIGENCE STATE NAV */}
           {activeNav === 'intelligence' && (
             <div className="animate-fade-in">
@@ -384,9 +375,9 @@ export default function Dashboard() {
             </div>
           )}
 
-          {activeNav === 'connections' && (
+          {activeNav === 'sources' && (
             <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <MailboxConnections />
+              <MailSources />
             </div>
           )}
 

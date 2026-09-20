@@ -1965,3 +1965,101 @@ feature's own reason for existing is the first thing that needs a test, not the
 last.
 
 **232 backend tests, 232 passing.**
+
+## 2026-09-20 — Watching the channels instead of connecting an account
+
+Asked for: drop the mail account connector, and instead catch mail before it
+reaches the mailbox or before it is opened, monitoring every route by which mail
+can enter — browser, desktop app, SMTP, IMAP.
+
+### What is and is not possible, said first
+
+For a provider like Gmail, **nothing running on this computer can see a message
+before Google does.** The mail arrives at Google's servers; there is no earlier
+point to stand at. Genuinely pre-delivery interception means owning the route —
+an MX record pointing at PhishLens, which inspects and then forwards — and that
+is available to somebody running a domain, not to somebody with a personal Gmail
+account.
+
+"Before it is opened" is a different claim and is entirely achievable. That is
+what most of this work delivers, and the console labels each channel with which
+of the two it actually does rather than letting the stronger claim cover both.
+
+### The connector is gone
+
+The Mailboxes page, the Google sign-in panel and the app-password flow are
+removed. In their place is **Where mail arrives**: every channel mail can enter
+by, whether each is watching, when it sees a message, and what switching it on
+would take. The question worth answering was never "which account did you
+connect" but "could a message reach you without being examined", and that is a
+question about channels.
+
+### Watching the browser
+
+The extension had no content scripts at all — it was a popup that read the
+backend and could not see a single message. It now watches the message list in
+Gmail and Outlook Web and examines what appears there, before it is opened. A
+dangerous message gets a label on its row. Nothing is hidden, moved or clicked:
+a tool that silently rearranges somebody's inbox is one they uninstall, and
+being wrong once would then mean losing a real message.
+
+**It fetches the original rather than reading the page.** Scraping a rendered
+row yields a subject, a display name and a snippet — and not the headers, which
+are most of what decides whether a message is phishing. Webmail already exposes
+the original to the signed-in user; it is what "Show original" downloads. A
+content script runs in the page's own origin, so it can fetch that with the
+session already in the browser. No password, no OAuth client, no token stored
+anywhere.
+
+Measured, on the same message:
+
+| Evidence available | Verdict |
+| --- | --- |
+| `FULL_HEADERS` — the original, fetched with the page's session | **HIGH_RISK, 0.93** |
+| `BODY_ONLY` — subject, sender and snippet from the row | **SUSPICIOUS, 0.45** |
+
+The second is not a failure. It is the system being honestly less certain with
+less evidence: the authentication findings are simply absent, not inverted. That
+was checked directly — analysing a message with no authentication headers
+produces **no** authentication findings rather than fabricated failures — and
+the completeness is recorded on the case, because a message whose authentication
+was never visible must not end up looking like one that failed it.
+
+The content script hands its submissions to the service worker rather than
+posting them itself: a content script's fetch carries the mail site's origin, so
+a call to localhost is cross-origin and blocked unless the backend allows
+`mail.google.com`, which would be a wide hole opened for a narrow need. The
+worker holds the host permission, and it keeps the API key out of a script
+injected into a page.
+
+### A bug I wrote and caught in the same hour
+
+The new page announced **"3 of your mail channels are being watched"** when
+nothing was watching. It filtered on `always_available`, which the registry
+tracks but had never serialized — so the flag was `undefined` everywhere, the
+three always-open submit endpoints counted as monitored channels, and the page
+reported coverage that did not exist.
+
+This is the same failure as this morning's, in the opposite direction, and the
+opposite direction is the dangerous one: understating coverage makes people
+ignore the page, overstating it makes them trust something that is not there.
+
+The registry had the right answer all along in `monitoring_live_mail` and
+`summary.automatic_active`. The page now uses those instead of computing a
+second, quietly different opinion, and a test asserts both that every source
+declares `always_available` and that the summary agrees with the flags.
+
+### Also removed: a duplicate I had just created
+
+**Where mail arrives** and **What is being watched** rendered the same
+`/api/ingestion` data under two names — precisely the fault I had criticised in
+Campaigns and Intelligence Graph a few hours earlier. The older, more technical
+one is gone.
+
+**234 backend tests, 234 passing.**
+
+### Still to do
+
+Desktop mail applications are named on the page but not yet watched. Thunderbird
+and Outlook keep local stores that can be followed on disk, which is the
+equivalent of the browser watcher for mail that never appears in a browser.

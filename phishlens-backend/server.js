@@ -845,6 +845,74 @@ app.post('/api/ingest/email', async (req, res) => {
 });
 
 /**
+ * Messages the browser extension found in webmail, examined before they are opened.
+ *
+ * Two shapes arrive here, and the difference between them is not cosmetic.
+ *
+ * `FULL_HEADERS` carries the original message, fetched from the provider with
+ * the session already in the browser. It is analysed exactly as mail from any
+ * other path, because it is the same bytes.
+ *
+ * `BODY_ONLY` carries what could be read from the message list - a subject, a
+ * sender, a snippet - because the original could not be retrieved. That is
+ * enough for lookalike domains, urgent language and bad links, and not enough
+ * for SPF, DKIM, DMARC or the Received chain. The distinction is recorded on
+ * the case rather than smoothed over: a message whose authentication was never
+ * visible must not end up looking like one that failed it.
+ */
+app.post('/api/ingest/browser', async (req, res) => {
+    try {
+        const { raw, evidence, source, provider_message_id: providerMessageId, subject, sender, snippet } = req.body || {};
+        const complete = evidence !== 'BODY_ONLY' && typeof raw === 'string' && raw.trim().length > 0;
+
+        let message = raw;
+        if (!complete) {
+            if (!subject && !sender && !snippet) {
+                return res.status(400).json({ success: false, error: 'Nothing was submitted to examine.' });
+            }
+            // Assembled so the parser has something well-formed to read. No
+            // authentication headers are invented - their absence is the honest
+            // state, and the analyser already treats absent as absent rather
+            // than as failed.
+            message = [
+                `From: ${sender || 'unknown@unknown.invalid'}`,
+                'To: (recipient not visible to the browser extension)',
+                `Subject: ${subject || '(no subject)'}`,
+                providerMessageId ? `X-PhishLens-Provider-Message-Id: ${providerMessageId}` : null,
+                'X-PhishLens-Evidence: BODY_ONLY',
+                '',
+                snippet || ''
+            ].filter(Boolean).join('\r\n');
+        }
+
+        const label = `BROWSER:${String(source || 'webmail').slice(0, 80)}`;
+        const threatObject = await processPipeline(message, label, null, {
+            provider: 'BROWSER_EXTENSION',
+            provider_account: String(source || 'webmail'),
+            provider_message_id: providerMessageId ? String(providerMessageId) : null,
+            evidence_completeness: complete ? 'FULL_HEADERS' : 'BODY_ONLY'
+        });
+
+        ingestionRegistry.recordMessage('browser_watch');
+        ingestionRegistry.heartbeat('browser_watch');
+
+        // Only what the extension needs to annotate the row. The rest of the
+        // case stays in the console rather than being handed back to a script
+        // running inside a mail page.
+        res.json({
+            success: true,
+            case_id: threatObject.case_id,
+            verdict: threatObject.detection?.verdict || 'UNKNOWN',
+            confidence: threatObject.confidence?.threat ?? null,
+            evidence_completeness: complete ? 'FULL_HEADERS' : 'BODY_ONLY'
+        });
+    } catch (error) {
+        ingestionRegistry.recordFailure('browser_watch', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
  * Message file ingestion (.eml / .msg), for analyst-submitted samples and
  * user-reported phishing forwarded as an attachment. The body is the raw
  * message itself rather than a multipart form, so the same bytes that were on

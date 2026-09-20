@@ -457,7 +457,7 @@ class MailConnections {
         else status = 'DISABLED';
 
         const detail = this.connections.size === 0
-            ? 'No mailbox is connected. Connect one on the Mailboxes page.'
+            ? 'No mailbox is signed in. The browser extension sees the same mail sooner and needs no credentials.'
             : `${watching} of ${this.connections.size} connected mailbox(es) being polled${failing ? `, ${failing} failing` : ''}.`;
 
         try {

@@ -16,7 +16,8 @@ import { api } from '../services/api';
  * in, the demo identity path must be replaced with real verification first -
  * it fabricates an identity and presents it as a Google sign-in.
  *
- * Mailbox connection has a working replacement in MailboxConnections.jsx.
+ * Mailbox connection is no longer done this way at all; see MailSources.jsx
+ * for the channels PhishLens watches.
  */
 export default function AuthModal({ currentUser, currentOrg, mailboxConn, onAuthSuccess, onClose }) {
   const [mode, setMode] = useState(!currentUser ? 'login' : (!currentOrg ? 'org' : 'mailbox'));

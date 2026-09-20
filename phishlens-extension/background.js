@@ -66,10 +66,49 @@ ext.alarms?.onAlarm.addListener(alarm => {
   if (alarm.name === REFRESH_ALARM) refreshBadge();
 });
 
+/**
+ * Submits a message the browser watcher found, on its behalf.
+ *
+ * The content script cannot make this request itself: its fetch carries the
+ * mail site's origin, so the browser treats a call to localhost as cross-origin
+ * and blocks it. The service worker holds the host permission for the backend
+ * and is not bound by the page's CORS, so the request belongs here. It also
+ * keeps the API key out of a script injected into a page.
+ */
+async function examineFromBrowser(payload) {
+  const settings = await readSettings();
+  if (!settings.apiKey) {
+    return { ok: false, error: 'PhishLens has no API key configured. Open the extension options.' };
+  }
+
+  try {
+    const base = settings.apiBaseUrl.replace(/\/$/, '');
+    const response = await fetch(`${base}/api/ingest/browser`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': settings.apiKey },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      return { ok: false, error: `PhishLens returned ${response.status}.` };
+    }
+    const result = await response.json();
+    // A verdict changes the badge, so it is refreshed rather than left stale.
+    refreshBadge();
+    return { ok: true, result };
+  } catch (e) {
+    return { ok: false, error: `PhishLens is not reachable (${e.message}).` };
+  }
+}
+
 // The popup asks for an immediate refresh after settings change.
 ext.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request?.type === 'REFRESH_BADGE') {
     refreshBadge().then(() => sendResponse({ success: true }));
+    return true;
+  }
+  if (request?.type === 'phishlens:examine') {
+    examineFromBrowser(request.payload).then(sendResponse);
     return true;
   }
 });

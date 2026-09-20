@@ -7,6 +7,11 @@ const secretStore = require('./secretStore');
 /**
  * Signing in with Google, on the user's own machine and on their own credential.
  *
+ * No longer used to connect a mailbox for reading - watching the browser sees
+ * the same mail sooner and needs no credential at all. What still needs a
+ * Google sign-in is acting on a message: moving one out of an inbox requires a
+ * token that IMAP read access does not provide.
+ *
  * Google will not let anybody obtain a token without a registered OAuth client,
  * so somebody has to own one. The choice is between shipping ours inside every
  * copy of the application - which makes every install depend on us, and hands a
@@ -133,7 +138,7 @@ class GoogleOAuth {
     begin({ port, folder = 'INBOX', scope = 'read' }) {
         if (!this.client) {
             const error = new Error('No Google client is configured yet.');
-            error.hint = 'Create a free OAuth client in a Google Cloud project and paste its client ID here. The Mailboxes page walks through it.';
+            error.hint = 'Create a free OAuth client in a Google Cloud project and register it with PhishLens first.';
             throw error;
         }
 
@@ -182,7 +187,7 @@ class GoogleOAuth {
         this.sweepPending();
         const record = this.pending.get(state);
         if (!record) {
-            throw new Error('This sign-in link has expired or was already used. Start again from the Mailboxes page.');
+            throw new Error('This sign-in link has expired or was already used. Start the sign-in again.');
         }
         this.pending.delete(state);
 
