@@ -224,6 +224,20 @@ Not just compiled: backend and dashboard were run, four messages seeded through 
 
 65 tests passing.
 
+## 2026-09-20 — Phase 7: an investigator-complete forensic report
+
+The report was a thin technical dump. It omitted NLP findings, MQL rule matches, threat intelligence, behavioural analysis, learned-pattern assessment, campaign detail, the case timeline, recommended action, analyst notes and any disclaimer — most of what the plan's section 28 requires and most of what the pipeline now produces. Its campaign section also read `threatObject.correlations`, a legacy field nothing populates, so it always reported zero.
+
+- **Rewritten as 19 sections** covering everything section 28 lists: case information, message metadata, authentication, relay path, infrastructure and geolocation, threat intelligence, IOCs, attachments, language findings, rule matches, behavioural findings, learned-pattern assessment, evidence register, risk assessment, campaign relationships, remediation, timeline, analyst notes, and scope/limitations.
+- **Written to be defensible rather than impressive.** The disposition and recommended action are stated first, and everything after is the evidence needed to check that conclusion. Every rule match prints the public source it derives from, so a reader can audit why a rule exists rather than trusting the match. Limitations are printed beside the finding they qualify, not buried at the end.
+- **Absence is stated, never implied.** Anything undetermined renders as "Not available" rather than being omitted, so a gap is never mistaken for a negative result. Feed absence explicitly reads as "unknown, not established as safe".
+- **Real data now included** that previously had no route into the report: audit events for the case timeline, remediation action history with provider results and failures, campaign factors, semantic matches, and the links deliberately *not* made with their reasons.
+- **Pagination bug found by inspecting the output.** Writing the footer inside the bottom margin made PDFKit start a new page, so the report emitted one blank page per footer — 10 pages instead of 5 — and the printed totals said "of 5". Fixed by suspending the bottom margin for the footer write. This was only visible by parsing the generated PDF; it would not have shown up in any code review.
+- **Verified against a real generated PDF**, not just compiled: a live case produced a 5-page report with all 19 sections, real RDAP data (gmail.com registered 1995), real rule citations (APWG, OWASP), the executable attachment, and no placeholder artefacts.
+- Added `pdf-parse` as a dev dependency and 7 regression tests that parse the rendered PDF, asserting section completeness, rule-source citation, limitation text, suppressed campaign links, footer/page-count agreement, and clean rendering of a sparse case.
+
+72 tests passing, 0 npm vulnerabilities.
+
 ### Next architectural gap (not yet started)
 
 - `DETECTION_PROVIDER` is still hardcoded to `sublime` with no local Sublime service in this repository — every ingestion path still calls out to an external, unconfigured detection dependency for MQL/rule matching (`mqlBridge.js` only normalizes a Sublime response; it does not run its own rules). This is the single largest remaining gap against the master plan's Phase 3 (Detection Engine): a native, source-cited MQL/rule engine (MITRE ATT&CK, APWG, CISA, OWASP, abuse.ch/OpenPhish/PhishTank-seeded rules per the compact plan) is not yet implemented, so the platform has no working detection path without an external Sublime instance.
