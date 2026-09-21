@@ -138,6 +138,89 @@ test('ordinary files produce no matches at all', async () => {
     }
 });
 
+/**
+ * Content that resembles a technique without being one.
+ *
+ * The rules above are conjunctions, and this is what checks they stay that way.
+ * Loosening any one of them - matching a password field without asking where it
+ * posts, or a clipboard write without asking what the page then tells the
+ * reader to do - turns ordinary mail into findings. A detector that cries wolf
+ * gets switched off, and then it detects nothing at all.
+ */
+test('content that merely resembles a technique is not flagged', async () => {
+    const rules = loadShippedRules();
+    const shell = 'Power' + 'Shell';
+
+    const lookalikes = {
+        'a marketing email with a tracking pixel': '<html><body><img src="https://e.example/px.gif">' +
+            '<a href="https://e.example/u">Unsubscribe</a></body></html>',
+
+        'a page linking to a sign-in rather than containing one':
+            '<html><body><p>Sign in at <a href="https://portal.example/login">the portal</a>.</p></body></html>',
+
+        'a subscribe form posting offsite with no password field':
+            '<html><form action="https://example.com/subscribe" method="post"><input type="email"></form></html>',
+
+        // The rule asks where the password goes. A relative action posts back to
+        // wherever the page came from, which an emailed attachment cannot do.
+        'a password form posting to a relative path':
+            '<html><form action="/login" method="post"><input type="password"></form></html>',
+
+        'a page that decodes text without saving a file':
+            '<html><script>var x = atob("aGk="); document.title = x;</script></html>',
+
+        'a page that builds an anchor for ordinary reasons':
+            '<html><script>var a=document.createElement("a");a.href="https://example.com";</script></html>',
+
+        'an SVG with styling but no script':
+            '<svg xmlns="http://www.w3.org/2000/svg"><style>.a{fill:red}</style><rect class="a"/></svg>',
+
+        'a meta refresh to an ordinary address':
+            '<html><meta http-equiv="refresh" content="0;url=https://example.com/next"></html>',
+
+        'documentation that mentions a shell':
+            '<html><body><p>Open ' + shell + ' and run the installer.</p></body></html>',
+
+        // A copy button is not paste-to-run: nothing tells the reader to open
+        // the Run dialog, and nothing copied is a command.
+        'a page with a copy-to-clipboard button':
+            '<html><script>navigator.clipboard.writeText("order-12345");</script><p>Copy your order number</p></html>',
+
+        'an RTF letter carrying no object': '{\rtf1\ansi Dear Priya, thanks for the notes.}'
+    };
+
+    for (const [description, content] of Object.entries(lookalikes)) {
+        const result = await rules.scan(bytes(content));
+        assert.deepStrictEqual(
+            result.findings.map(f => f.rule), [],
+            `${description} must not be flagged`
+        );
+    }
+});
+
+test('only rules with no innocent reading are marked decisive', () => {
+    const rules = loadShippedRules();
+
+    // A decisive finding raises a case to high risk on its own, so this list is
+    // deliberately short and is asserted rather than left to drift.
+    const decisive = rules.engine.rules.filter(r => r.meta.decisive === true).map(r => r.name).sort();
+    const notDecisive = rules.engine.rules.filter(r => r.meta.decisive !== true).map(r => r.name).sort();
+
+    assert.deepStrictEqual(notDecisive, [
+        'Archive_Password_Hint_In_Message',
+        'Disk_Image_Attachment',
+        'HTML_Obfuscated_Body_Only',
+        'SVG_With_Embedded_Script'
+    ], 'each of these has a legitimate use and must not decide a verdict alone');
+
+    // Everything marked decisive must also be HIGH: a rule cannot be decisive
+    // and only moderately concerning at the same time.
+    for (const name of decisive) {
+        const rule = rules.engine.rules.find(r => r.name === name);
+        assert.strictEqual(rule.meta.severity, 'HIGH', `${name} is decisive and must be HIGH`);
+    }
+});
+
 test('a scan reports which engine ran and how many rules were tried', async () => {
     const rules = loadShippedRules();
     const result = await rules.scan(bytes('nothing interesting here'));
