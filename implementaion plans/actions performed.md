@@ -373,6 +373,25 @@ four that could be switched on from here; the other three need something only
 the user has (a routed domain, a Gmail App Password, a Google Cloud project).
 Commit: (this commit)
 
+**A-039 · SMTP gateway verified end to end**
+What: Sent a phishing message through the enabled gateway.
+Status: `Done`
+Evidence: Accepted (`250 OK: message queued`), examined, `HIGH_RISK` at 0.70,
+source recorded as `SMTP_GATEWAY`, attachment finding
+`RULE_HTML_CREDENTIAL_FORM_POSTING_OFFSITE`, and `messages_ingested` advanced to
+1. This is the only channel that sees a message before it reaches a mailbox.
+Commit: (this commit)
+
+**A-040 · False alarm: "the examined counter is stuck at 0"**
+What: Reported the channel counter as broken after it showed 0 following a
+successful examination.
+Status: `Abandoned` — the diagnosis was wrong, no change made.
+Evidence: My probe read `messages_examined`; the field is `messages_ingested`,
+and it was correctly 1. The console already reads the right field. Recorded
+because it is the same mistake as A-005 and A-006 — assuming a name instead of
+reading it — and this time I nearly reported it to the user as a defect.
+Commit: (this commit)
+
 ### Releases
 
 | Version | Carried | Status |
