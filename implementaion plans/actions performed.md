@@ -33,6 +33,71 @@ would otherwise be repeated.
 
 ---
 
+## Where this stands — paused 2026-09-22
+
+**Installed:** PhishLens **1.7.5**, running. Repository clean, everything pushed.
+**Tests:** 317 backend · 33 desktop · 4 console · 0 failing · 0 skipped.
+**User's data:** 0 cases. Every probe message created while verifying was removed.
+
+### The one thing waiting on an answer
+
+The Gmail reader fix (**A-035**) is **not yet confirmed against live Gmail**. The
+cause found from outside was that the message id sits on a `<span>` inside the
+row rather than on the row itself, and that is fixed and tested — but whether it
+is *the* cause on the user's actual inbox is unknown.
+
+**To resume:** the user reloads the extension (⟳ on `chrome://extensions`), opens
+Gmail, waits about fifteen seconds, and opens the popup. It will say one of three
+things, and they are now distinguishable:
+
+| What the popup says | What it means | What to do |
+|---|---|---|
+| `N messages in view, M examined` | Working | Nothing — the channel is live |
+| `N rows on the page, but none carried a message id` | The row selector is right, the identifier moved again | Widen `identify()` in `mail-providers.js` |
+| `found no messages in the list` | The row selector itself no longer matches | Fix the selector in `listVisible()` |
+
+Do not guess between these. The distinction exists precisely so it does not have
+to be guessed, and it cost a wrong diagnosis to learn that.
+
+### Monitoring channels
+
+| Channel | State | What it still needs |
+|---|---|---|
+| Inline SMTP gateway | **ACTIVE**, 1 examined then cleared | Nothing — verified end to end (A-039) |
+| Browser (webmail) | `NOT_CONFIGURED` | The reload above |
+| IMAP poller | `DISABLED` | A Gmail App Password from the user, into `channels.json` |
+| Gmail API | `NOT_CONFIGURED` | An OAuth client from the user's Google Cloud project |
+| REST / webhook / file upload | `ACTIVE` | Nothing |
+
+SMTP credentials live in `%APPDATA%\phishlens-desktop\data\channels.json`
+(loopback only, generated for this machine, not an account credential).
+
+### Things a later session should not re-learn
+
+- The app window reports `document.hidden = true` with **zero** animation frames
+  when driven over CDP. No CSS transition completes, so animated zoom looks
+  frozen. This has produced a false "the map cannot zoom" diagnosis **twice**
+  (A-022). Check `document.hidden` before believing any animation result.
+- `node --check` does not catch an undefined function (A-032). The extension
+  pages are now run in the test suite for this reason.
+- Windows Defender deletes `phishlens-extension/tests/provider-fixture.html`
+  (A-028). It is Gmail-shaped phishing markup. Restore from git; do not commit
+  the deletion.
+- Reading a field name off a status object without checking it has now caused
+  three false conclusions (A-005, A-006, A-040).
+
+### Larger items still open
+
+| Item | Why |
+|---|---|
+| Live packet capture | Needs Npcap and administrator rights — the user's decision |
+| Phase 6 live remediation | Needs a Google OAuth client and `REMEDIATION_MODE=live` |
+| `dist`, `dist-171`, `dist-172`, `dist-173`, `dist-174` | Superseded build output; `dist-171` carries the console crash |
+| Test-suite cross-file coupling | Six tests; an isolated-data-dir attempt was backed out rather than leave the suite red |
+| Console vocabulary | Some pages still use analyst terms (Threat data, Linked attacks) |
+
+---
+
 ## 2026-09-21
 
 ### Session: open-source security tooling
