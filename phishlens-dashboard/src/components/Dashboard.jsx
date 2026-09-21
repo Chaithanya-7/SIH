@@ -10,6 +10,7 @@ import RemediationTimeline from './RemediationTimeline';
 import ResponsePosture from './ResponsePosture';
 import MailSources from './MailSources';
 import DetectionDepth from './DetectionDepth';
+import PanelBoundary from './PanelBoundary';
 import AuditTimeline from './AuditTimeline';
 import ForensicReportModal from './ForensicReportModal';
 import AdminQuarantineQueue from './AdminQuarantineQueue';
@@ -334,6 +335,10 @@ export default function Dashboard() {
 
         {/* Workspace Content View */}
         <div style={{ padding: '20px', flex: 1, overflowY: 'auto' }}>
+          {/* Everything below renders inside a boundary, so a panel that throws
+              shows a message in place instead of unmounting the application.
+              Keyed by page so an error on one does not follow you to the next. */}
+          <PanelBoundary key={activeNav} name={activeNav}>
           {/* OVERVIEW NAV */}
           {activeNav === 'overview' && (
             <div className="animate-fade-in">
@@ -378,8 +383,8 @@ export default function Dashboard() {
 
           {activeNav === 'sources' && (
             <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <MailSources />
-              <DetectionDepth />
+              <PanelBoundary name="mail sources"><MailSources /></PanelBoundary>
+              <PanelBoundary name="detection depth"><DetectionDepth /></PanelBoundary>
             </div>
           )}
 
@@ -409,6 +414,7 @@ export default function Dashboard() {
           {activeNav === 'quarantine' && (
             <AdminQuarantineQueue currentUser={currentUser} currentOrg={currentOrg} onRefresh={loadData} />
           )}
+          </PanelBoundary>
         </div>
       </main>
 

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Popup, Tooltip, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -28,6 +28,44 @@ const VERDICT_LABEL = {
     SAFE: 'Legitimate',
     UNKNOWN: 'Not classified'
 };
+
+/**
+ * The severity colours, resolved to actual colour values.
+ *
+ * The markers are drawn onto a canvas, and a canvas context cannot resolve CSS
+ * custom properties: assigning "var(--danger)" to fillStyle is simply rejected
+ * and the previous value stays. The markers were therefore painted with nothing
+ * and the map came up empty, while the heading above it correctly said how many
+ * addresses there were. In SVG mode the same code works, because the fill is an
+ * attribute in the document and inherits the variable - which is why this was
+ * easy to miss.
+ *
+ * Re-read when the theme changes, so switching between light and dark repaints
+ * the markers rather than leaving them the previous theme's colour.
+ */
+function useSeverityColours() {
+    const read = () => {
+        const styles = getComputedStyle(document.documentElement);
+        // The fallbacks are what gets used if a variable is ever renamed: a
+        // visible marker in roughly the right colour beats an invisible one.
+        const resolve = (name, fallback) => styles.getPropertyValue(name).trim() || fallback;
+        return {
+            HIGH: resolve('--danger', '#c02626'),
+            MEDIUM: resolve('--warning', '#b8860b'),
+            LOW: resolve('--success', '#2e7d32')
+        };
+    };
+
+    const [colours, setColours] = useState(read);
+
+    useEffect(() => {
+        const observer = new MutationObserver(() => setColours(read()));
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class'] });
+        return () => observer.disconnect();
+    }, []);
+
+    return colours;
+}
 
 function radiusFor(observations) {
     // Square-rooted so one very noisy address cannot swamp the map.
@@ -172,6 +210,7 @@ function KeepMapSized() {
 }
 
 export default function GlobalThreatMap({ points = [], coverage }) {
+    const severityColours = useSeverityColours();
     // Remembered per browser: a basemap is a preference, not a setting worth a
     // round trip, and losing it on every reload is the sort of small friction
     // that makes a panel feel unfinished.
@@ -389,8 +428,9 @@ export default function GlobalThreatMap({ points = [], coverage }) {
                                 center={[point.latitude, point.longitude]}
                                 radius={radiusFor(point.observations)}
                                 pathOptions={{
-                                    color: meta.colour,
-                                    fillColor: meta.colour,
+                                    // Resolved values, never var(...): see useSeverityColours.
+                                    color: severityColours[point.severity] || severityColours.LOW,
+                                    fillColor: severityColours[point.severity] || severityColours.LOW,
                                     fillOpacity: 0.55,
                                     weight: 1.5
                                 }}

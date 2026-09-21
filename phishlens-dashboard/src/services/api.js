@@ -143,6 +143,10 @@ export const api = {
     const res = await axios.get(`${API_BASE}/ingestion`);
     return res.data;
   },
+  getSecurityTools: async () => {
+    const res = await axios.get(`${API_BASE}/security-tools`);
+    return res.data;
+  },
   getLearningState: async () => {
     const res = await axios.get(`${API_BASE}/learning`);
     return res.data;

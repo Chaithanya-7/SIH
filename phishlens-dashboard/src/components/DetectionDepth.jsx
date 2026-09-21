@@ -52,8 +52,11 @@ export default function DetectionDepth() {
     useEffect(() => {
         let cancelled = false;
 
-        api.get('/api/security-tools')
-            .then(res => { if (!cancelled) setState(res.data); })
+        // api is a set of named methods, not an axios instance. Calling a
+        // generic api.get threw during render, and with no error boundary above
+        // it that unmounted the whole console - every page, not just this panel.
+        api.getSecurityTools()
+            .then(data => { if (!cancelled) setState(data); })
             .catch(err => { if (!cancelled) setError(err.response?.data?.error || err.message); });
 
         return () => { cancelled = true; };
