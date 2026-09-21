@@ -151,6 +151,24 @@ test('the Public Suffix List ships with the backend', { skip }, () => {
             `${suffix} must be present or subdomains of it resolve to the platform itself`));
 });
 
+test('the detection rules ship, and still compile where they land', { skip }, () => {
+    const directory = path.join(PACKAGED, 'backend', 'rules');
+    assert.ok(fs.existsSync(directory), 'without the rules the scanner loads nothing and reports every file as unmatched');
+
+    const files = fs.readdirSync(directory).filter(name => name.endsWith('.yar'));
+    assert.ok(files.length >= 2, `expected the shipped rule files, found ${files.length}`);
+
+    // Shipping the files is not the same as shipping working rules. A rule that
+    // fails to compile matches nothing, which is indistinguishable from a rule
+    // that ran and found nothing - so they are compiled from where they landed.
+    const YaraEngine = require(path.join(PACKAGED, 'backend', 'modules', 'yaraEngine.js'));
+    const engine = new YaraEngine();
+    for (const file of files) engine.load(fs.readFileSync(path.join(directory, file), 'utf8'), file);
+
+    assert.deepStrictEqual(engine.errors, [], 'a shipped rule that will not compile is a silent hole');
+    assert.ok(engine.rules.length >= 12, `expected the full rule set, compiled ${engine.rules.length}`);
+});
+
 test('the QR decoder and its image libraries are all present', { skip }, () => {
     const modules = path.join(PACKAGED, 'backend', 'node_modules');
     ['jsqr', 'jpeg-js', 'pngjs'].forEach(dependency =>

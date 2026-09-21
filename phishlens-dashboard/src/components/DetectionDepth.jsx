@@ -32,8 +32,11 @@ const TOOL_META = {
     },
     yara: {
         icon: ScanLine,
-        plain: 'Matches attachments against named detection rules',
-        absent: 'Attachments are examined by structure and content, but not against a rule set.'
+        plain: 'Widens what a detection rule may be written in',
+        // Deliberately not "rules are not running". They are: the panel says so
+        // directly above this list. Installing YARA only allows rules that use
+        // parts of the language the built-in engine does not implement.
+        absent: 'The rules that ship with PhishLens all run without it. It would only be needed for rules using parts of YARA the built-in engine does not implement.'
     },
     clamscan: {
         icon: ShieldCheck,
@@ -80,6 +83,36 @@ export default function DetectionDepth() {
                 tools that go deeper — all free, all open source, all running on this computer.
                 Adding one is optional; {present === 0 ? 'none are' : `${present} of ${tools.length} are`} installed.
             </p>
+
+            {state.rule_matching && state.rule_matching.rules_loaded > 0 && (
+                <div style={{
+                    display: 'flex', alignItems: 'flex-start', gap: '13px',
+                    background: 'var(--tint-success)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '9px',
+                    padding: '13px 15px',
+                    marginBottom: '14px'
+                }}>
+                    <CheckCircle2 size={17} style={{ color: 'var(--success)', flexShrink: 0, marginTop: '2px' }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 500 }}>
+                            {state.rule_matching.rules_loaded} detection rules are running
+                        </div>
+                        <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', marginTop: '5px', lineHeight: 1.5 }}>
+                            These look for how an attack is built rather than what it says — a page that
+                            asks you to paste a command, an image carrying script, a shortcut that runs a
+                            shell. They need nothing installed and are always on.
+                        </div>
+                        {state.rule_matching.rule_errors && state.rule_matching.rule_errors.length > 0 && (
+                            /* A rule that failed to compile matches nothing, which reads
+                               exactly like a rule that found nothing. Never silent. */
+                            <div style={{ fontSize: '0.73rem', color: 'var(--danger)', marginTop: '6px' }}>
+                                {state.rule_matching.rule_errors.length} rule(s) could not be loaded and were not applied.
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {tools.map(tool => {

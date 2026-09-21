@@ -22,6 +22,7 @@ const forensicEngine = require('./modules/forensicEngine');
 const attachmentAnalyzer = require('./modules/attachmentAnalyzer');
 const securityTools = require('./modules/securityTools');
 const connectionEvidence = require('./modules/connectionEvidence');
+const yaraRules = require('./modules/yaraRules');
 const iocExtractor = require('./modules/iocExtractor');
 const nlpAnalyzer = require('./modules/nlpAnalyzer');
 const ruleEngine = require('./modules/ruleEngine');
@@ -1011,7 +1012,12 @@ app.get('/api/security-tools', async (req, res) => {
             // Kept separate from the tool list because this is the one whose
             // absence changes what a report can claim rather than how deeply it
             // can look.
-            connection_evidence: await connectionEvidence.availability()
+            connection_evidence: await connectionEvidence.availability(),
+            // Rule matching is not optional and is not in the tool list: the
+            // rules ship with PhishLens and run on an engine that is already
+            // here. Installing YARA does not switch it on, it only widens what a
+            // rule may be written in.
+            rule_matching: yaraRules.status()
         });
     } catch (error) {
         res.status(500).json({ success: false, error: 'Could not determine which tools are installed.', detail: error.message });

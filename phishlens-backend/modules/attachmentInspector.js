@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const zlib = require('zlib');
+const yaraRules = require('./yaraRules');
 
 /**
  * Looks inside an attachment, rather than only at its name and size.
@@ -96,8 +97,9 @@ const PDF_ACTIVE_CONTENT = [
 ];
 
 class AttachmentInspector {
-    constructor(securityTools = require('./securityTools')) {
+    constructor(securityTools = require('./securityTools'), rules = yaraRules) {
         this.securityTools = securityTools;
+        this.rules = rules;
     }
 
     /**
@@ -140,6 +142,21 @@ class AttachmentInspector {
         }
 
         inspection.macro_analysis = await this.deepMacroAnalysis(inspection, readable);
+
+        // The detection rules run over every attachment, whatever its format.
+        // They cover what walking a container cannot: an HTML file that is a
+        // sign-in page, a shortcut that runs a shell, a page that asks the
+        // person to paste a command themselves.
+        const ruleScan = await this.rules.scan(readable);
+        inspection.rule_matching = {
+            status: ruleScan.status,
+            engine: ruleScan.engine || null,
+            engine_note: ruleScan.engine_note || ruleScan.detail || null,
+            rules_evaluated: ruleScan.rules_evaluated || 0,
+            rule_errors: ruleScan.rule_errors || []
+        };
+        inspection.findings.push(...(ruleScan.findings || []));
+
         return inspection;
     }
 
