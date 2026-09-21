@@ -154,7 +154,7 @@ test('the complete pipeline runs end to end and every stage contributes', async 
         threatObject.forensics.smtp_relay = [{ hop_index: 0, hostname: 'relay.attacker.example', ip: '8.8.8.8', is_public: true, classification: 'ORIGIN_CANDIDATE', trust_level: 0.75, trust_explanation: 'Earliest public hop' }];
 
         // ---- ATTACHMENTS + IOC ----
-        threatObject = attachmentAnalyzer.analyze(threatObject, parsedEmail);
+        threatObject = await attachmentAnalyzer.analyze(threatObject, parsedEmail);
         assert.strictEqual(threatObject.attachments.length, 1, 'the attachment must be extracted');
         assert.match(threatObject.attachments[0].sha256, /^[a-f0-9]{64}$/, 'the attachment must be hashed');
 

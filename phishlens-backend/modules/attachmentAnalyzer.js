@@ -1,6 +1,17 @@
 const crypto = require('crypto');
+const attachmentInspector = require('./attachmentInspector');
 
-/** Safe, metadata-only MIME attachment analysis. Untrusted bytes are never executed or written to disk. */
+/**
+ * Pulls attachments out of a message and has their contents inspected.
+ *
+ * This described attachments and never opened them, which made every attachment
+ * look alike: the one carrying the attack and the one carrying the invoice have
+ * the same name, size and MIME type, and differ only inside. The describing is
+ * still here, and attachmentInspector now does the looking.
+ *
+ * Nothing is executed. See attachmentInspector for what reading the bytes does
+ * and does not involve.
+ */
 class AttachmentAnalyzer {
     parseHeaders(headerBlock) {
         const headers = {};
@@ -63,26 +74,55 @@ class AttachmentAnalyzer {
         return threatObject;
     }
 
-    analyze(threatObject, parsedEmail) {
+    async analyze(threatObject, parsedEmail) {
         if (!parsedEmail) {
             return this.analyzeFromRawString(threatObject);
         }
 
-        threatObject.attachments = (parsedEmail.attachments || []).map(a => {
-            const fileName = (a.filename || 'unnamed-attachment').replace(/[\\/:*?"<>|]/g, '_').slice(0, 255);
-            return {
-                file_name: fileName,
-                extension: this.extensionOf(fileName) || null,
-                mime_type: a.contentType,
-                size_bytes: a.size || a.content.length,
-                sha256: crypto.createHash('sha256').update(a.content).digest('hex'),
-                content_transfer_encoding: a.contentTransferEncoding,
-                analysis_status: 'METADATA_ONLY',
-                limitation: 'The attachment was not opened or executed; only MIME metadata and a content hash were analyzed.'
-            };
+        const attachments = [];
+
+        // One at a time. Inspecting a document that carries macros starts a
+        // separate process, and a message with a dozen attachments should not
+        // start a dozen of them at once.
+        for (const a of (parsedEmail.attachments || [])) {
+            const fileName = (a.filename || 'unnamed-attachment').replace(/[\/:*?"<>|]/g, '_').slice(0, 255);
+            attachments.push(await this.describe(a.content, {
+                fileName,
+                mimeType: a.contentType,
+                sizeBytes: a.size || a.content.length,
+                encoding: a.contentTransferEncoding
+            }));
+        }
+
+        threatObject.attachments = attachments;
+        return threatObject;
+    }
+
+    /** One attachment, described and inspected, in the shape the rest of the pipeline reads. */
+    async describe(content, { fileName, mimeType, sizeBytes, encoding }) {
+        const inspection = await attachmentInspector.inspect(content, {
+            fileName,
+            declaredMimeType: mimeType || ''
         });
 
-        return threatObject;
+        return {
+            file_name: fileName,
+            extension: this.extensionOf(fileName) || null,
+            mime_type: mimeType,
+            size_bytes: sizeBytes,
+            sha256: inspection.sha256,
+            content_transfer_encoding: encoding || 'unknown',
+            analysis_status: 'CONTENT_INSPECTED',
+            // What the bytes are, which is not always what the message called them.
+            format: inspection.format,
+            findings: inspection.findings,
+            // Null where the document carries no macros; where it does, this says
+            // either what the code contained or why it could not be read.
+            macro_analysis: inspection.macro_analysis,
+            archive: inspection.archive || null,
+            embedded_links: inspection.pdf_links || null,
+            limitation: 'The attachment was read as bytes and never opened or executed. Findings describe its structure and contents, not what it would do if run.'
+        };
     }
 }
 

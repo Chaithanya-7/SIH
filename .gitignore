@@ -24,3 +24,20 @@ dist/
 # it. The file is untracked rather than merely ignored, because ignoring a file
 # git already follows changes nothing.
 phishlens-extension/provisioned.js
+
+# The browser extension's signing key and the packed extension it signs.
+#
+# A .pem here is the private key that identifies this extension. Committed, it
+# becomes the key of everyone who clones the repository, and anyone holding it
+# can publish an update that browsers accept as genuine. The .crx is built from
+# the source in this repository and does not belong in it.
+*.pem
+*.crx
+
+# Generated forensic reports. These describe real messages belonging to whoever
+# ran the tool, so they are output, not source.
+report.pdf
+PhishLens_Report_*.pdf
+
+# Planning archives dropped in the working directory.
+*architecture-v*.zip

@@ -26,7 +26,7 @@ async function runPipeline(raw, authentication) {
     const parsedEmail = await emailParser.parse(raw);
     let threatObject = mqlBridge.normalize(parsedEmail, null, raw);
     threatObject.forensics.authentication = authentication;
-    threatObject = attachmentAnalyzer.analyze(threatObject, parsedEmail);
+    threatObject = await attachmentAnalyzer.analyze(threatObject, parsedEmail);
     threatObject = iocExtractor.extract(threatObject, parsedEmail);
     threatObject = nlpAnalyzer.analyze(threatObject, parsedEmail);
     threatObject = ruleEngine.evaluate(threatObject, parsedEmail);
@@ -134,8 +134,19 @@ test('executable attachment is detected and hashed without being executed', asyn
 
     assert.strictEqual(result.attachments.length, 1);
     assert.strictEqual(result.attachments[0].file_name, 'invoice.pdf.exe');
-    assert.strictEqual(result.attachments[0].analysis_status, 'METADATA_ONLY');
+    // Was METADATA_ONLY, when attachments were described and never opened. The
+    // bytes are now read - still never executed - so the status changed with it.
+    assert.strictEqual(result.attachments[0].analysis_status, 'CONTENT_INSPECTED');
     assert.match(result.attachments[0].sha256, /^[a-f0-9]{64}$/);
+
+    // The name alone already matched a rule. Reading the file adds what the name
+    // cannot settle: this particular payload is inert text, so the inspector must
+    // report the misleading name without claiming to have found a program.
+    const findings = result.attachments[0].findings.map(f => f.code);
+    assert.ok(findings.includes('DOUBLE_EXTENSION'), 'the hidden second extension is a property of the name');
+    assert.ok(findings.includes('EXECUTABLE_ATTACHMENT'), 'a .exe is run rather than opened');
+    assert.strictEqual(result.attachments[0].format.detected, 'UNRECOGNISED', 'the test payload is inert text, and must not be reported as a program');
+    assert.strictEqual(result.attachments[0].macro_analysis, null, 'nothing here carries macros');
     assert.ok(ruleIds.includes('MQL-ATT-101'), 'executable-class extension should match');
     assert.ok(ruleIds.includes('MQL-ATT-103'), 'double extension should match');
     assert.ok(result.iocs.hashes.includes(result.attachments[0].sha256), 'attachment hash should be an IOC');

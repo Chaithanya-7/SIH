@@ -20,6 +20,8 @@ const googleOAuth = require('./modules/googleOAuth');
 const qrAnalyzer = require('./modules/qrAnalyzer');
 const forensicEngine = require('./modules/forensicEngine');
 const attachmentAnalyzer = require('./modules/attachmentAnalyzer');
+const securityTools = require('./modules/securityTools');
+const connectionEvidence = require('./modules/connectionEvidence');
 const iocExtractor = require('./modules/iocExtractor');
 const nlpAnalyzer = require('./modules/nlpAnalyzer');
 const ruleEngine = require('./modules/ruleEngine');
@@ -192,7 +194,7 @@ async function processPipeline(emailContent, source = 'MANUAL_API', clientMessag
         threatObject = arcAnalyzer.analyze(threatObject, emailContent);
 
         // 5. Safe attachment metadata and hash analysis (no execution)
-        threatObject = attachmentAnalyzer.analyze(threatObject, parsedEmail);
+        threatObject = await attachmentAnalyzer.analyze(threatObject, parsedEmail);
 
         // 5b. QR codes in attached images, decoded locally. This runs before
         //     IOC extraction on purpose: a link inside a QR code is invisible to
@@ -992,6 +994,30 @@ app.get('/api/ingestion', (req, res) => {
     });
 });
 
+/**
+ * Which optional open-source tools this machine has, and what their absence costs.
+ *
+ * Answers a question people ask about a security tool that has none of them
+ * installed - "is it working?" - in a way that does not imply either that it is
+ * broken or that it is complete. Every message is analysed without any of these.
+ * Each one present adds a kind of evidence the message itself cannot carry.
+ */
+app.get('/api/security-tools', async (req, res) => {
+    try {
+        const detected = await securityTools.detectAll();
+        res.json({
+            success: true,
+            ...detected,
+            // Kept separate from the tool list because this is the one whose
+            // absence changes what a report can claim rather than how deeply it
+            // can look.
+            connection_evidence: await connectionEvidence.availability()
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: 'Could not determine which tools are installed.', detail: error.message });
+    }
+});
+
 // ==================== CASES API (DATA ISOLATION) ====================
 app.get('/api/cases', (req, res) => {
     let allCases = caseManager.getAllCases();
@@ -1182,7 +1208,7 @@ app.post('/api/detection-config/test', requireRole('ADMIN'), async (req, res) =>
         const parsedEmail = await emailParser.parse(emailContent);
         let threatObject = mqlBridge.normalize(parsedEmail, null, emailContent);
         threatObject = await authAnalyzer.analyze(threatObject, parsedEmail, emailContent);
-        threatObject = attachmentAnalyzer.analyze(threatObject, parsedEmail);
+        threatObject = await attachmentAnalyzer.analyze(threatObject, parsedEmail);
         threatObject = iocExtractor.extract(threatObject, parsedEmail);
         threatObject = nlpAnalyzer.analyze(threatObject, parsedEmail);
 

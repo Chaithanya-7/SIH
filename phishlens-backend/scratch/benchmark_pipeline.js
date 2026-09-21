@@ -133,7 +133,7 @@ async function main() {
         let threatObject = time('ThreatObject build', () => mqlBridge.normalize(parsedEmail, null, raw));
         threatObject.forensics.authentication = PASSING_AUTH;
 
-        threatObject = time('Attachment analysis', () => attachmentAnalyzer.analyze(threatObject, parsedEmail));
+        threatObject = await time('Attachment analysis', () => attachmentAnalyzer.analyze(threatObject, parsedEmail));
         threatObject = time('IOC extraction', () => iocExtractor.extract(threatObject, parsedEmail));
         threatObject = time('NLP analysis', () => nlpAnalyzer.analyze(threatObject, parsedEmail));
         threatObject = time('MQL rules (message stage)', () => ruleEngine.evaluate(threatObject, parsedEmail, 'message'));
@@ -184,7 +184,7 @@ async function main() {
     for (let i = 0; i < 50; i++) {
         const base = mqlBridge.normalize(attachmentParsed, null, attachmentMessage);
         const start = process.hrtime.bigint();
-        attachmentAnalyzer.analyze(base, attachmentParsed);
+        await attachmentAnalyzer.analyze(base, attachmentParsed);
         attachmentSamples.push(Number(process.hrtime.bigint() - start) / 1e6);
     }
     const attachmentSummary = summarise('attachment', attachmentSamples);
