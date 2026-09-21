@@ -27,7 +27,8 @@ const PROVISIONED_STEPS = [
     },
     {
         title: 'Load the folder below',
-        body: 'Click "Load unpacked", paste the folder path below into the dialog\'s address bar, and press Enter, then "Select Folder".'
+        body: 'Click "Load unpacked", paste the folder path below into the dialog\'s address bar, and press Enter, then "Select Folder".',
+        warning: 'Not "Pack extension" — that button is for publishing to the Web Store and will fail here.'
     },
     {
         title: 'Open your mail',
@@ -42,7 +43,8 @@ const MANUAL_STEPS = [
     },
     {
         title: 'Load the PhishLens extension',
-        body: 'Click "Load unpacked" and choose the phishlens-extension folder.'
+        body: 'Click "Load unpacked" and choose the phishlens-extension folder.',
+        warning: 'Not "Pack extension" — that button is for publishing to the Web Store and will fail here.'
     },
     {
         title: 'Give it this computer\'s key',
@@ -158,6 +160,17 @@ export default function BrowserWatcherSetup({ extensionPath }) {
                         <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>{step.title}</div>
                             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '3px', lineHeight: 1.55 }}>{step.body}</div>
+                            {step.warning && (
+                                /* The adjacent button people press by mistake. It fails
+                                   with a key-already-exists error, which reads like a
+                                   problem with PhishLens rather than a wrong button. */
+                                <div style={{
+                                    fontSize: '0.75rem', color: 'var(--warning)', marginTop: '6px',
+                                    lineHeight: 1.5
+                                }}>
+                                    {step.warning}
+                                </div>
+                            )}
 
                             {i === loadStepIndex && folder && (
                                 <>
