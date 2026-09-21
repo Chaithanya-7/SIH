@@ -11,7 +11,8 @@ import { api } from '../services/api';
  * that lives in an application data folder they have no reason to know about.
  *
  * So the desktop application now publishes a copy of the extension with its own
- * address and key already written in, and that step disappears. Two steps
+ * address and key already written in, and that step disappears. Two of the
+ * three steps below are browser setup
  * remain, both of them in the browser.
  *
  * In a browser - where there is no desktop app to publish anything - the older
@@ -142,7 +143,7 @@ export default function BrowserWatcherSetup({ extensionPath }) {
             {provisioned && (
                 <p style={{ margin: '0 0 15px 0', fontSize: '0.79rem', color: 'var(--success)', lineHeight: 1.6 }}>
                     PhishLens has already prepared a copy of the extension with this computer's address and
-                    key written in, so there is nothing to type. Two steps.
+                    key written in, so there is nothing to type.
                 </p>
             )}
 
