@@ -19,12 +19,35 @@ document.addEventListener('DOMContentLoaded', () => {
     status.className = `status ${kind}`;
   }
 
-  ext.storage.local.get(defaults, stored => {
-    const settings = { ...defaults, ...stored };
+  /**
+   * Shows what is actually in effect, not only what was typed here.
+   *
+   * The desktop application writes its address and key into provisioned.js,
+   * which is imported into the background worker rather than into this page.
+   * Reading storage alone showed an empty key box over a working extension,
+   * which reads as "not set up" and invites somebody to paste a key that was
+   * already there.
+   */
+  function populate(settings, provisioned) {
     apiBaseInput.value = settings.apiBaseUrl;
     dashboardInput.value = settings.dashboardUrl;
     apiKeyInput.value = settings.apiKey;
-  });
+    if (provisioned) {
+      setStatus('This key was written in by the PhishLens desktop application. Saving here replaces it.', 'ok');
+    }
+  }
+
+  if (ext?.runtime?.sendMessage) {
+    ext.runtime.sendMessage({ type: 'phishlens:get-settings' }, response => {
+      if (ext.runtime.lastError || !response) {
+        ext.storage.local.get(defaults, stored => populate({ ...defaults, ...stored }, false));
+        return;
+      }
+      populate({ ...defaults, ...response }, response.provisioned);
+    });
+  } else {
+    ext.storage.local.get(defaults, stored => populate({ ...defaults, ...stored }, false));
+  }
 
   function currentSettings() {
     return {

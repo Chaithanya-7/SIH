@@ -140,4 +140,19 @@ ext.runtime.onMessage.addListener((request, sender, sendResponse) => {
     examineFromBrowser(request.payload).then(sendResponse);
     return true;
   }
+  // The popup and the options page cannot see what the desktop application
+  // provisioned: that file is imported into this worker, not into a page, and
+  // the values are deliberately not copied into storage - storage is where a
+  // person's own choice lives, and writing provisioned values there would
+  // overwrite it on the next start. So they ask here instead, and there stays
+  // one place that knows the precedence.
+  if (request?.type === 'phishlens:get-settings') {
+    readSettings().then(settings => sendResponse({
+      ...settings,
+      // Says where the key came from, so the options page can show it as
+      // supplied rather than presenting an empty box over a working key.
+      provisioned: Boolean(globalThis.PHISHLENS_PROVISIONED?.apiKey)
+    }));
+    return true;
+  }
 });

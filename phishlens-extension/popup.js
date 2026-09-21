@@ -23,10 +23,36 @@ document.addEventListener('DOMContentLoaded', () => {
     apiKey: ''
   };
 
+  /**
+   * Asks the background worker what the settings actually are.
+   *
+   * Reading storage directly was wrong: the key the desktop application writes
+   * lives in provisioned.js, which is imported into the worker and not into
+   * this page, so a fully configured extension reported "Not configured" here
+   * while the worker was using the key perfectly well.
+   *
+   * Storage is still the fallback, for the case where the worker is asleep and
+   * cannot be woken.
+   */
   function readSettings() {
     return new Promise(resolve => {
-      if (!ext?.storage?.local) return resolve(defaults);
-      ext.storage.local.get(defaults, stored => resolve({ ...defaults, ...stored }));
+      const fromStorage = () => {
+        if (!ext?.storage?.local) return resolve(defaults);
+        ext.storage.local.get(defaults, stored => resolve({ ...defaults, ...stored }));
+      };
+
+      if (!ext?.runtime?.sendMessage) return fromStorage();
+
+      try {
+        ext.runtime.sendMessage({ type: 'phishlens:get-settings' }, response => {
+          // A sleeping or missing worker sets lastError; touching it also stops
+          // the browser logging it as unchecked.
+          if (ext.runtime.lastError || !response) return fromStorage();
+          resolve({ ...defaults, ...response });
+        });
+      } catch (e) {
+        fromStorage();
+      }
     });
   }
 
