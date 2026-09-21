@@ -9,6 +9,7 @@ import ExecutiveView from './ExecutiveView';
 import RemediationTimeline from './RemediationTimeline';
 import ResponsePosture from './ResponsePosture';
 import MailSources from './MailSources';
+import DetectionDepth from './DetectionDepth';
 import AuditTimeline from './AuditTimeline';
 import ForensicReportModal from './ForensicReportModal';
 import AdminQuarantineQueue from './AdminQuarantineQueue';
@@ -378,6 +379,7 @@ export default function Dashboard() {
           {activeNav === 'sources' && (
             <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <MailSources />
+              <DetectionDepth />
             </div>
           )}
 
