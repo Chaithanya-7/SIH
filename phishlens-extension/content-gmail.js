@@ -226,22 +226,56 @@
         }
     }
 
+    /**
+     * Tells the worker what this sweep actually saw.
+     *
+     * The watcher was designed to fail quietly, so that a backend which is not
+     * running could not fill the console of somebody's mail client. That was
+     * right, and it left no way to answer the only question anybody asks of it:
+     * is this looking at my mail? "Not running", "running but recognising
+     * nothing on the page", and "running with nothing new to examine" all
+     * produced exactly the same silence.
+     *
+     * So each sweep reports what it saw. Nothing here is message content - it is
+     * counts, a timestamp, and the last error, which is what distinguishes those
+     * three cases from each other.
+     */
+    function report(status) {
+        try {
+            ext.runtime.sendMessage({
+                type: 'phishlens:watch-status',
+                status: { ...status, host: location.hostname, at: new Date().toISOString() }
+            }, () => void ext.runtime.lastError);
+        } catch (e) {
+            // The worker is gone or the page is unloading. Nothing to do.
+        }
+    }
+
     async function sweepOnce() {
         const visible = provider.listVisible(document);
+        // Reported before anything is examined, because finding no rows at all
+        // is the failure that matters most: it means the page is not the one
+        // this reader understands, or its markup has moved.
+        report({ rowsSeen: visible.length, provider: provider.id || 'unknown', phase: 'listed' });
         // Unread first. Those are the ones not yet opened, which is the whole
         // reason for watching the list rather than the open message.
         visible.sort((a, b) => Number(b.unread) - Number(a.unread));
 
+        let examined = 0;
         for (const entry of visible.slice(0, MAX_PER_SWEEP)) {
             try {
                 await examine(entry);
+                examined++;
             } catch (e) {
+                report({ rowsSeen: visible.length, examined, phase: 'error', error: String(e && e.message || e).slice(0, 200) });
                 // Whatever stopped this message will stop the next twenty-four
                 // in exactly the same way, so the sweep ends here and the
                 // backoff decides when to try again.
                 return;
             }
         }
+
+        report({ rowsSeen: visible.length, examined, phase: 'done' });
     }
 
     function start() {

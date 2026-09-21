@@ -24,6 +24,11 @@
       </div>
     </header>
 
+    <!-- What the page watcher last reported. This answers "is it looking at my
+         mail", which counts of past detections cannot: those persist whether or
+         not anything is watching right now. -->
+    <div id="watch-state" class="notice hidden" style="margin-bottom:8px"></div>
+
     <!-- Connection problem / setup needed -->
     <div id="setup-notice" class="notice hidden">
       <div id="setup-message">PhishLens backend is not reachable.</div>

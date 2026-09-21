@@ -25,6 +25,9 @@ const DEFAULTS = {
 
 const REFRESH_ALARM = 'phishlens-refresh-badge';
 
+/** The most recent sweep reported by a content script, or null if none ever has. */
+let lastWatchStatus = null;
+
 /**
  * What the extension should use, in order of who decided it.
  *
@@ -146,6 +149,18 @@ ext.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // person's own choice lives, and writing provisioned values there would
   // overwrite it on the next start. So they ask here instead, and there stays
   // one place that knows the precedence.
+  // What the page watcher last saw. Kept in the worker rather than in storage:
+  // it is a live fact about this browsing session, not a setting, and it should
+  // not survive as a stale reassurance after the browser is closed.
+  if (request?.type === 'phishlens:watch-status') {
+    lastWatchStatus = request.status || null;
+    sendResponse({ ok: true });
+    return false;
+  }
+  if (request?.type === 'phishlens:get-watch-status') {
+    sendResponse(lastWatchStatus);
+    return false;
+  }
   if (request?.type === 'phishlens:get-settings') {
     readSettings().then(settings => sendResponse({
       ...settings,

@@ -128,6 +128,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function loadSummary() {
+    // Always, and before anything else that can return early. Whether the page
+    // watcher is running is independent of whether the backend answers, and it
+    // matters most in the cases below where this function gives up.
+    showWatchState();
+
     const settings = await readSettings();
 
     if (!settings.apiKey) {
