@@ -94,10 +94,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (status.phase === 'error') {
           watchState.textContent = `Watching ${status.host}, but the last sweep stopped: ${status.error}`;
         } else if (seen === 0) {
-          // The failure that matters: running, and recognising nothing.
+          // Nothing on the page the reader recognises as a message row.
           watchState.textContent = `Running on ${status.host} but found no messages in the list ${ago}s ago. If mail is on screen, this reader no longer matches that page.`;
+        } else if (Number(status.identified ?? seen) === 0) {
+          // Rows were found and none could be identified. A different fault
+          // from the one above, and it used to look exactly like it.
+          watchState.textContent = `Running on ${status.host}: ${seen} rows on the page, but none carried a message id ${ago}s ago. The list is being read; the identifier has moved.`;
         } else {
-          watchState.textContent = `Watching ${status.host}: ${seen} message${seen === 1 ? '' : 's'} in view, ${status.examined ?? 0} examined ${ago}s ago.`;
+          const identified = Number(status.identified ?? seen);
+          watchState.textContent = `Watching ${status.host}: ${identified} message${identified === 1 ? '' : 's'} in view, ${status.examined ?? 0} examined ${ago}s ago.`;
         }
         watchState.classList.remove('hidden');
       });

@@ -256,7 +256,18 @@
         // Reported before anything is examined, because finding no rows at all
         // is the failure that matters most: it means the page is not the one
         // this reader understands, or its markup has moved.
-        report({ rowsSeen: visible.length, provider: provider.id || 'unknown', phase: 'listed' });
+        // Rows on the page and rows that could be identified are reported
+        // separately. They used to be the same number, and when every row was
+        // dropped for lacking an id the result was "no messages in the list" -
+        // which reads as the reader not matching the page, when in fact it
+        // matched every row and threw them all away.
+        const rowsOnPage = typeof provider.countRows === 'function' ? provider.countRows(document) : visible.length;
+        report({
+            rowsSeen: rowsOnPage,
+            identified: visible.length,
+            provider: provider.id || 'unknown',
+            phase: 'listed'
+        });
         // Unread first. Those are the ones not yet opened, which is the whole
         // reason for watching the list rather than the open message.
         visible.sort((a, b) => Number(b.unread) - Number(a.unread));
@@ -267,7 +278,7 @@
                 await examine(entry);
                 examined++;
             } catch (e) {
-                report({ rowsSeen: visible.length, examined, phase: 'error', error: String(e && e.message || e).slice(0, 200) });
+                report({ rowsSeen: rowsOnPage, identified: visible.length, examined, phase: 'error', error: String(e && e.message || e).slice(0, 200) });
                 // Whatever stopped this message will stop the next twenty-four
                 // in exactly the same way, so the sweep ends here and the
                 // backoff decides when to try again.
@@ -275,7 +286,7 @@
             }
         }
 
-        report({ rowsSeen: visible.length, examined, phase: 'done' });
+        report({ rowsSeen: rowsOnPage, identified: visible.length, examined, phase: 'done' });
     }
 
     function start() {

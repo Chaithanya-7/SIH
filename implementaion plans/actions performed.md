@@ -328,6 +328,27 @@ Evidence: Chrome lists it on the extension's error page under MV3. A red
 support was aspirational and never tested, so the browser actually in use wins.
 Commit: (this commit)
 
+**A-035 · A full inbox reported as an empty list**
+What: The Gmail reader looked for the message id **only on the row element**.
+Gmail carries it on a `<span>` inside the row, so every row was found and then
+silently dropped for having no id.
+Status: `Done` — cause fixed; **not yet confirmed against the user's live Gmail**
+Evidence: Found by the diagnostic added in A-026, which reported "Running on
+mail.google.com but found no messages in the list". `identify()` now searches
+the row, its descendants, and the row's own `id` attribute, stripping the
+`thread-f:` prefix. Tested against the real Gmail shape.
+Commit: (this commit)
+
+**A-036 · Two different faults looked identical**
+What: "No rows on the page" and "rows found, none identifiable" both reported as
+`rowsSeen: 0`.
+Status: `Done`
+Evidence: Added `countRows()` so rows-on-page and rows-identified are reported
+separately, and the popup now says which of the two happened. The first means
+the selectors are wrong; the second means the identifier moved. Diagnosing A-035
+would have been immediate with this.
+Commit: (this commit)
+
 ### Releases
 
 | Version | Carried | Status |

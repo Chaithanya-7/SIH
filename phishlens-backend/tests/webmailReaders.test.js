@@ -77,6 +77,39 @@ test('the Gmail reader finds message rows in Gmail-shaped markup', () => {
     }
 });
 
+test('a row whose id sits on a child element is still identified', () => {
+    const providers = loadProviders();
+
+    // This is the shape real Gmail uses, and it is what broke: the reader looked
+    // only at the row element, found every row, and dropped all of them for
+    // having no id. A full inbox reported as an empty list.
+    const dom = new JSDOM(`
+        <table><tbody>
+            <tr class="zA zE">
+                <td><span data-legacy-thread-id="18f3a1b2c3d4e5f6" data-thread-id="#thread-f:18f3a1b2c3d4e5f6"></span></td>
+                <td><span class="bog">Your account will be suspended</span></td>
+            </tr>
+        </tbody></table>
+    `);
+
+    const rows = providers.gmail.listVisible(dom.window.document);
+    assert.strictEqual(rows.length, 1, 'the row was dropped because its id is on a child, not on itself');
+    assert.strictEqual(rows[0].id, '18f3a1b2c3d4e5f6', 'the thread-f: prefix must be stripped');
+    assert.strictEqual(rows[0].unread, true);
+});
+
+test('rows on the page are counted even when none can be identified', () => {
+    const providers = loadProviders();
+
+    // "No rows at all" and "rows I cannot identify" are different faults and
+    // used to produce identical output. countRows reports the first number so
+    // the popup can tell them apart.
+    const dom = new JSDOM('<table><tbody><tr class="zA"><td>no identifier anywhere</td></tr></tbody></table>');
+
+    assert.strictEqual(providers.gmail.countRows(dom.window.document), 1, 'the row is on the page');
+    assert.strictEqual(providers.gmail.listVisible(dom.window.document).length, 0, 'and cannot be identified');
+});
+
 test('unread messages are told apart from read ones', () => {
     const providers = loadProviders();
     const rows = providers.gmail.listVisible(fixtureDocument());

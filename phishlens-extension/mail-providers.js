@@ -33,18 +33,55 @@
             const rows = doc.querySelectorAll('tr.zA, div[role="listitem"][data-legacy-message-id]');
             const found = [];
             rows.forEach(row => {
-                const id = row.getAttribute('data-legacy-message-id')
-                    || row.getAttribute('data-legacy-thread-id')
-                    || row.getAttribute('data-thread-id');
+                const id = this.identify(row);
                 if (!id) return;
                 const label = row.getAttribute('aria-label') || '';
                 found.push({
-                    id: String(id).replace(/^#/, ''),
+                    id,
                     unread: row.classList.contains('zE') || /(^|,\s*)unread/i.test(label),
                     row
                 });
             });
             return found;
+        },
+
+        /**
+         * The identifier for one row, wherever Gmail has put it.
+         *
+         * This looked only at the row element, and Gmail carries these
+         * attributes on a span *inside* the row. Every row was therefore found
+         * and then silently dropped for having no id, so a full inbox reported
+         * as an empty list - which is indistinguishable from the reader not
+         * matching the page at all.
+         */
+        identify(row) {
+            const ATTRIBUTES = ['data-legacy-message-id', 'data-legacy-thread-id', 'data-thread-id'];
+
+            for (const attribute of ATTRIBUTES) {
+                const own = row.getAttribute(attribute);
+                if (own) return String(own).replace(/^#/, '').replace(/^thread-[fa]:/, '');
+            }
+
+            // Then anywhere inside it.
+            const carrier = row.querySelector('[' + ATTRIBUTES.join('],[') + ']');
+            if (carrier) {
+                for (const attribute of ATTRIBUTES) {
+                    const value = carrier.getAttribute(attribute);
+                    if (value) return String(value).replace(/^#/, '').replace(/^thread-[fa]:/, '');
+                }
+            }
+
+            // Gmail also puts a thread id on the row's own id attribute in some
+            // views, as ":123" or "thread-f:456".
+            const elementId = row.getAttribute('id');
+            if (elementId && /\d/.test(elementId)) return elementId.replace(/^#/, '').replace(/^thread-[fa]:/, '');
+
+            return null;
+        },
+
+        /** How many rows were on the page, regardless of whether any could be identified. */
+        countRows(doc) {
+            return doc.querySelectorAll('tr.zA, div[role="listitem"][data-legacy-message-id]').length;
         },
 
         /** The account index in the URL, so a second signed-in account is not read as the first. */
