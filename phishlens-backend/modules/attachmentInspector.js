@@ -74,7 +74,8 @@ const EXPECTED_FORMAT = {
     pptx: 'ZIP', pptm: 'ZIP', odt: 'ZIP', ods: 'ZIP', zip: 'ZIP', jar: 'ZIP',
     doc: 'OLE2', xls: 'OLE2', ppt: 'OLE2', msi: 'OLE2',
     pdf: 'PDF', exe: 'PE_EXECUTABLE', dll: 'PE_EXECUTABLE', scr: 'PE_EXECUTABLE',
-    rar: 'RAR', '7z': 'SEVEN_ZIP', gz: 'GZIP', chm: 'CHM'
+    rar: 'RAR', '7z': 'SEVEN_ZIP', gz: 'GZIP', chm: 'CHM',
+    html: 'HTML', htm: 'HTML', svg: 'SVG', rtf: 'RTF', xml: 'XML'
 };
 
 /**
@@ -168,6 +169,26 @@ class AttachmentInspector {
                 return { detected: signature.format, note: signature.note };
             }
         }
+        // Text formats carry no signature, so they are sniffed from the opening
+        // bytes instead. Without this an HTML attachment - which is a whole
+        // phishing page, and one of the commoner ones - was reported as
+        // UNRECOGNISED, which reads in a report as though nothing at all could
+        // be determined about it.
+        const opening = bytes.subarray(0, 1024).toString('latin1').trimStart();
+
+        if (/^(<\?xml[^>]*\?>\s*)?<svg[\s>]/i.test(opening)) {
+            return { detected: 'SVG', note: 'A vector image. A browser treats one as a document and will run script inside it.' };
+        }
+        if (/^(<!doctype\s+html|<html[\s>]|<head[\s>]|<body[\s>])/i.test(opening)) {
+            return { detected: 'HTML', note: 'A web page. An HTML attachment opens in the browser as a page in its own right.' };
+        }
+        if (/^\{\rtf/i.test(opening)) {
+            return { detected: 'RTF', note: 'A rich text document.' };
+        }
+        if (/^<\?xml/i.test(opening)) {
+            return { detected: 'XML', note: 'An XML document.' };
+        }
+
         return { detected: 'UNRECOGNISED', note: 'The leading bytes match no format this inspector knows.' };
     }
 
