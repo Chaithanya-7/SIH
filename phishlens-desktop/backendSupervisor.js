@@ -182,6 +182,64 @@ class BackendSupervisor extends EventEmitter {
         return this.spawnBackend(backendDir);
     }
 
+    /**
+     * Channel settings the person has switched on, from their own data folder.
+     *
+     * The monitoring channels are switched on by environment variables, and the
+     * only way to set those for an installed application was to write them into
+     * the Windows user environment - which puts a password in the registry, for
+     * every process the user runs, for good. This reads them from a file beside
+     * the application's own data instead, next to the API key and the secret
+     * key that already live there.
+     *
+     * Absent, unreadable or malformed means the channels stay off. A monitoring
+     * channel that cannot read its own settings must not come up half-configured
+     * and report itself as watching.
+     */
+    channelEnvironment(dataDir) {
+        const file = path.join(dataDir, 'channels.json');
+
+        let config;
+        try {
+            config = JSON.parse(fs.readFileSync(file, 'utf8'));
+        } catch (e) {
+            if (e.code !== 'ENOENT') this.record(`[Channels] ${file} could not be read: ${e.message}`);
+            return {};
+        }
+
+        const env = {};
+
+        if (config.smtp?.enabled && config.smtp.username && config.smtp.password) {
+            env.ENABLE_SMTP_INGESTION = 'true';
+            env.SMTP_USERNAME = String(config.smtp.username);
+            env.SMTP_PASSWORD = String(config.smtp.password);
+            // Loopback unless deliberately changed. A gateway reachable from the
+            // network is a mail relay, and this one authenticates with a
+            // credential kept in a file.
+            env.SMTP_BIND_HOST = String(config.smtp.bindHost || '127.0.0.1');
+            env.SMTP_LISTEN_PORT = String(config.smtp.port || 2525);
+            this.record(`[Channels] SMTP gateway enabled on ${env.SMTP_BIND_HOST}:${env.SMTP_LISTEN_PORT}`);
+        }
+
+        if (config.imap?.enabled && config.imap.user && config.imap.password) {
+            env.IMAP_ENABLED = 'true';
+            env.IMAP_USER = String(config.imap.user);
+            env.IMAP_PASSWORD = String(config.imap.password);
+            env.IMAP_HOST = String(config.imap.host || 'imap.gmail.com');
+            env.IMAP_PORT = String(config.imap.port || 993);
+            this.record(`[Channels] IMAP poller enabled for ${env.IMAP_USER} at ${env.IMAP_HOST}`);
+        }
+
+        if (config.gmail?.clientId && config.gmail?.clientSecret) {
+            env.GOOGLE_CLIENT_ID = String(config.gmail.clientId);
+            env.GOOGLE_CLIENT_SECRET = String(config.gmail.clientSecret);
+            if (config.gmail.redirectUri) env.GMAIL_REDIRECT_URI = String(config.gmail.redirectUri);
+            this.record('[Channels] Gmail API credentials supplied');
+        }
+
+        return env;
+    }
+
     async spawnBackend(backendDir) {
         const { command, env, label } = this.runtime();
         this.setStatus('STARTING', `Starting the PhishLens backend with ${label}…`);
@@ -192,6 +250,11 @@ class BackendSupervisor extends EventEmitter {
             env: {
                 ...process.env,
                 ...env,
+                // Whatever the person switched on, read from their own data
+                // folder. Spread above everything this supervisor decides, so a
+                // malformed file cannot move the port, replace the API key or
+                // redirect the data directory.
+                ...this.channelEnvironment(process.env.PHISHLENS_DATA_DIR || path.join(app.getPath('userData'), 'data')),
                 PORT: String(this.port),
                 PHISHLENS_API_KEY: this.apiKey,
                 // Cases, tokens and the audit ledger belong with the user, not

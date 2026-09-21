@@ -183,3 +183,70 @@ test('it reports a clear failure when the backend cannot be located', async () =
 test.after(() => {
     try { fs.rmSync(userDataDir, { recursive: true, force: true }); } catch (e) { /* best effort */ }
 });
+
+/**
+ * Channel settings, read from the person's own data folder.
+ *
+ * The monitoring channels are switched on by environment variables, and for an
+ * installed application the only way to set those was the Windows user
+ * environment - which puts a password in the registry for every process that
+ * user runs. These are read from a file beside the application's own data
+ * instead.
+ */
+test('channels are off when there is no settings file', () => {
+    const supervisor = new BackendSupervisor();
+    const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'phishlens-channels-'));
+
+    assert.deepStrictEqual(supervisor.channelEnvironment(empty), {},
+        'no file means no channels, not half-configured ones');
+});
+
+test('a malformed settings file leaves every channel off', () => {
+    const supervisor = new BackendSupervisor();
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'phishlens-channels-'));
+    fs.writeFileSync(path.join(dir, 'channels.json'), '{ not json');
+
+    // A monitoring channel that cannot read its own settings must not come up
+    // and report itself as watching.
+    assert.deepStrictEqual(supervisor.channelEnvironment(dir), {});
+});
+
+test('SMTP is only switched on when it has a credential to enforce', () => {
+    const supervisor = new BackendSupervisor();
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'phishlens-channels-'));
+
+    // Enabled but with nothing to authenticate against would be an open relay.
+    fs.writeFileSync(path.join(dir, 'channels.json'), JSON.stringify({ smtp: { enabled: true } }));
+    assert.deepStrictEqual(supervisor.channelEnvironment(dir), {});
+
+    fs.writeFileSync(path.join(dir, 'channels.json'), JSON.stringify({
+        smtp: { enabled: true, username: 'u', password: 'p' }
+    }));
+    const env = supervisor.channelEnvironment(dir);
+    assert.strictEqual(env.ENABLE_SMTP_INGESTION, 'true');
+    assert.strictEqual(env.SMTP_BIND_HOST, '127.0.0.1', 'it must bind to loopback unless deliberately changed');
+    assert.strictEqual(env.SMTP_LISTEN_PORT, '2525');
+});
+
+test('a channel marked disabled stays disabled even with credentials present', () => {
+    const supervisor = new BackendSupervisor();
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'phishlens-channels-'));
+    fs.writeFileSync(path.join(dir, 'channels.json'), JSON.stringify({
+        imap: { enabled: false, user: 'someone@example.com', password: 'secret', host: 'imap.example.com' }
+    }));
+
+    assert.deepStrictEqual(supervisor.channelEnvironment(dir), {},
+        'leaving credentials in the file must not switch the channel on');
+});
+
+test('channel settings cannot override the port, the key or the data directory', () => {
+    const source = fs.readFileSync(path.join(__dirname, '..', 'backendSupervisor.js'), 'utf8');
+
+    const spread = source.indexOf('...this.channelEnvironment(');
+    assert.ok(spread > 0, 'the channel settings must be spread into the backend environment');
+
+    for (const setting of ['PORT: String(this.port)', 'PHISHLENS_API_KEY: this.apiKey', 'PHISHLENS_DATA_DIR:']) {
+        assert.ok(source.indexOf(setting) > spread,
+            `${setting} must come after the channel settings, so a file cannot move it`);
+    }
+});

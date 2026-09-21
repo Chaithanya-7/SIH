@@ -349,6 +349,30 @@ the selectors are wrong; the second means the identifier moved. Diagnosing A-035
 would have been immediate with this.
 Commit: (this commit)
 
+**A-037 · Switch monitoring channels on without touching the system**
+What: The channels are enabled by environment variables, and for an installed
+application the only way to set those was the Windows user environment.
+Status: `Done`
+Evidence: Writing a password into the registry for every process the user runs,
+permanently, was the wrong shape — and was refused by a guardrail, correctly.
+The supervisor now reads `channels.json` from the application's own data folder,
+beside the API key and secret key already there. Absent, unreadable or malformed
+means every channel stays **off**: a channel that cannot read its settings must
+not come up half-configured and report itself as watching. SMTP will not start
+without a credential, so it cannot become an open relay, and binds to loopback
+unless deliberately changed. Five tests, including one asserting the settings are
+spread where they cannot override the port, the API key or the data directory.
+Commit: (this commit)
+
+**A-038 · Enabled the SMTP gateway locally**
+What: Generated a credential and switched the inline SMTP gateway on.
+Status: `Done`
+Evidence: The credential is generated for this machine and guards a listener on
+127.0.0.1:2525 — it is not an account credential. This is the one channel of the
+four that could be switched on from here; the other three need something only
+the user has (a routed domain, a Gmail App Password, a Google Cloud project).
+Commit: (this commit)
+
 ### Releases
 
 | Version | Carried | Status |
