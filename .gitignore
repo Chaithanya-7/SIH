@@ -11,6 +11,9 @@ data/imap_state.json
 *.log
 **/*.log
 dist/
+# Builds go to dist-<version> when Windows holds a lock on dist/win-unpacked,
+# which it does after most builds. Same output, so the same rule applies.
+dist-*/
 **/dist/
 .vscode/
 .idea/
