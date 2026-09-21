@@ -14,6 +14,7 @@ rule LNK_Shortcut_Running_A_Shell
         description = "A Windows shortcut that runs a command interpreter"
         rationale = "A shortcut attached to an email is not a document. Its target is a program and its arguments, and they are not shown to the person clicking it."
         severity = "HIGH"
+        decisive = true
         technique = "T1204.001"
 
     strings:
@@ -36,6 +37,7 @@ rule Encoded_PowerShell_Command
         description = "A base64-encoded PowerShell command line"
         rationale = "The encoding exists so the command cannot be read by whatever is looking at it, including the person. Legitimate automation has no reason to hide its arguments."
         severity = "HIGH"
+        decisive = true
         technique = "T1027"
 
     strings:
@@ -57,6 +59,7 @@ rule RTF_Loading_Remote_Object
         description = "An RTF document that pulls in an object from elsewhere when opened"
         rationale = "The document arrives carrying nothing detectable and fetches the rest of itself on open, so what was scanned is not what runs."
         severity = "HIGH"
+        decisive = true
 
     strings:
         $rtf = "{\\rt"
@@ -75,6 +78,7 @@ rule Office_DDE_Auto_Execution
         description = "An Office document using a field to run an external command"
         rationale = "This runs a program without containing a macro, so a document that reports no macros can still start one."
         severity = "HIGH"
+        decisive = true
 
     strings:
         $dde1 = "DDEAUTO" nocase

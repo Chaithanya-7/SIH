@@ -121,6 +121,10 @@ class YaraRules {
                 detail: match.meta.rationale || `Matched rule ${match.rule}.`,
                 rule: match.rule,
                 technique: match.meta.technique || null,
+                // Declared by the rule, not inferred from its severity. A rule
+                // says this of itself only where there is no innocent way for
+                // the structure it describes to exist.
+                decisive: match.meta.decisive === true,
                 matched_strings: match.matched_strings.map(s => s.identifier)
             }))
         };

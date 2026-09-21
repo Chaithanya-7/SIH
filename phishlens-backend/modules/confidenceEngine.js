@@ -7,7 +7,11 @@ class ConfidenceEngine {
         if (type === 'IDENTITY_SPOOF' || type === 'MQL_DOM' || type === 'MQL_IMP') return 'IDENTITY';
         if (['INFRASTRUCTURE_ANOMALY', 'REPUTATION_RISK'].includes(type)) return 'INFRASTRUCTURE';
         if (type === 'MQL_URL') return 'URL_RISK';
-        if (type === 'MQL_ATT') return 'ATTACHMENT_RISK';
+        // Both belong to the same family: the MQL rules judge an attachment by
+        // its name and declared type, the inspector and the detection rules by
+        // its contents. Kept apart they would count as two independent kinds of
+        // evidence for what is one attachment being wrong.
+        if (type === 'MQL_ATT' || type === 'ATTACHMENT_CONTENT') return 'ATTACHMENT_RISK';
         if (type === 'MQL_BEC') return 'BEC_COMPOSITE';
         if (type === 'MQL_INTEL') return 'THREAT_INTEL';
         if (type === 'MQL_CUSTOM') return 'CUSTOM';

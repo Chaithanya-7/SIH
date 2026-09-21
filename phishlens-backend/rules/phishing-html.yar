@@ -18,6 +18,7 @@ rule HTML_Smuggling_Blob_Download
         description = "An HTML attachment that assembles a file in the browser and saves it"
         rationale = "The payload never crosses the network as a file, so nothing between the sender and the person can scan it. It is built from text inside the page after it opens."
         severity = "HIGH"
+        decisive = true
         technique = "T1027.006"
 
     strings:
@@ -42,6 +43,7 @@ rule HTML_Credential_Form_Posting_Offsite
         description = "A local HTML file containing a password field that submits to a remote address"
         rationale = "A sign-in page that arrives as an attachment has no reason to exist. The form action is where the typed password is sent."
         severity = "HIGH"
+        decisive = true
 
     strings:
         $password = /<input[^>]{0,200}type\s*=\s*["']?password/ nocase
@@ -78,6 +80,7 @@ rule HTML_Meta_Refresh_To_Encoded_Page
         description = "A page that immediately redirects itself into an encoded document"
         rationale = "The address bar never shows a destination worth reading, and the destination is carried in the page rather than fetched, so there is nothing to look up."
         severity = "HIGH"
+        decisive = true
 
     strings:
         $refresh = /<meta[^>]{0,120}http-equiv\s*=\s*["']?refresh/ nocase
@@ -94,6 +97,7 @@ rule HTML_Clipboard_Paste_To_Run
         description = "A page that copies a command and instructs the reader to run it"
         rationale = "The page performs no exploit at all: it writes a command to the clipboard and asks the person to paste it into the Run dialog or a terminal, so the person becomes the delivery mechanism."
         severity = "HIGH"
+        decisive = true
         technique = "T1204.004"
 
     strings:

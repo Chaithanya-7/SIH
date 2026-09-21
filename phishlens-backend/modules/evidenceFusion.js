@@ -197,6 +197,53 @@ class EvidenceFusion {
             }));
         });
 
+        // 11. What was found inside the attachments themselves.
+        //
+        //     This was missing, and its absence was invisible: an HTML
+        //     attachment carrying a credential form produced a HIGH finding on
+        //     the attachment and a verdict of SAFE on the message, because
+        //     nothing downstream read attachments at all. Findings that reach
+        //     nobody are the same as findings that were never made.
+        (threatObject.attachments || []).forEach(attachment => {
+            (attachment.findings || []).forEach(finding => {
+                evidenceList.push(new EvidenceObject({
+                    evidence_type: 'ATTACHMENT_CONTENT',
+                    source: finding.rule ? 'PHISHLENS_DETECTION_RULES' : 'ATTACHMENT_INSPECTOR',
+                    finding: finding.summary,
+                    severity: finding.severity,
+                    // Structural facts, not guesses about intent. A macro either
+                    // is present or is not, and a form either posts offsite or
+                    // does not, so these are not hedged the way a heuristic is.
+                    confidence: finding.severity === 'HIGH' ? 0.9 : finding.severity === 'MEDIUM' ? 0.65 : 0.4,
+                    explanation: `${attachment.file_name}: ${finding.detail || finding.summary}`,
+                    // Family caps stop correlated facts compounding. They must
+                    // not also cap a single structural fact that has no benign
+                    // reading - an emailed sign-in page scored 0.28 and read as
+                    // SAFE. The floor is visible in the contributions.
+                    decisive: finding.decisive === true,
+                    provenance: {
+                        source_type: 'ATTACHMENT_BYTES',
+                        source_reference: `${attachment.file_name} (sha256 ${String(attachment.sha256 || '').slice(0, 16)})`
+                    }
+                }));
+            });
+
+            // A document whose macros could not be read is a gap in the
+            // analysis, and a gap belongs in the evidence rather than in a log.
+            const macro = attachment.macro_analysis;
+            if (macro && (macro.status === 'UNAVAILABLE' || macro.status === 'FAILED')) {
+                evidenceList.push(new EvidenceObject({
+                    evidence_type: 'ANALYSIS_LIMITATION',
+                    source: 'ATTACHMENT_INSPECTOR',
+                    finding: 'Macro code was present and was not read',
+                    severity: 'MEDIUM',
+                    confidence: 0.5,
+                    explanation: `${attachment.file_name}: ${macro.detail}`,
+                    provenance: { source_type: 'ATTACHMENT_BYTES', source_reference: attachment.file_name }
+                }));
+            }
+        });
+
         threatObject.evidence = evidenceList;
         return threatObject;
     }
