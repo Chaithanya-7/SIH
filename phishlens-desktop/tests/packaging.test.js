@@ -21,9 +21,30 @@ const { execFileSync } = require('child_process');
  * one.
  */
 
-const PACKAGED = path.join(__dirname, '..', 'dist', 'win-unpacked', 'resources');
-const built = fs.existsSync(PACKAGED);
-const skip = built ? false : 'no packaged build in dist/win-unpacked - run `npm run build` first';
+/**
+ * The most recently built output, wherever it went.
+ *
+ * This pointed at dist/win-unpacked and nowhere else. When a build has to go
+ * somewhere else - Windows holds a lock on a previous win-unpacked long after
+ * the process using it is gone, and electron-builder cannot remove it - these
+ * checks quietly went on validating the stale build instead of the new one,
+ * which is the exact failure they exist to catch.
+ */
+function mostRecentBuild() {
+    const root = path.join(__dirname, '..');
+    const candidates = fs.readdirSync(root)
+        .filter(name => name === 'dist' || name.startsWith('dist-'))
+        .map(name => path.join(root, name, 'win-unpacked', 'resources'))
+        .filter(candidate => fs.existsSync(candidate))
+        .map(candidate => ({ candidate, at: fs.statSync(candidate).mtimeMs }))
+        .sort((a, b) => b.at - a.at);
+
+    return candidates.length ? candidates[0].candidate : null;
+}
+
+const PACKAGED = mostRecentBuild();
+const built = Boolean(PACKAGED);
+const skip = built ? false : 'no packaged build found - run `npm run build` first';
 
 test('the packaged app contains the backend and the console', { skip }, () => {
     assert.ok(fs.existsSync(path.join(PACKAGED, 'backend', 'server.js')), 'the backend must be bundled');
