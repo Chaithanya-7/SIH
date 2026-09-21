@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const connectionState = document.getElementById('connection-state');
   const setupNotice = document.getElementById('setup-notice');
+  const watchState = document.getElementById('watch-state');
   const setupMessage = document.getElementById('setup-message');
   const summary = document.getElementById('summary');
   const recentList = document.getElementById('recent-list');
@@ -64,6 +65,45 @@ document.addEventListener('DOMContentLoaded', () => {
   function openOptions() {
     if (ext?.runtime?.openOptionsPage) ext.runtime.openOptionsPage();
     else openUrl('options.html');
+  }
+
+  /**
+   * Says what the watcher is doing on the mail tab, in plain terms.
+   *
+   * Three situations look identical from the counts alone: the watcher never
+   * ran, it ran and recognised nothing on the page, and it ran with nothing new
+   * to examine. Only the first two are faults, and only this tells them apart.
+   */
+  function showWatchState() {
+    if (!watchState || !ext?.runtime?.sendMessage) return;
+
+    try {
+      ext.runtime.sendMessage({ type: 'phishlens:get-watch-status' }, status => {
+        // Touching lastError also stops the browser logging it as unchecked.
+        if (ext.runtime.lastError) return;
+
+        if (!status) {
+          watchState.textContent = 'The page watcher has not reported yet. Open Gmail or Outlook Web in a tab, then reopen this.';
+          watchState.classList.remove('hidden');
+          return;
+        }
+
+        const ago = Math.max(0, Math.round((Date.now() - new Date(status.at).getTime()) / 1000));
+        const seen = Number(status.rowsSeen || 0);
+
+        if (status.phase === 'error') {
+          watchState.textContent = `Watching ${status.host}, but the last sweep stopped: ${status.error}`;
+        } else if (seen === 0) {
+          // The failure that matters: running, and recognising nothing.
+          watchState.textContent = `Running on ${status.host} but found no messages in the list ${ago}s ago. If mail is on screen, this reader no longer matches that page.`;
+        } else {
+          watchState.textContent = `Watching ${status.host}: ${seen} message${seen === 1 ? '' : 's'} in view, ${status.examined ?? 0} examined ${ago}s ago.`;
+        }
+        watchState.classList.remove('hidden');
+      });
+    } catch (e) {
+      // The worker is unavailable. The rest of the popup still works.
+    }
   }
 
   function showSetupNotice(message) {

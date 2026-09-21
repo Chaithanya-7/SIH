@@ -297,6 +297,37 @@ be used. The reader is correct against Gmail-shaped markup (A-027); whether
 Gmail still looks like that is what the sweep report (A-026) exists to reveal.
 Commit: —
 
+**A-032 · Shipped a ReferenceError to the user's browser**
+What: A-026 added a call to `showWatchState()` and **never added the function**.
+Status: `Done` (fixed)
+Evidence: An edit script hit an assertion and died part-way; the call landed, the
+definition did not. I fixed the HTML half and moved on without re-running the
+JavaScript half. `node --check` passed, because an undefined function is not a
+syntax error — it is a ReferenceError at the moment the line runs. The user saw
+the popup stuck on "Connecting…" and a red **Errors** badge. **Caught by the
+user, not by me**, which is the point of recording it.
+Commit: `2421c1a` introduced it
+
+**A-033 · Run the extension's pages in a test**
+What: Added `tests/extensionPages.test.js` — loads the real popup and options
+HTML with every script it references, extension APIs stubbed, and fails if the
+page throws while opening.
+Status: `Done`
+Evidence: Proven to fail when the `showWatchState` definition is removed again,
+reproducing A-032 exactly. Also checks that every element the popup looks up
+exists in its HTML, since `getElementById` returns null silently. Two harness
+bugs of my own on the way: separate `eval` calls do not share a lexical scope the
+way `<script>` tags do, and a heredoc ate a newline escape.
+Commit: (this commit)
+
+**A-034 · Removed the MV2 key Chrome rejects**
+What: `background.scripts` sat beside `service_worker` for Firefox.
+Status: `Done`
+Evidence: Chrome lists it on the extension's error page under MV3. A red
+"Errors" badge on a security tool reads as the tool being broken. Firefox
+support was aspirational and never tested, so the browser actually in use wins.
+Commit: (this commit)
+
 ### Releases
 
 | Version | Carried | Status |
