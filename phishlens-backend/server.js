@@ -918,6 +918,12 @@ app.post('/api/ingest/browser', express.json({ limit: '35mb' }), async (req, res
             evidence_completeness: complete ? 'FULL_HEADERS' : 'BODY_ONLY'
         });
     } catch (error) {
+        // Logged with its stack, not only recorded as a count. The registry
+        // keeps failures in memory and loses them on restart, which is how one
+        // of these became undiagnosable: by the time it was looked for, the
+        // application had been restarted and the only trace was a 500 the
+        // extension had already reduced to a status code.
+        console.error('[BrowserIngest] Failed to examine a submitted message:', error);
         ingestionRegistry.recordFailure('browser_watch', error);
         res.status(500).json({ success: false, error: error.message });
     }

@@ -110,6 +110,37 @@ test('rows on the page are counted even when none can be identified', () => {
     assert.strictEqual(providers.gmail.listVisible(dom.window.document).length, 0, 'and cannot be identified');
 });
 
+test('a row Gmail publishes no id for is still examined, under a derived one', () => {
+    const providers = loadProviders();
+
+    // Dropping such rows is what silently reported a full inbox as empty. The
+    // derived id only has to be the same across sweeps and different between
+    // messages; the backend deduplicates properly on the raw message after.
+    const markup = `
+        <table><tbody>
+            <tr class="zA zE">
+                <td><span email="billing@supplier.example">Billing</span></td>
+                <td><span class="bog">Your account will be suspended</span></td>
+                <td class="xW"><span title="Mon, 22 Sep 2026 09:14">09:14</span></td>
+            </tr>
+        </tbody></table>`;
+
+    const rows = providers.gmail.listVisible(new JSDOM(markup).window.document);
+    assert.strictEqual(rows.length, 1, 'the row must not be dropped for lacking a published id');
+    assert.match(rows[0].id, /^derived-/, "a derived id must be marked as derived, never passed off as one Gmail published");
+
+    // Stable: the same row read twice gives the same id, or every sweep would
+    // submit the same message again as though it were new.
+    const again = providers.gmail.listVisible(new JSDOM(markup).window.document);
+    assert.strictEqual(again[0].id, rows[0].id, 'the derived id must be stable across sweeps');
+
+    // And different for a different message.
+    const other = providers.gmail.listVisible(new JSDOM(
+        markup.replace('Your account will be suspended', 'Lunch on Thursday')
+    ).window.document);
+    assert.notStrictEqual(other[0].id, rows[0].id, 'two different messages must not share an id');
+});
+
 test('unread messages are told apart from read ones', () => {
     const providers = loadProviders();
     const rows = providers.gmail.listVisible(fixtureDocument());

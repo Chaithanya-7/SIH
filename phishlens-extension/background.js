@@ -122,7 +122,21 @@ async function examineFromBrowser(payload) {
     });
 
     if (!response.ok) {
-      return { ok: false, error: `PhishLens returned ${response.status}.` };
+      // The backend puts the reason in the body. Reporting only the status code
+      // turned a diagnosable fault into "returned 500", which says nothing about
+      // which message failed or why - and the status is the one thing already
+      // obvious from the request failing.
+      let detail = '';
+      try {
+        const body = await response.json();
+        if (body && body.error) detail = String(body.error).slice(0, 300);
+      } catch (e) {
+        // Not JSON, or already consumed. The status alone will have to do.
+      }
+      return {
+        ok: false,
+        error: `PhishLens returned ${response.status}${detail ? ': ' + detail : '.'}`
+      };
     }
     const result = await response.json();
     // A verdict changes the badge, so it is refreshed rather than left stale.

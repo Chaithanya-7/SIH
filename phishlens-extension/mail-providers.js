@@ -76,7 +76,34 @@
             const elementId = row.getAttribute('id');
             if (elementId && /\d/.test(elementId)) return elementId.replace(/^#/, '').replace(/^thread-[fa]:/, '');
 
-            return null;
+            // Nothing Gmail publishes as an identifier is here any more.
+            //
+            // Rather than drop the row - which is what silently emptied a full
+            // inbox once - derive one from what the row says. Sender, subject
+            // and time together identify a message well enough to deduplicate
+            // it across sweeps, which is all this id is for; the backend
+            // deduplicates properly on the raw message afterwards.
+            //
+            // Marked so it is never mistaken for Gmail's own id.
+            const derived = this.deriveId(row);
+            return derived ? 'derived-' + derived : null;
+        },
+
+        /** A stable identifier built from what the row displays, when Gmail publishes none. */
+        deriveId(row) {
+            const text = [
+                row.querySelector('span[email]')?.getAttribute('email') || '',
+                row.querySelector('.bog')?.textContent || '',
+                row.querySelector('.xW span')?.getAttribute('title') || row.querySelector('.xW span')?.textContent || ''
+            ].join('|').trim();
+
+            if (text.length < 3) return null;
+
+            // A small, stable hash. Not cryptographic - it only has to be the
+            // same string every sweep and different between messages.
+            let hash = 5381;
+            for (let i = 0; i < text.length; i++) hash = ((hash * 33) ^ text.charCodeAt(i)) >>> 0;
+            return hash.toString(36);
         },
 
         /** How many rows were on the page, regardless of whether any could be identified. */

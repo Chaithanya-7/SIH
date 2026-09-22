@@ -188,6 +188,53 @@ service. Place names stay at every zoom: they are what makes photography
 legible at all.
 Commit: (this commit)
 
+**A-061 · The browser reader now finds real Gmail messages**
+What: After the reload, the popup changed from "found no messages in the list"
+to "Watching mail.google.com, but the last sweep stopped".
+Status: `Done`
+Evidence: The identifier fix (A-035) works against live Gmail — the reader is
+finding rows, reading them, and submitting them. The three-way diagnostic
+(A-036) is what made this legible rather than a guess.
+Commit: (this commit)
+
+**A-062 · Rows Gmail publishes no id for are no longer dropped**
+What: `identify()` now derives a stable id from sender, subject and time when
+Gmail publishes none, rather than discarding the row.
+Status: `Done`
+Evidence: Dropping such rows is what silently reported a 2,241-message inbox as
+empty. The derived id is marked `derived-` so it is never mistaken for Gmail's
+own, is stable across sweeps, and differs between messages — all asserted. The
+backend still deduplicates properly on the raw message afterwards.
+Commit: (this commit)
+
+**A-063 · A 500 that could not be reproduced, made self-reporting**
+What: The sweep stopped with "PhishLens returned 500".
+Status: `Done` — cause **not found**; the failure now reports itself
+Evidence: Could not be reproduced. Tested against the running instance:
+duplicate submissions, six concurrent submissions, 1/4/12 MB attachments, lone
+surrogates, replacement characters, null bytes, undeclared MIME boundaries,
+malformed multipart, a header with no colon, a 500,000-character line — every
+one returned 200. The original error was gone by the time it was looked for:
+the registry keeps failures in memory and the application had been restarted.
+
+So rather than guess, the failure now carries its own diagnosis. The backend
+already returned the reason in the 500 body and the extension was discarding
+it, reporting only the status code — the one thing already obvious. It now
+shows what the backend said, and the backend logs the stack for that path.
+**If it happens again the popup will name the cause.**
+Commit: (this commit)
+
+**A-064 · Two console hints were wrong**
+What: The browser channel said "paste your API key into its options"; the Gmail
+API said it needs "a public address Google can reach".
+Status: `Done`
+Evidence: The key has been written in automatically since the provisioning work
+— nothing to paste. And a public address is only needed for Pub/Sub **push**;
+without one the adapter still collects mail on each sync, which the backend's
+own `limitation` field already said correctly. The console was telling people
+they needed infrastructure they do not.
+Commit: (this commit)
+
 **A-058 · Street-level 3D view — evaluated, not built**
 What: Asked for a Street View equivalent.
 Status: `Abandoned` — blocked on both a source and a truthfulness problem.

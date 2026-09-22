@@ -26,7 +26,7 @@ const CHANNEL_META = {
         timing: 'Before you open it',
         timingTone: 'good',
         plain: 'Watches Gmail and Outlook Web in your browser. As soon as a message appears in the list it is examined, and a dangerous one is labelled before you click it.',
-        needs: 'Install the PhishLens browser extension and paste your API key into its options.'
+        needs: 'Load the PhishLens browser extension. The key is written in for you; nothing to paste.'
     },
     smtp_gateway: {
         icon: Server,
@@ -47,7 +47,10 @@ const CHANNEL_META = {
         timing: 'Shortly after it arrives',
         timingTone: 'ok',
         plain: 'Receives a push from Google when mail arrives and fetches it through the Gmail API.',
-        needs: 'Requires a Google Cloud project and a public address Google can reach.'
+        // The public address is for Pub/Sub push only. Without it the adapter
+        // still works, collecting mail when a sync runs - and saying otherwise
+        // told people they needed infrastructure they do not.
+        needs: 'Requires an OAuth client from a Google Cloud project. A public address is only needed for instant push; without one, mail is collected on each sync.'
     },
     file_upload: {
         icon: Upload,
