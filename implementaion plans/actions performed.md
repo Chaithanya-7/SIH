@@ -199,6 +199,33 @@ service. Place names stay at every zoom: they are what makes photography
 legible at all.
 Commit: (this commit)
 
+**A-072 - A document that explains the tool to somebody who has not seen it**
+What: Wrote `PhishLens - How It Works.pdf` (26 pages) covering the architecture,
+the seven ingestion channels, all sixteen pipeline stages, evidence fusion and
+the scoring constants, attachment inspection, the twelve rules, the optional
+open-source tools, the data-locality guarantees, the full dependency versions,
+and the open items.
+Status: `Done`
+Evidence: Every figure in it was read out of the repository rather than
+remembered - the family caps and the 0.70/0.35 thresholds from
+`confidenceEngine.js`, the stage order and its stated reasons from `server.js`,
+the channel descriptions from `ingestionRegistry.js`, the finding codes from
+`attachmentInspector.js`, the rule names from `rules/*.yar`, the counts from the
+directories themselves (54 modules, 14 adapters, 28 test files, 23 console
+panels), and the dependency versions from the lockfiles.
+
+The open items are stated as open in the document, in their own table, including
+that `browser_watch` is receiving nothing. A document that described the browser
+channel as working would be the same failure this project has a rule against.
+
+Generator script kept out of the repository: it is a one-shot, and the PDF is
+the artefact. The source is pure ASCII on purpose - reportlab's built-in fonts
+have no glyph for arrows or Unicode sub/superscripts and render them as solid
+black boxes, so `->`, `>=` and `<sub>` tags were used instead. Verified: 26
+pages, 66.8 KB, no non-ASCII in the source.
+Commit: (this commit)
+
+
 **A-071 · "Still 0 analyzed" — the popup now says why**
 What: After reloading the extension, nothing was examined. The backend showed
 `browser_watch` at **0 examined and 0 failures**.
