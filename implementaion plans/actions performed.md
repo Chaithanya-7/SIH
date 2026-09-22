@@ -35,9 +35,15 @@ would otherwise be repeated.
 
 ## Where this stands — paused 2026-09-22
 
-**Installed:** PhishLens **1.7.5**, running. Repository clean, everything pushed.
-**Tests:** 317 backend · 33 desktop · 4 console · 0 failing · 0 skipped.
+**Installed:** PhishLens **1.7.8**, running. Repository clean, everything pushed.
+**Tests:** 319 backend · 33 desktop · 4 console · 0 failing · 0 skipped.
 **User's data:** 0 cases. Every probe message created while verifying was removed.
+
+**Map, as of 1.7.8:** country view ~1290 ms and street level ~1685 ms, against
+~2350 ms for both this morning. Nowhere on earth draws a blank tile. The caption
+states when the photography under the view was taken. Roads load from zoom 9;
+an OpenStreetMap layer sits beneath the imagery, capped at zoom 12, and Esri
+"no data" tiles are made transparent so it shows through.
 
 ### The one thing waiting on an answer
 
