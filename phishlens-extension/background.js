@@ -25,6 +25,14 @@ const DEFAULTS = {
 
 const REFRESH_ALARM = 'phishlens-refresh-badge';
 
+/** The webmail this extension watches. Used for injecting and for nudging. */
+const MAIL_HOSTS = [
+  'https://mail.google.com/*',
+  'https://outlook.live.com/*',
+  'https://outlook.office.com/*',
+  'https://outlook.office365.com/*'
+];
+
 /** The most recent sweep reported by a content script, or null if none ever has. */
 let lastWatchStatus = null;
 
@@ -103,13 +111,6 @@ async function setBadge(text, color) {
  */
 async function watchAlreadyOpenTabs(reason) {
   if (!ext.scripting?.executeScript || !ext.tabs?.query) return;
-
-  const MAIL_HOSTS = [
-    'https://mail.google.com/*',
-    'https://outlook.live.com/*',
-    'https://outlook.office.com/*',
-    'https://outlook.office365.com/*'
-  ];
 
   let tabs = [];
   try {
@@ -223,6 +224,36 @@ ext.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request?.type === 'phishlens:get-watch-status') {
     sendResponse(lastWatchStatus);
     return false;
+  }
+  // "Check my mail now", from the popup's refresh button.
+  //
+  // Two things have to happen, because either can be the reason nothing is
+  // being examined: a tab that was open before the extension loaded has no
+  // watcher in it at all, and a tab that does have one is between polls.
+  if (request?.type === 'phishlens:sweep-now') {
+    (async () => {
+      await watchAlreadyOpenTabs('asked from the popup');
+
+      let nudged = 0;
+      try {
+        const tabs = await ext.tabs.query({ url: MAIL_HOSTS });
+        for (const tab of tabs) {
+          try {
+            await ext.tabs.sendMessage(tab.id, { type: 'phishlens:sweep-now' });
+            nudged++;
+          } catch (e) {
+            // No watcher listening in that tab yet. The injection above will
+            // have started one, and it sweeps as soon as it comes up.
+          }
+        }
+      } catch (e) {
+        // No tabs permission, or no mail tabs. Nothing to nudge.
+      }
+
+      await refreshBadge();
+      sendResponse({ ok: true, tabs: nudged });
+    })();
+    return true;
   }
   if (request?.type === 'phishlens:get-settings') {
     readSettings().then(settings => sendResponse({

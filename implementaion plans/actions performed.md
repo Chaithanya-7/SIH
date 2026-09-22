@@ -188,6 +188,27 @@ service. Place names stay at every zoom: they are what makes photography
 legible at all.
 Commit: (this commit)
 
+**A-070 · A refresh button that actually checks the mail**
+What: Added a refresh control to the popup header.
+Status: `Done`
+Evidence: It would have been easy to make it re-read the summary, which looks
+like a refresh and changes nothing — the summary only moves once a sweep has
+examined something. So pressing it does three things: starts a watcher in any
+mail tab that has none (the case it most often exists for, per A-068), nudges
+the tabs that have one to sweep immediately rather than waiting out the
+four-second poll, and clears any backoff, so an earlier failure cannot leave the
+button doing nothing for up to a minute.
+
+The button turns while it works. Without that the only feedback is the counts
+changing, which is exactly what does not happen when nothing new was found — and
+then it reads as a dead button. Motion is dropped for anyone who prefers reduced
+motion, but the disabled state still shows.
+
+The whole chain is asserted — popup, worker, watcher, the backoff reset and the
+injection — because any one link missing leaves a button that looks like it
+works.
+Commit: (this commit)
+
 **A-068 · Reloading the extension did not start watching an open Gmail tab**
 What: The popup said "The page watcher has not reported yet" with Gmail plainly
 open in another tab.

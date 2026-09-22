@@ -299,6 +299,23 @@
         report({ rowsSeen: rowsOnPage, identified: visible.length, examined, phase: 'done' });
     }
 
+    // Sweep on request, not only on the timer.
+    //
+    // Without this the refresh button could only promise "it will look within
+    // four seconds", which is not what pressing a button should mean.
+    if (ext.runtime?.onMessage) {
+        ext.runtime.onMessage.addListener((request, sender, sendResponse) => {
+            if (request?.type !== 'phishlens:sweep-now') return;
+            // Clear any backoff: the person is asking now, and an earlier
+            // failure should not make them wait out its penalty.
+            quietUntil = 0;
+            consecutiveFailures = 0;
+            sweep();
+            sendResponse({ ok: true });
+            return false;
+        });
+    }
+
     function start() {
         ext.storage?.local.get(['browserWatchEnabled'], stored => {
             enabled = stored.browserWatchEnabled !== false;

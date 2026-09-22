@@ -158,6 +158,32 @@ test('the popup keeps the list behind a drawer, and the counts can be pressed', 
     assert.match(script, /renderRecent\(\)/, 'pressing a count must re-render the list');
 });
 
+test('the refresh button reaches the watcher, not only the popup', () => {
+    const html = fs.readFileSync(path.join(EXTENSION, 'popup.html'), 'utf8');
+    const popup = fs.readFileSync(path.join(EXTENSION, 'popup.js'), 'utf8');
+    const worker = fs.readFileSync(path.join(EXTENSION, 'background.js'), 'utf8');
+    const content = fs.readFileSync(path.join(EXTENSION, 'content-gmail.js'), 'utf8');
+
+    assert.match(html, /id="btn-refresh"/, 'the button must exist');
+
+    // The whole chain has to be there. A button that only re-reads the summary
+    // would look like it worked and change nothing, because the summary only
+    // moves after a sweep has actually examined something.
+    assert.match(popup, /phishlens:sweep-now/, 'the popup must ask the worker to sweep');
+    assert.match(worker, /phishlens:sweep-now/, 'the worker must handle the request');
+    assert.match(content, /phishlens:sweep-now/, 'the watcher must sweep when asked');
+
+    // Pressing it must also clear any backoff, or an earlier failure makes the
+    // button do nothing for up to a minute.
+    const listener = content.slice(content.indexOf("request?.type !== 'phishlens:sweep-now'"));
+    assert.match(listener.slice(0, 400), /quietUntil = 0/, 'a request must not wait out a backoff');
+
+    // And it must start a watcher in tabs that have none, which is the case the
+    // button most often exists for.
+    assert.match(worker, /watchAlreadyOpenTabs\('asked from the popup'\)/,
+        'the request must also inject into mail tabs with no watcher');
+});
+
 test('the manifest carries nothing the target browser rejects', () => {
     const manifest = JSON.parse(fs.readFileSync(path.join(EXTENSION, 'manifest.json'), 'utf8'));
 

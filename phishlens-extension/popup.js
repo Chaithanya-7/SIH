@@ -233,6 +233,45 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  /**
+   * "Check my mail now".
+   *
+   * Asks the worker to start a watcher in any mail tab that has none, nudge the
+   * ones that have, then re-reads the summary. The button says what happened
+   * while it is happening, because a button that looks identical before and
+   * after leaves somebody pressing it again.
+   */
+  const refreshButton = document.getElementById('btn-refresh');
+  if (refreshButton) {
+    refreshButton.addEventListener('click', () => {
+      if (refreshButton.disabled) return;
+
+      refreshButton.disabled = true;
+      refreshButton.classList.add('spinning');
+      const restore = () => {
+        refreshButton.disabled = false;
+        refreshButton.classList.remove('spinning');
+      };
+
+      const done = () => { loadSummary().finally(restore); };
+
+      if (!ext?.runtime?.sendMessage) { done(); return; }
+
+      try {
+        ext.runtime.sendMessage({ type: 'phishlens:sweep-now' }, () => {
+          // Touched so the browser does not log it as unchecked; a sleeping
+          // worker is not a failure worth reporting here.
+          void ext.runtime.lastError;
+          // A sweep has to fetch and examine before anything changes, so the
+          // summary is re-read a moment later rather than immediately.
+          setTimeout(done, 1200);
+        });
+      } catch (e) {
+        done();
+      }
+    });
+  }
+
   async function loadSummary() {
     // Always, and before anything else that can return early. Whether the page
     // watcher is running is independent of whether the backend answers, and it
