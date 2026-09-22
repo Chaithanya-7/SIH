@@ -98,6 +98,66 @@ SMTP credentials live in `%APPDATA%\phishlens-desktop\data\channels.json`
 
 ---
 
+## 2026-09-22 — map accuracy and speed (PAUSED MID-EXPERIMENT)
+
+**A-046 · How old the map actually is**
+What: Queried Esri's World Imagery metadata service for per-tile capture dates,
+rather than repeating a general claim about satellite imagery.
+Status: `Done`
+Evidence: Esri publishes capture date, resolution and positional accuracy per
+tile. For Hyderabad: captured **15 Nov 2025**, **0.46 m/pixel**, positional
+accuracy **8.47 m**, sensor GeoEye-1, product "Vivid Advanced", released in
+"Raster Basemaps 2026.R06". Other samples: Delhi 23 Oct 2025, rural Rajasthan
+8 Dec 2025, London 6 Aug 2025, New York 14 Mar 2024. Indian coverage is roughly
+**9–11 months old**; the United States sample was **2.5 years** old. The
+OpenStreetMap layers are a different thing entirely — vector data edited
+continuously, so minutes to days old, not years.
+Commit: —
+
+**A-047 · Why zooming takes seconds — measured**
+What: Instrumented the application's own network stack during one zoom step.
+Status: `Done`
+Evidence: One zoom to level 13 costs **72 tile requests**, every one to
+`server.arcgisonline.com`, over **HTTP/1.1**, median **800 ms**, slowest
+1746 ms. The satellite view is three layers — imagery plus two Esri reference
+overlays — and all three are served from the same host, so they compete for the
+same per-host connection budget of about six.
+Commit: —
+
+**A-048 · Nearly trusted curl about HTTP/2**
+What: Concluded from curl that every tile host was HTTP/1.1.
+Status: `Abandoned` — the reading was an artefact.
+Evidence: The local curl has **no HTTP/2 support compiled in**, so it reports
+1.1 for everything. Chromium confirmed HTTP/1.1 independently, so the
+conclusion happened to hold — but it was not evidence when it was first used.
+Fourth instance of trusting a tool's answer without checking the tool.
+Commit: —
+
+**A-049 · Esri host sharding — INCONCLUSIVE, reverted**
+What: Spread the 72 requests over `server`, `services` and `server2`
+.arcgisonline.com, which return byte-identical tiles (verified by hash).
+Status: `Reverted` — **unproven, and the map is back to the committed version**
+Evidence: Sharded cold loads measured **7171 / 5285 / 7087 ms**. The equivalent
+baseline was never measured, so whether this helps at all is **unknown**. Two
+measurement mistakes on the way: per-request medians were compared first, which
+can move opposite to the total; and a warm cache produced a run of zero
+requests that briefly looked like an instant map.
+
+Also found while doing it: Leaflet splits a **string** `subdomains` option into
+single characters, so `'server,services'` becomes `['s','e','r',…]` and every
+tile URL names a host that does not exist. It must be an array.
+
+**To resume:** measure the single-host baseline the same way — cold cache
+(`Network.setCacheDisabled`), a randomised location per run, and total wall
+clock from the zoom to the last tile, not per-request medians. Only then is
+there anything to compare. The measurement script is
+`scratchpad/measure-tiles.js`. Other untried avenues: cutting the request count
+from 72 (three layers per tile position), and prefetching the next zoom level
+to warm the cache before it is needed.
+Commit: —
+
+---
+
 ## 2026-09-22 — full verification pass
 
 **A-041 · Detection battery through the real SMTP channel**
