@@ -180,6 +180,20 @@ service. Place names stay at every zoom: they are what makes photography
 legible at all.
 Commit: (this commit)
 
+**A-054 · A test changed the user's saved basemap and left it changed**
+What: Verifying that the imagery caption hides on a non-photographic basemap
+switched the selector to Standard — which is persisted to localStorage, so it
+survived a reinstall.
+Status: `Done` — restored to satellite
+Evidence: The next measurement then read 145 ms and no caption, both of which
+looked like features failing. They were not: the map was on OpenStreetMap, which
+is one layer and has no photography to date. A test that alters a stored
+preference must put it back; this one now does. Verified restored, and the
+packaged build re-measured on satellite: country view **~1380 ms / 49 requests**,
+street level **~1264 ms / 73 requests**. The extra single request in each is the
+imagery-date lookup — once per settled view, not per tile.
+Commit: (this commit)
+
 **A-053 · The map now says how old its photography is**
 What: The caption under the map states when the imagery beneath the current view
 was captured, and at what resolution.
