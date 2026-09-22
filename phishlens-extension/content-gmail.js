@@ -28,6 +28,16 @@
  */
 
 (() => {
+    // Run once per page, however the script arrived.
+    //
+    // It is injected by the manifest when a mail page loads, and injected again
+    // by the worker into tabs that were already open when the extension loaded.
+    // Both can happen to the same page, and a second copy would sweep the same
+    // list in parallel with the first - submitting every message twice and
+    // doubling the requests for nothing.
+    if (window.__phishlensWatcherRunning) return;
+    window.__phishlensWatcherRunning = true;
+
     'use strict';
 
     const ext = globalThis.browser || globalThis.chrome;

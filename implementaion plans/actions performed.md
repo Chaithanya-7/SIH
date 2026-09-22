@@ -188,6 +188,39 @@ service. Place names stay at every zoom: they are what makes photography
 legible at all.
 Commit: (this commit)
 
+**A-068 · Reloading the extension did not start watching an open Gmail tab**
+What: The popup said "The page watcher has not reported yet" with Gmail plainly
+open in another tab.
+Status: `Done`
+Evidence: A content script is injected when a page loads. Reloading an extension
+does **not** re-run it in tabs that are already open, so reloading with Gmail
+already open produced nothing at all — and the only hint was a popup saying the
+watcher had not reported. Expecting somebody to know they must also reload the
+mail tab is expecting them to know how extensions are loaded.
+
+The worker now finds already-open mail tabs and injects into them itself, on
+install, on update and on browser startup. That needed the `scripting` and
+`tabs` permissions. A guard was added at the same time: the script can now
+arrive twice on one page — once from the manifest, once from the worker — and a
+second copy would sweep the same list in parallel and submit every message
+twice.
+Commit: (this commit)
+
+**A-069 · What "analyse existing mail" can and cannot mean**
+What: Asked to analyse existing mail as well as incoming.
+Status: `Done (partly)` — the rest needs a channel that can enumerate a mailbox
+Evidence: The watcher already examines existing mail: it keeps a `seen` set, so
+it progresses through the list rather than re-examining the same messages, and
+anything scrolled into view is examined. What it cannot do is reach mail that
+Gmail has not rendered — a content script sees the page, not the mailbox. For a
+2,239-message inbox that means browsing it, not one sweep.
+
+Enumerating a whole mailbox is what the IMAP poller and the Gmail API are for,
+and both need a credential only the account holder can create. Raising
+MAX_PER_SWEEP would not help: the limit is what Gmail renders, around fifty
+rows, not the twenty-five the sweep takes.
+Commit: —
+
 **A-065 · My own probe messages were sitting in the user's app**
 What: The popup showed "17 messages analyzed" with five entries titled "probe",
 all SAFE. The user read this, correctly, as the tool scanning invented mail

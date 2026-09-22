@@ -88,6 +88,55 @@ async function setBadge(text, color) {
   }
 }
 
+/**
+ * Starts watching tabs that were already open.
+ *
+ * A content script is injected when a page loads. Loading or reloading an
+ * extension does not re-run it in tabs that are already there - so somebody who
+ * reloads the extension with Gmail open in another tab gets nothing at all, and
+ * the only hint is a popup saying the watcher has not reported. Expecting a
+ * person to know they must also reload the mail tab is expecting them to know
+ * how extensions are loaded.
+ *
+ * So the worker finds those tabs and injects into them itself, on install, on
+ * update and on browser startup.
+ */
+async function watchAlreadyOpenTabs(reason) {
+  if (!ext.scripting?.executeScript || !ext.tabs?.query) return;
+
+  const MAIL_HOSTS = [
+    'https://mail.google.com/*',
+    'https://outlook.live.com/*',
+    'https://outlook.office.com/*',
+    'https://outlook.office365.com/*'
+  ];
+
+  let tabs = [];
+  try {
+    tabs = await ext.tabs.query({ url: MAIL_HOSTS });
+  } catch (e) {
+    return;
+  }
+
+  for (const tab of tabs) {
+    try {
+      await ext.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ['mail-providers.js', 'content-gmail.js']
+      });
+      console.log(`[PhishLens] Started watching an already-open mail tab (${reason}).`);
+    } catch (e) {
+      // The tab may have navigated away, or be one the browser will not let an
+      // extension touch. Nothing to do but leave it to the normal injection.
+    }
+  }
+}
+
+ext.runtime.onInstalled.addListener(() => {
+  watchAlreadyOpenTabs('installed or updated');
+});
+ext.runtime.onStartup?.addListener(() => watchAlreadyOpenTabs('browser started'));
+
 ext.runtime.onInstalled.addListener(() => {
   ext.alarms?.create(REFRESH_ALARM, { periodInMinutes: 5 });
   refreshBadge();
