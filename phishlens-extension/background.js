@@ -221,6 +221,44 @@ ext.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({ ok: true });
     return false;
   }
+  /**
+   * Why nothing is being watched, in terms somebody can act on.
+   *
+   * "The page watcher has not reported yet" is true and useless: it does not
+   * say whether a mail tab is even open, whether the watcher is in it, or
+   * whether the extension lacks the permission to put one there. Those need
+   * three different things done about them.
+   */
+  if (request?.type === 'phishlens:diagnose') {
+    (async () => {
+      const diagnosis = {
+        canQueryTabs: Boolean(ext.tabs?.query),
+        canInject: Boolean(ext.scripting?.executeScript),
+        mailTabs: 0,
+        watchedTabs: 0
+      };
+
+      if (!diagnosis.canQueryTabs) { sendResponse(diagnosis); return; }
+
+      let tabs = [];
+      try { tabs = await ext.tabs.query({ url: MAIL_HOSTS }); } catch (e) { tabs = []; }
+      diagnosis.mailTabs = tabs.length;
+
+      // A watcher answers this; a tab with none does not.
+      for (const tab of tabs) {
+        try {
+          const reply = await ext.tabs.sendMessage(tab.id, { type: 'phishlens:ping' });
+          if (reply && reply.ok) diagnosis.watchedTabs++;
+        } catch (e) {
+          // Nothing listening in that tab.
+        }
+      }
+
+      sendResponse(diagnosis);
+    })();
+    return true;
+  }
+
   if (request?.type === 'phishlens:get-watch-status') {
     sendResponse(lastWatchStatus);
     return false;

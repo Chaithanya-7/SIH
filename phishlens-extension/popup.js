@@ -90,8 +90,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (ext.runtime.lastError) return;
 
         if (!status) {
-          watchState.textContent = 'The page watcher has not reported yet. Open Gmail or Outlook Web in a tab, then reopen this.';
-          watchState.classList.remove('hidden');
+          // Ask why, rather than stating that it has not happened. The three
+          // reasons need three different things done about them, and saying
+          // only "has not reported" left somebody reloading the extension over
+          // and over with a Gmail tab open that had no watcher in it.
+          explainWhyNothingIsWatched();
           return;
         }
 
@@ -116,6 +119,37 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) {
       // The worker is unavailable. The rest of the popup still works.
     }
+  }
+
+  /** Says which of the several reasons applies, and what to do about it. */
+  function explainWhyNothingIsWatched() {
+    const say = text => {
+      watchState.textContent = text;
+      watchState.classList.remove('hidden');
+    };
+
+    if (!ext?.runtime?.sendMessage) {
+      say('The page watcher has not reported yet.');
+      return;
+    }
+
+    ext.runtime.sendMessage({ type: 'phishlens:diagnose' }, d => {
+      if (ext.runtime.lastError || !d) {
+        say('The page watcher has not reported yet. Open Gmail or Outlook Web, then press the refresh button above.');
+        return;
+      }
+
+      if (!d.canQueryTabs || !d.canInject) {
+        say('PhishLens is missing the permission it needs to watch tabs. Reload the extension on chrome://extensions and approve the request.');
+      } else if (d.mailTabs === 0) {
+        say('No Gmail or Outlook Web tab is open. Open your mail, then press the refresh button above.');
+      } else if (d.watchedTabs === 0) {
+        // The common one, and the one that reads as the tool being broken.
+        say(`${d.mailTabs} mail tab${d.mailTabs === 1 ? ' is' : 's are'} open but not being watched yet. Press the refresh button above, or reload the mail tab.`);
+      } else {
+        say(`Watching ${d.watchedTabs} mail tab${d.watchedTabs === 1 ? '' : 's'}; nothing examined yet. Press the refresh button above.`);
+      }
+    });
   }
 
   function showSetupNotice(message) {

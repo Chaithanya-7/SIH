@@ -188,6 +188,32 @@ service. Place names stay at every zoom: they are what makes photography
 legible at all.
 Commit: (this commit)
 
+**A-071 · "Still 0 analyzed" — the popup now says why**
+What: After reloading the extension, nothing was examined. The backend showed
+`browser_watch` at **0 examined and 0 failures**.
+Status: `Done` — cause narrowed, and the popup now names it
+Evidence: Zero *failures* was the informative number. Had the watcher been
+submitting and being rejected, that count would be non-zero; nothing was
+reaching the backend at all. Ruled out from this side: the backend answers, the
+provisioned key still authenticates, and the content script loads cleanly when
+run the way Chrome loads it — no throw, the single-run guard sets, the providers
+export. So the code is fine and something in the browser is not running it.
+
+Chrome could not be inspected from here (no browser is connected to this
+session), and asking for the popup's line twice had not produced it. So the
+popup now answers the question itself. It asks the worker, which counts mail
+tabs and pings each for a watcher, and says which of these applies:
+
+- the permission to watch tabs was not granted
+- no Gmail or Outlook tab is open
+- a mail tab is open but has no watcher yet — press refresh, or reload the tab
+- watching, but nothing examined yet
+
+"The page watcher has not reported yet" was true and useless: those four need
+four different things done about them, and it is what left somebody reloading
+the extension repeatedly with a tab open that had no watcher in it.
+Commit: (this commit)
+
 **A-070 · A refresh button that actually checks the mail**
 What: Added a refresh control to the popup header.
 Status: `Done`

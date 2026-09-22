@@ -305,6 +305,9 @@
     // four seconds", which is not what pressing a button should mean.
     if (ext.runtime?.onMessage) {
         ext.runtime.onMessage.addListener((request, sender, sendResponse) => {
+            // Answers "is a watcher in this tab", which is how the popup tells
+            // a tab with no content script from one that simply found nothing.
+            if (request?.type === 'phishlens:ping') { sendResponse({ ok: true }); return false; }
             if (request?.type !== 'phishlens:sweep-now') return;
             // Clear any backoff: the person is asking now, and an earlier
             // failure should not make them wait out its penalty.

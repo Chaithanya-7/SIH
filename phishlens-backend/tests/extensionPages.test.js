@@ -184,6 +184,27 @@ test('the refresh button reaches the watcher, not only the popup', () => {
         'the request must also inject into mail tabs with no watcher');
 });
 
+test('the popup says which reason applies when nothing is watched', () => {
+    const popup = fs.readFileSync(path.join(EXTENSION, 'popup.js'), 'utf8');
+    const worker = fs.readFileSync(path.join(EXTENSION, 'background.js'), 'utf8');
+    const content = fs.readFileSync(path.join(EXTENSION, 'content-gmail.js'), 'utf8');
+
+    // "The page watcher has not reported yet" is true and useless: it does not
+    // distinguish no mail tab, a mail tab with no watcher, and a missing
+    // permission - which need three different things done about them.
+    assert.match(popup, /phishlens:diagnose/, 'the popup must ask why');
+    assert.match(worker, /phishlens:diagnose/, 'the worker must answer');
+    assert.match(content, /phishlens:ping/, 'a watcher must be able to say it is there');
+
+    for (const reason of [
+        /missing the permission/i,
+        /No Gmail or Outlook Web tab is open/i,
+        /open but not being watched/i
+    ]) {
+        assert.match(popup, reason, `the popup must name the case: ${reason}`);
+    }
+});
+
 test('the manifest carries nothing the target browser rejects', () => {
     const manifest = JSON.parse(fs.readFileSync(path.join(EXTENSION, 'manifest.json'), 'utf8'));
 
