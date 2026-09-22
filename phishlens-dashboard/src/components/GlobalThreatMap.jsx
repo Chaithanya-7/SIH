@@ -131,7 +131,18 @@ const BASEMAPS = [
             {
                 id: 'transport',
                 url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',
-                maxZoom: 19
+                maxZoom: 19,
+                // Roads are not drawn until somebody is close enough to read a
+                // street, because that is the only zoom at which they say
+                // anything - and they are not free.
+                //
+                // Measured: one zoom costs 24 tile requests per layer, and the
+                // wait is very nearly linear in the total. Imagery alone
+                // finishes in about 840ms, imagery and place names in 1440ms,
+                // all three in 2350ms. Street geometry over a whole country is
+                // a grey haze that costs 900ms of that, on every zoom, at the
+                // levels this map spends most of its time.
+                minZoom: 9
             },
             {
                 id: 'places',
@@ -411,6 +422,7 @@ export default function GlobalThreatMap({ points = [], coverage }) {
                         <TileLayer
                             key={`${basemap.id}-${overlay.id}`}
                             url={overlay.url}
+                            minZoom={overlay.minZoom || 0}
                             maxZoom={DEEPEST_ZOOM}
                             maxNativeZoom={overlay.maxZoom}
                             noWrap

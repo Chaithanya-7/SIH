@@ -133,30 +133,60 @@ conclusion happened to hold — but it was not evidence when it was first used.
 Fourth instance of trusting a tool's answer without checking the tool.
 Commit: —
 
-**A-049 · Esri host sharding — INCONCLUSIVE, reverted**
+**A-049 · Esri host sharding — measured, did not help, reverted**
 What: Spread the 72 requests over `server`, `services` and `server2`
 .arcgisonline.com, which return byte-identical tiles (verified by hash).
-Status: `Reverted` — **unproven, and the map is back to the committed version**
-Evidence: Sharded cold loads measured **7171 / 5285 / 7087 ms**. The equivalent
-baseline was never measured, so whether this helps at all is **unknown**. Two
-measurement mistakes on the way: per-request medians were compared first, which
-can move opposite to the total; and a warm cache produced a run of zero
-requests that briefly looked like an instant map.
+Status: `Reverted` — **the theory was wrong**
+Evidence: Measured properly on a fixed location with the cache disabled: single
+host **2430/2287/2414/2144 ms**, three hosts **3440/2332/2704/2166 ms**.
+Sharding is **not faster** and is slightly slower — Chromium pools connections
+well, and three cold hosts cost three TLS handshakes rather than saving
+queueing. Three measurement mistakes on the way, each of which produced a
+plausible wrong answer: per-request medians were compared first, and they can
+move opposite to the total; a warm cache produced a run of zero requests that
+read as an instant map; and a randomised location changed the tile count
+between runs (72, then 45, then 60), making two configurations incomparable.
 
 Also found while doing it: Leaflet splits a **string** `subdomains` option into
 single characters, so `'server,services'` becomes `['s','e','r',…]` and every
 tile URL names a host that does not exist. It must be an array.
 
-**To resume:** measure the single-host baseline the same way — cold cache
-(`Network.setCacheDisabled`), a randomised location per run, and total wall
-clock from the zoom to the last tile, not per-request medians. Only then is
-there anything to compare. The measurement script is
-`scratchpad/measure-tiles.js`. Other untried avenues: cutting the request count
-from 72 (three layers per tile position), and prefetching the next zoom level
-to warm the cache before it is needed.
+This ruled out the theory but not the problem, which is the request count
+itself. See A-050.
 Commit: —
 
 ---
+
+**A-050 · The request count is the whole cost**
+What: Measured the wait against the number of tile layers, holding location and
+cache constant.
+Status: `Done`
+Evidence: The wait is very nearly linear in the request count — about 30 ms per
+tile. Imagery alone: **24 requests, ~840 ms**. Imagery and place names: **48
+requests, ~1440 ms**. All three layers: **72 requests, ~2350 ms**. The satellite
+view is three stacked layers, so every zoom pays three times over.
+Commit: (this commit)
+
+**A-051 · Roads only where a street can be read**
+What: The `World_Transportation` overlay now loads from zoom 9 rather than
+always.
+Status: `Done`
+Evidence: Street geometry across a whole country is a grey haze that says
+nothing, and it costs 900 ms of the 2350. Measured after: country view (zoom 6)
+**~1276 ms, 48 requests** — down from ~2350 ms, a **46%** reduction at the zoom
+levels a world threat map spends most of its time at. Street level (zoom 13) is
+unchanged at 72 requests with roads present, confirmed by counting tiles per
+service. Place names stay at every zoom: they are what makes photography
+legible at all.
+Commit: (this commit)
+
+**A-052 · Measured a build that was not running**
+What: Deployed the new console and measured without restarting the application.
+Status: `Abandoned` — the numbers described the previous build.
+Evidence: Zoom 13 reported 48 requests when it should have been 72, and the
+layer count gave it away: two panes, not three. The bundle had been replaced on
+disk and the running window still held the old one. Deploying is not loading.
+Commit: —
 
 ## 2026-09-22 — full verification pass
 
