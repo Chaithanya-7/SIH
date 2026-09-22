@@ -180,6 +180,44 @@ service. Place names stay at every zoom: they are what makes photography
 legible at all.
 Commit: (this commit)
 
+**A-055 · Imagery coverage is not uniform, and cannot be made so**
+What: Measured resolution, capture date and maximum zoom across every continent,
+after a report that only India had been updated.
+Status: `Done`
+Evidence: Nothing had been updated anywhere — PhishLens hosts no map data. India
+is unremarkable in Esri's global product: **New York is 0.15 m/pixel against
+Hyderabad's 0.46 m**, and every major city sampled reaches zoom 19. What does
+vary is the edge of coverage: deserts and forest stop near **17**, and open
+ocean, Greenland and Antarctica have nothing better than **15 m/pixel** and stop
+at **11**. Siberia's most recent imagery is from **2012**. None of that is
+fixable from here — nobody photographs the open sea at half a metre.
+Commit: (this commit)
+
+**A-056 · Nowhere is blank any more**
+What: Past the edge of coverage Esri returns a grey "Map data not yet available"
+tile, and because it arrives as a valid JPEG with HTTP 200 Leaflet drew it like
+any other tile.
+Status: `Done`
+Evidence: Three facts made a fix possible, each verified rather than assumed:
+Esri send `Access-Control-Allow-Origin: *`; the placeholders are byte-identical
+(1652 and 2521 bytes, stable hashes); and OpenStreetMap has coverage exactly
+where Esri does not. An ordinary map now sits beneath the photography, and tiles
+smaller than 3500 bytes are left transparent so it shows through. Measured
+after: Pacific, Greenland and Antarctica went from blank to drawn, with 24, 15
+and 24 placeholder tiles correctly hidden, and cities unchanged with zero hidden.
+Commit: (this commit)
+
+**A-057 · The fallback map capped at zoom 12**
+What: The map underneath was being fetched to zoom 19 as well, doubling tiles
+for a layer that is invisible wherever imagery exists.
+Status: `Done`
+Evidence: Street level went from **97 to 81 requests**. Coverage is unchanged —
+Leaflet scales the shallower tiles where photography is missing, which is
+slightly soft in the few deep-zoomed places with none, and free everywhere else.
+Net against the start of the day: country view **2350 → ~1290 ms**, street level
+**2350 → ~1685 ms**, with complete global coverage rather than grey squares.
+Commit: (this commit)
+
 **A-054 · A test changed the user's saved basemap and left it changed**
 What: Verifying that the imagery caption hides on a non-photographic basemap
 switched the selector to Standard — which is persisted to localStorage, so it

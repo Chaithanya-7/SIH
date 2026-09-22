@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Popup, Tooltip, useMap } from 'react-leaflet';
+import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
 /**
@@ -103,6 +104,21 @@ const BASEMAPS = [
     {
         id: 'satellite',
         label: 'Satellite',
+        // Photography does not cover the whole planet and cannot be made to.
+        // Measured: cities reach zoom 19, deserts and forest stop near 17, and
+        // open ocean, Greenland and Antarctica have nothing better than 15 m per
+        // pixel and stop at 11. Past the edge Esri returns a grey "no data"
+        // tile, so an ordinary map is drawn underneath and those tiles are left
+        // transparent. Somewhere on earth is then never blank.
+        fallbackUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+        // The map underneath is only ever seen where photography is missing, and
+        // that is overwhelmingly ocean, ice and empty desert - places nobody
+        // inspects at street level. Fetching it to zoom 19 as well doubled the
+        // tiles for a layer that is invisible wherever imagery exists. Stopping
+        // at 12 lets Leaflet scale those tiles instead: slightly soft in the few
+        // deep-zoomed places with no photography, and free everywhere else.
+        fallbackMaxZoom: 12,
+        inspectTiles: true,
         url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
         attribution: 'Imagery &copy; Esri, Maxar, Earthstar Geographics',
         // Esri serves this one row-before-column, which is why the template
@@ -285,6 +301,90 @@ function formatImageryDate(raw) {
     return `${when} (${Math.floor(months / 12)} years ago)`;
 }
 
+/**
+ * Anything Esri answers with that is smaller than this is not a photograph.
+ *
+ * Where Esri holds no imagery it still returns HTTP 200 and a JPEG - a grey
+ * tile reading "Map data not yet available". Two of them were found, at 1652
+ * and 2521 bytes, byte-identical wherever they appear. Real photography of the
+ * emptiest desert measured 16KB and the smallest real tile seen was about 5KB,
+ * so this threshold separates them with room to spare.
+ */
+const NO_IMAGERY_BYTES = 3500;
+
+/** A 1x1 transparent GIF, for a tile that is to show nothing at all. */
+const TRANSPARENT = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+
+/**
+ * Satellite imagery that never draws a "no data" tile.
+ *
+ * Imagery coverage is not uniform and cannot be made so: measured across the
+ * world, cities reach zoom 19 at 0.15-0.5 m per pixel, deserts and forest stop
+ * around 17, and open ocean, Greenland and Antarctica have nothing better than
+ * 15 m per pixel and stop at 11. Nobody photographs the open sea at half a
+ * metre, so no setting can conjure it.
+ *
+ * What can be fixed is what happens past the edge of coverage. Esri's reply
+ * there is a grey placeholder, and because it arrives as a perfectly valid
+ * image with HTTP 200, Leaflet draws it like any other tile. This recognises
+ * those replies by size and leaves the tile transparent instead, so the
+ * ordinary map layered beneath shows through - coastlines, names, terrain -
+ * rather than a grey square saying nothing is here.
+ *
+ * Esri serve these with Access-Control-Allow-Origin: *, which is what makes
+ * inspecting them possible at all.
+ */
+function ImageryWithFallback({ url, subdomains, maxNativeZoom, maxZoom, keepBuffer }) {
+    const map = useMap();
+
+    useEffect(() => {
+        const InspectedTileLayer = L.TileLayer.extend({
+            createTile(coords, done) {
+                const tile = document.createElement('img');
+                tile.alt = '';
+                tile.setAttribute('role', 'presentation');
+
+                fetch(this.getTileUrl(coords))
+                    .then(response => (response.ok ? response.blob() : Promise.reject(new Error(String(response.status)))))
+                    .then(blob => {
+                        if (blob.size < NO_IMAGERY_BYTES) {
+                            // No photography here. Say nothing rather than
+                            // drawing a grey square that says nothing.
+                            tile.src = TRANSPARENT;
+                        } else {
+                            tile.src = URL.createObjectURL(blob);
+                            // Released once drawn; the browser keeps its own copy.
+                            tile.addEventListener('load', () => URL.revokeObjectURL(tile.src), { once: true });
+                        }
+                        done(null, tile);
+                    })
+                    .catch(error => {
+                        tile.src = TRANSPARENT;
+                        done(error, tile);
+                    });
+
+                return tile;
+            }
+        });
+
+        const layer = new InspectedTileLayer(url, {
+            subdomains: subdomains || 'abc',
+            maxNativeZoom,
+            maxZoom,
+            keepBuffer,
+            noWrap: true,
+            updateWhenIdle: false,
+            updateWhenZooming: true,
+            crossOrigin: true
+        });
+
+        layer.addTo(map);
+        return () => { map.removeLayer(layer); };
+    }, [map, url, subdomains, maxNativeZoom, maxZoom, keepBuffer]);
+
+    return null;
+}
+
 function KeepMapSized() {
     const map = useMap();
 
@@ -464,6 +564,30 @@ export default function GlobalThreatMap({ points = [], coverage }) {
                     <KeepMapSized />
                     <ImageryDate active={basemap.id === 'satellite'} onDate={setImagery} />
 
+                    {/* A map beneath the photography, so nowhere is blank where
+                        imagery stops. Only the photographic basemap needs it. */}
+                    {basemap.fallbackUrl && (
+                        <TileLayer
+                            key={`${basemap.id}-fallback`}
+                            url={basemap.fallbackUrl}
+                            maxZoom={DEEPEST_ZOOM}
+                            maxNativeZoom={basemap.fallbackMaxZoom}
+                            noWrap
+                            updateWhenIdle={false}
+                            updateWhenZooming
+                            keepBuffer={3}
+                        />
+                    )}
+                    {basemap.inspectTiles ? (
+                        <ImageryWithFallback
+                            key={`${basemap.id}-imagery`}
+                            url={basemap.url}
+                            subdomains={basemap.subdomains || 'abc'}
+                            maxNativeZoom={basemap.maxZoom}
+                            maxZoom={DEEPEST_ZOOM}
+                            keepBuffer={3}
+                        />
+                    ) : (
                     <TileLayer
                         // Remounted when the basemap changes, so Leaflet builds
                         // a fresh layer rather than swapping URLs underneath the
@@ -505,6 +629,7 @@ export default function GlobalThreatMap({ points = [], coverage }) {
                         // expensive.
                         keepBuffer={3}
                     />
+                    )}
 
                     {/*
                       * Roads and place names drawn over the imagery.
