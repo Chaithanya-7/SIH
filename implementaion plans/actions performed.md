@@ -180,6 +180,22 @@ service. Place names stay at every zoom: they are what makes photography
 legible at all.
 Commit: (this commit)
 
+**A-053 · The map now says how old its photography is**
+What: The caption under the map states when the imagery beneath the current view
+was captured, and at what resolution.
+Status: `Done`
+Evidence: Answers the question in the product rather than only in conversation.
+Satellite imagery is a photograph with a date, and the date varies enormously —
+about ten months for Indian cities, two and a half years for the United States
+sample. For a tool whose job is to say where a message came from, showing a
+location on imagery of unstated vintage invites reading it as current. Verified
+in the running application: "Photography here taken November 2025 (10 months
+ago) · 0.46 m per pixel", and correctly absent on the OpenStreetMap basemaps,
+which have no photography to date. Asked once per settled view, not per tile,
+through the same free keyless Esri service; a failed or slow lookup shows
+nothing rather than a guess.
+Commit: (this commit)
+
 **A-052 · Measured a build that was not running**
 What: Deployed the new console and measured without restarting the application.
 Status: `Abandoned` — the numbers described the previous build.

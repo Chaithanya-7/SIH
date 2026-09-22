@@ -200,6 +200,91 @@ const BASEMAP_STORAGE_KEY = 'phishlens.basemap';
  * browser it was being tested in never fires one. Kept anyway, because
  * re-measuring on resize is correct regardless of what it did not fix.
  */
+/**
+ * When the photography under the cursor was actually taken.
+ *
+ * Satellite imagery is not "now". It is a photograph with a date, and that date
+ * varies enormously by place - around ten months for Indian cities, two and a
+ * half years for the United States sample checked. For a tool whose job is to
+ * say where a message came from, showing a location on imagery of unstated
+ * vintage invites reading it as current. So the date is stated.
+ *
+ * Esri publish this per tile through a free, keyless service, which is asked
+ * once per view rather than once per tile. A failed or slow lookup shows
+ * nothing at all: an unanswered question is better left unanswered than filled
+ * with a guess.
+ */
+function ImageryDate({ active, onDate }) {
+    const map = useMap();
+
+    useEffect(() => {
+        if (!active) { onDate(null); return; }
+
+        let cancelled = false;
+        let timer = null;
+
+        const ask = async () => {
+            const centre = map.getCenter();
+            const lon = centre.lng, lat = centre.lat;
+            const url = 'https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/identify'
+                + `?geometry=${lon},${lat}&geometryType=esriGeometryPoint&sr=4326&layers=all&tolerance=1`
+                + `&mapExtent=${lon - 0.01},${lat - 0.01},${lon + 0.01},${lat + 0.01}`
+                + '&imageDisplay=600,600,96&returnGeometry=false&f=json';
+
+            try {
+                const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
+                const body = await response.json();
+                const attributes = (body.results && body.results[0] && body.results[0].attributes) || {};
+                const date = attributes['SRC_DATE2'] || attributes['DATE (YYYYMMDD)'];
+                const resolution = attributes['RESOLUTION (M)'];
+                if (!cancelled) onDate(date ? { date: String(date), resolution } : null);
+            } catch (e) {
+                // Offline, slow, or the service changed its shape. Say nothing.
+                if (!cancelled) onDate(null);
+            }
+        };
+
+        // Asked once the view settles, not on every frame of a pan.
+        const schedule = () => {
+            clearTimeout(timer);
+            timer = setTimeout(ask, 900);
+        };
+
+        schedule();
+        map.on('moveend zoomend', schedule);
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+            map.off('moveend zoomend', schedule);
+        };
+    }, [map, active, onDate]);
+
+    return null;
+}
+
+/** Esri gives either "11/15/2025" or "20251115". Both become a readable month and year. */
+function formatImageryDate(raw) {
+    const text = String(raw || '');
+    let date = null;
+
+    if (/^\d{8}$/.test(text)) {
+        date = new Date(Number(text.slice(0, 4)), Number(text.slice(4, 6)) - 1, Number(text.slice(6, 8)));
+    } else {
+        const parsed = new Date(text);
+        if (!Number.isNaN(parsed.getTime())) date = parsed;
+    }
+
+    if (!date) return text;
+
+    const months = Math.max(0, Math.round((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24 * 30.44)));
+    const when = date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+
+    // The age is the point. A date on its own still reads as recent.
+    if (months < 1) return `${when} (this month)`;
+    if (months < 24) return `${when} (${months} month${months === 1 ? '' : 's'} ago)`;
+    return `${when} (${Math.floor(months / 12)} years ago)`;
+}
+
 function KeepMapSized() {
     const map = useMap();
 
@@ -222,6 +307,7 @@ function KeepMapSized() {
 
 export default function GlobalThreatMap({ points = [], coverage }) {
     const severityColours = useSeverityColours();
+    const [imagery, setImagery] = useState(null);
     // Remembered per browser: a basemap is a preference, not a setting worth a
     // round trip, and losing it on every reload is the sort of small friction
     // that makes a panel feel unfinished.
@@ -267,6 +353,14 @@ export default function GlobalThreatMap({ points = [], coverage }) {
                     <h3 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary)' }}>Where messages were sent from</h3>
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)', marginTop: '2px' }}>
                         {points.length} located address{points.length === 1 ? '' : 'es'} · drag to pan, scroll to zoom, click a dot to see the messages
+                        {imagery && (
+                            /* Photography has a date, and it is rarely recent. Saying so
+                               stops a location being read as where something is now. */
+                            <span style={{ display: 'block', marginTop: '3px' }}>
+                                Photography here taken {formatImageryDate(imagery.date)}
+                                {imagery.resolution ? ` · ${imagery.resolution} m per pixel` : ''}
+                            </span>
+                        )}
                     </div>
                 </div>
                 <div style={{ display: 'flex', gap: '14px', fontSize: '0.7rem', alignItems: 'center' }}>
@@ -368,6 +462,7 @@ export default function GlobalThreatMap({ points = [], coverage }) {
                     style={{ height: '100%', width: '100%', backgroundColor: 'var(--bg-code)' }}
                 >
                     <KeepMapSized />
+                    <ImageryDate active={basemap.id === 'satellite'} onDate={setImagery} />
 
                     <TileLayer
                         // Remounted when the basemap changes, so Leaflet builds
