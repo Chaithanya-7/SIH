@@ -186,6 +186,54 @@ service. Place names stay at every zoom: they are what makes photography
 legible at all.
 Commit: (this commit)
 
+**A-058 · Street-level 3D view — evaluated, not built**
+What: Asked for a Street View equivalent.
+Status: `Abandoned` — blocked on both a source and a truthfulness problem.
+Evidence: Every street-level source was tested. Google Street View is a paid API
+("You must use an API key"). Mapillary needs an OAuth token. KartaView is
+keyless but returned **0 photographs** within 500 m of Hyderabad or rural
+Rajasthan. OSM Buildings has required registration since 2024-04-03. Overpass is
+keyless (with a User-Agent — 406 without one) and returns footprints, but only
+**1 of 99** buildings carried a height, so any 3D would be invented.
+
+The stronger objection is not technical. This map plots IP geolocation, which
+resolves to a city or an ISP's service area — `8.8.8.8` returns a San Jose
+centroid, not a building. Dropping somebody into a street-level view at those
+coordinates would show a specific house and imply the message came from it. For
+a tool whose whole discipline is not reporting unchecked things as known, that
+is the same error as reporting "no macros found" when nothing looked.
+Commit: —
+
+**A-059 · detectRetina — measured, broke deep zoom, reverted**
+What: Enabled retina tiles to counter the softness from 125% display scaling.
+Status: `Reverted`
+Evidence: It did sharpen imagery (1.25 to 0.63 device pixels per image pixel) at
+a cost of 81 to 117 requests and ~1685 to ~2360 ms. But it also produced **no
+imagery at all at zooms 19, 20 and 21**: it requests one level deeper than
+exists, and the placeholder detection correctly hides what comes back. Far worse
+than slight softness, and the same reason detectRetina was removed earlier in
+this project. The first measurement of it was also wrong — it read the
+OpenStreetMap fallback tile rather than the imagery layer, and reported no
+change at all.
+Commit: —
+
+**A-060 · Stopped magnifying five times over**
+What: The map allowed two zoom levels past the deepest real imagery.
+Status: `Done`
+Evidence: Measured per level on this display: zoom 19 draws imagery at 1.25
+device pixels per image pixel, zoom 20 at 2.5, zoom 21 at **5.0** — a building
+as a handful of coloured squares. The second level bought nothing but the
+impression the map had gone out of focus. Capped at one level, and the caption
+now says "Magnified past the available detail" when the view has passed real
+detail. Verified: the note appears at zoom 20 and not at 18 or 19.
+
+What could not be improved: the residual 1.25x softness is **Windows display
+scaling at 125%**, which affects everything on screen, not the map. The display
+is 1920x1080, not 4K. And the imagery's own resolution — 0.46 m/pixel in
+Hyderabad — is the real limit on detail; no setting adds information that was
+never photographed.
+Commit: (this commit)
+
 **A-055 · Imagery coverage is not uniform, and cannot be made so**
 What: Measured resolution, capture date and maximum zoom across every continent,
 after a report that only India had been updated.

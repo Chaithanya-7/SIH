@@ -198,7 +198,18 @@ const BASEMAPS = [
 // than asking for one that does not exist, so this is how much closer somebody
 // may look. Two levels is soft but readable, and it is the difference between
 // running out of zoom and being shown a tile that says there is no data.
-const DEEPEST_ZOOM = Math.max(...BASEMAPS.map(b => b.maxZoom)) + 2;
+// One level past the deepest imagery that exists, not two.
+//
+// Past a source's own maximum there is no more detail anywhere on earth; the
+// map simply magnifies the pixels it already has. Measured on this display:
+// zoom 19 draws imagery at 1.25 device pixels per image pixel, zoom 20 at 2.5,
+// and zoom 21 at 5.0 - by which point a building is a handful of coloured
+// squares. Allowing two levels of that bought nothing but the impression that
+// the map had gone out of focus.
+//
+// One level is kept because it is genuinely useful for placing a marker
+// precisely, and the caption says when the view has passed real detail.
+const DEEPEST_ZOOM = Math.max(...BASEMAPS.map(b => b.maxZoom)) + 1;
 
 const DEFAULT_BASEMAP = 'satellite';
 const BASEMAP_STORAGE_KEY = 'phishlens.basemap';
@@ -385,6 +396,18 @@ function ImageryWithFallback({ url, subdomains, maxNativeZoom, maxZoom, keepBuff
     return null;
 }
 
+/** Reports the current zoom, so the caption can say when detail has run out. */
+function ZoomWatcher({ onZoom }) {
+    const map = useMap();
+    useEffect(() => {
+        const report = () => onZoom(map.getZoom());
+        report();
+        map.on('zoomend', report);
+        return () => { map.off('zoomend', report); };
+    }, [map, onZoom]);
+    return null;
+}
+
 function KeepMapSized() {
     const map = useMap();
 
@@ -408,6 +431,7 @@ function KeepMapSized() {
 export default function GlobalThreatMap({ points = [], coverage }) {
     const severityColours = useSeverityColours();
     const [imagery, setImagery] = useState(null);
+    const [zoom, setZoom] = useState(2);
     // Remembered per browser: a basemap is a preference, not a setting worth a
     // round trip, and losing it on every reload is the sort of small friction
     // that makes a panel feel unfinished.
@@ -453,6 +477,13 @@ export default function GlobalThreatMap({ points = [], coverage }) {
                     <h3 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary)' }}>Where messages were sent from</h3>
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)', marginTop: '2px' }}>
                         {points.length} located address{points.length === 1 ? '' : 'es'} · drag to pan, scroll to zoom, click a dot to see the messages
+                        {zoom > basemap.maxZoom && (
+                            /* Past the deepest imagery there is. Saying so stops
+                               a magnified picture reading as a sharper one. */
+                            <span style={{ display: 'block', marginTop: '3px', color: 'var(--warning)' }}>
+                                Magnified past the available detail — no more exists at this place
+                            </span>
+                        )}
                         {imagery && (
                             /* Photography has a date, and it is rarely recent. Saying so
                                stops a location being read as where something is now. */
@@ -562,6 +593,7 @@ export default function GlobalThreatMap({ points = [], coverage }) {
                     style={{ height: '100%', width: '100%', backgroundColor: 'var(--bg-code)' }}
                 >
                     <KeepMapSized />
+                    <ZoomWatcher onZoom={setZoom} />
                     <ImageryDate active={basemap.id === 'satellite'} onDate={setImagery} />
 
                     {/* A map beneath the photography, so nowhere is blank where
