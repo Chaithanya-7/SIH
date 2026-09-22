@@ -14,6 +14,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const connectionState = document.getElementById('connection-state');
   const setupNotice = document.getElementById('setup-notice');
   const watchState = document.getElementById('watch-state');
+  const drawer = document.getElementById('details-drawer');
+  const drawerTitle = document.getElementById('drawer-title');
+
+  /** The most recent summary, kept so filtering need not ask the backend again. */
+  let lastSummary = null;
+  /** Which verdict the list is filtered to, or null for all of them. */
+  let filterVerdict = null;
   const setupMessage = document.getElementById('setup-message');
   const summary = document.getElementById('summary');
   const recentList = document.getElementById('recent-list');
@@ -117,6 +124,9 @@ document.addEventListener('DOMContentLoaded', () => {
     summary.classList.add('hidden');
   }
 
+  /** Shown when the list is filtered, so the drawer title says what it is showing. */
+  const LABELS = { high: 'High risk', suspicious: 'Suspicious', safe: 'Legitimate' };
+
   function verdictClass(verdict) {
     if (verdict === 'HIGH_RISK') return 'high';
     if (verdict === 'SUSPICIOUS') return 'suspicious';
@@ -142,14 +152,42 @@ document.addEventListener('DOMContentLoaded', () => {
       modeNote.className = acting ? 'mode-note live' : 'mode-note simulated';
     }
 
+    lastSummary = data;
+    renderRecent();
+
+    setupNotice.classList.add('hidden');
+    summary.classList.remove('hidden');
+    connectionState.textContent = `${data.total} message${data.total === 1 ? '' : 's'} analyzed`;
+  }
+
+  /**
+   * The recent list, showing either everything or one verdict.
+   *
+   * Pressing a count filters to it. The counts were three numbers that looked
+   * pressable and were not, and the question they raise - which messages are
+   * those - had no answer in the popup at all.
+   */
+  function renderRecent() {
+    const data = lastSummary;
+    if (!data) return;
+
+    const items = (data.recent || []).filter(item =>
+      !filterVerdict || verdictClass(item.verdict) === filterVerdict);
+
+    drawerTitle.textContent = filterVerdict
+      ? `${LABELS[filterVerdict]} — ${items.length} shown`
+      : 'Recent detections';
+
     recentList.innerHTML = '';
-    if (!data.recent.length) {
+    if (!items.length) {
       const li = document.createElement('li');
       li.className = 'empty';
-      li.textContent = 'No messages analyzed yet.';
+      li.textContent = filterVerdict
+        ? `Nothing in the recent list is ${LABELS[filterVerdict].toLowerCase()}.`
+        : 'No messages analyzed yet.';
       recentList.appendChild(li);
     } else {
-      data.recent.forEach(item => {
+      items.forEach(item => {
         const li = document.createElement('li');
         li.className = 'recent-item';
 
@@ -166,11 +204,34 @@ document.addEventListener('DOMContentLoaded', () => {
         recentList.appendChild(li);
       });
     }
-
-    setupNotice.classList.add('hidden');
-    summary.classList.remove('hidden');
-    connectionState.textContent = `${data.total} message${data.total === 1 ? '' : 's'} analyzed`;
   }
+
+  /**
+   * Pressing a count shows only those messages.
+   *
+   * Pressing the same one again clears the filter, so there is always a way back
+   * without knowing which of the three was pressed. The drawer opens on a
+   * filter, because filtering a list nobody can see would do nothing visible.
+   */
+  ['high', 'suspicious', 'safe'].forEach(verdict => {
+    const button = document.getElementById(`filter-${verdict}`);
+    if (!button) return;
+
+    button.addEventListener('click', () => {
+      filterVerdict = filterVerdict === verdict ? null : verdict;
+
+      ['high', 'suspicious', 'safe'].forEach(other => {
+        const el = document.getElementById(`filter-${other}`);
+        if (el) {
+          el.setAttribute('aria-pressed', String(filterVerdict === other));
+          el.classList.toggle('active', filterVerdict === other);
+        }
+      });
+
+      renderRecent();
+      if (filterVerdict && drawer) drawer.open = true;
+    });
+  });
 
   async function loadSummary() {
     // Always, and before anything else that can return early. Whether the page

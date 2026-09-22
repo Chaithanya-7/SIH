@@ -135,6 +135,29 @@ test('every element the popup looks up exists in its HTML', () => {
     assert.deepStrictEqual(missing, [], 'popup.js looks up elements that popup.html does not contain');
 });
 
+test('the popup keeps the list behind a drawer, and the counts can be pressed', () => {
+    const html = fs.readFileSync(path.join(EXTENSION, 'popup.html'), 'utf8');
+    const script = fs.readFileSync(path.join(EXTENSION, 'popup.js'), 'utf8');
+
+    // The list and the two buttons sit inside a details element, so the popup
+    // opens short and grows only when asked.
+    assert.match(html, /<details[^>]*id="details-drawer"/, 'the drawer must exist');
+    const drawer = html.slice(html.indexOf('id="details-drawer"'), html.indexOf('</details>'));
+    assert.match(drawer, /id="recent-list"/, 'the recent list belongs inside the drawer');
+    assert.match(drawer, /id="btn-more-info"/, 'the buttons belong inside the drawer too');
+    assert.doesNotMatch(html, /<details[^>]*open/, 'the drawer must start closed');
+
+    // The counts are buttons, not text that merely looks pressable.
+    for (const verdict of ['high', 'suspicious', 'safe']) {
+        assert.match(html, new RegExp(`<button[^>]*id="filter-${verdict}"`),
+            `the ${verdict} count must be a button`);
+    }
+
+    // And pressing one has to actually filter, rather than only look pressed.
+    assert.match(script, /filterVerdict/, 'the popup must track what it is filtered to');
+    assert.match(script, /renderRecent\(\)/, 'pressing a count must re-render the list');
+});
+
 test('the manifest carries nothing the target browser rejects', () => {
     const manifest = JSON.parse(fs.readFileSync(path.join(EXTENSION, 'manifest.json'), 'utf8'));
 

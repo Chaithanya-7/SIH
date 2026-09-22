@@ -173,6 +173,8 @@ h2 {
   gap: 6px;
 }
 
+/* A button now, not a div: pressing one filters the list below. It has to keep
+   looking like the row it was, so the button's own chrome is reset. */
 .count-row {
   display: flex;
   justify-content: space-between;
@@ -181,6 +183,22 @@ h2 {
   border-radius: 6px;
   background-color: var(--bg-surface);
   border-left: 3px solid var(--neutral);
+  width: 100%;
+  border-top: none;
+  border-right: none;
+  border-bottom: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.count-row:hover { filter: brightness(1.15); }
+
+/* The pressed one is obvious, so it is clear why the list is short. */
+.count-row.active {
+  outline: 2px solid var(--accent, #7c5cff);
+  outline-offset: -2px;
 }
 
 .count-row.high { border-left-color: var(--danger); }
@@ -417,3 +435,41 @@ h2 {
 
 .status.ok { color: var(--success); }
 .status.error { color: var(--danger); }
+
+
+/* ---------------------------------------------------------------------------
+   The details drawer.
+
+   The popup is read at a glance - the counts, and whether the watcher is
+   running. The recent list and the two buttons below it made it tall enough to
+   scroll for information most openings do not want, so they are behind a
+   summary that opens on a click.
+   --------------------------------------------------------------------------- */
+.drawer {
+  margin-top: 10px;
+  border-top: 1px solid var(--border, rgba(255,255,255,0.08));
+  padding-top: 8px;
+}
+
+.drawer-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  list-style: none;
+  padding: 4px 2px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dim, #8b93a7);
+  user-select: none;
+}
+
+/* Chrome draws its own marker on summary; this replaces it with the chevron. */
+.drawer-summary::-webkit-details-marker { display: none; }
+.drawer-summary:hover { color: var(--text-primary, #e6e9f0); }
+
+.drawer-chevron { transition: transform 0.15s ease; }
+.drawer[open] .drawer-chevron { transform: rotate(180deg); }
+
+.drawer-body { padding-top: 6px; }

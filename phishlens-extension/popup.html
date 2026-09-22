@@ -38,18 +38,21 @@
     <!-- Compact summary: the popup deliberately shows only headline counts. -->
     <div id="summary" class="hidden">
       <div class="counts">
-        <div class="count-row high">
+        <button type="button" class="count-row high" id="filter-high" data-verdict="high"
+                aria-pressed="false" title="Show only these">
           <span class="count-label">High risk</span>
           <span class="count-value" id="count-high">0</span>
-        </div>
-        <div class="count-row suspicious">
+        </button>
+        <button type="button" class="count-row suspicious" id="filter-suspicious" data-verdict="suspicious"
+                aria-pressed="false" title="Show only these">
           <span class="count-label">Suspicious</span>
           <span class="count-value" id="count-suspicious">0</span>
-        </div>
-        <div class="count-row safe">
+        </button>
+        <button type="button" class="count-row safe" id="filter-safe" data-verdict="safe"
+                aria-pressed="false" title="Show only these">
           <span class="count-label">Legitimate</span>
           <span class="count-value" id="count-safe">0</span>
-        </div>
+        </button>
       </div>
 
       <div class="meta-row">
@@ -59,17 +62,27 @@
 
       <div class="mode-note" id="mode-note"></div>
 
-      <div class="recent-section">
-        <div class="section-title">Recent detections</div>
-        <ul id="recent-list" class="recent-list">
-          <li class="empty">No messages analyzed yet.</li>
-        </ul>
-      </div>
-    </div>
+      <!-- Collapsed by default. The popup is read at a glance - the counts and
+           whether the watcher is running - and the list plus the two buttons
+           made it tall enough to need scrolling for information most openings
+           do not want. -->
+      <details id="details-drawer" class="drawer">
+        <summary class="drawer-summary">
+          <span id="drawer-title">Recent detections</span>
+          <span class="drawer-chevron" aria-hidden="true">&#9662;</span>
+        </summary>
 
-    <div class="footer">
-      <button id="btn-more-info" class="btn-primary full">More info →</button>
-      <button id="btn-web-console" class="link-btn">Desktop app not installed? Open web console</button>
+        <div class="drawer-body">
+          <ul id="recent-list" class="recent-list">
+            <li class="empty">No messages analyzed yet.</li>
+          </ul>
+
+          <div class="footer">
+            <button id="btn-more-info" class="btn-primary full">More info &rarr;</button>
+            <button id="btn-web-console" class="link-btn">Desktop app not installed? Open web console</button>
+          </div>
+        </div>
+      </details>
     </div>
   </div>
   <script src="config.js"></script>

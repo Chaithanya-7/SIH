@@ -188,6 +188,46 @@ service. Place names stay at every zoom: they are what makes photography
 legible at all.
 Commit: (this commit)
 
+**A-065 · My own probe messages were sitting in the user's app**
+What: The popup showed "17 messages analyzed" with five entries titled "probe",
+all SAFE. The user read this, correctly, as the tool scanning invented mail
+rather than theirs.
+Status: `Done`
+Evidence: Every one was mine, from diagnosing the 500. I had cleared
+`cases.json` **while the application was running**, so the backend rewrote it
+from memory — the same class of mistake as measuring a build that was not
+running (A-052). Cleared properly this time: application stopped first, then
+cases, the dedup ledger, the thread index, the sender baselines, the audit log
+and the knowledge graph, which had 104 KB of probe nodes and now rebuilds empty.
+Backup at `data-backup-before-probe-purge`. Verified after restart: total 0,
+all counts 0, recent list empty.
+
+The sender baselines mattered most: leaving them would have taught the detector
+what "normal" looks like from senders I invented.
+Commit: (this commit)
+
+**A-066 · The popup opened too tall**
+What: The recent list and the two buttons made the popup long enough to need
+scrolling.
+Status: `Done`
+Evidence: Both now sit inside a `<details>` drawer that starts closed, so the
+popup opens to the counts and the watcher state — which is what it is read for —
+and grows only when asked. Asserted: the list and buttons are inside the drawer,
+and the drawer has no `open` attribute.
+Commit: (this commit)
+
+**A-067 · The three counts do something when pressed**
+What: High risk, Suspicious and Legitimate were text that looked pressable and
+was not.
+Status: `Done`
+Evidence: They are buttons now, and pressing one filters the recent list to that
+verdict, opens the drawer so the filtering is visible, and marks itself pressed.
+Pressing the same one again clears the filter, so there is a way back without
+remembering which was pressed. The drawer title says what is being shown and how
+many. Asserted in the page tests, which also confirm the filter actually
+re-renders rather than only looking pressed.
+Commit: (this commit)
+
 **A-061 · The browser reader now finds real Gmail messages**
 What: After the reload, the popup changed from "found no messages in the list"
 to "Watching mail.google.com, but the last sweep stopped".
