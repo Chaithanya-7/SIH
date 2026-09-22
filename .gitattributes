@@ -1,0 +1,22 @@
+# Git on Windows has core.autocrlf=true here, which means it rewrites line
+# endings in anything it decides is text. It decided the generated PDF was
+# text, and warned that it would turn every LF into CRLF on the next checkout -
+# which silently corrupts a PDF for anyone who clones the repository. The file
+# committed fine; it is the checkout that would break it.
+#
+# So the formats that must never be touched are named explicitly.
+
+*.pdf   binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.zip   binary
+*.crx   binary
+*.db    binary
+*.sqlite binary
+*.woff  binary
+*.woff2 binary
+*.exe   binary
+*.dll   binary
