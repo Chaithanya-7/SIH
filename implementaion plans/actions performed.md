@@ -35,8 +35,8 @@ would otherwise be repeated.
 
 ## Where this stands — paused 2026-09-22
 
-**Installed:** PhishLens **1.7.9**, running. Repository clean, everything pushed.
-**Tests:** 319 backend · 33 desktop · 4 console · 0 failing · 0 skipped.
+**Installed:** PhishLens **1.7.10**, running. Repository clean, everything pushed.
+**Tests:** 323 backend · 33 desktop · 4 console · 0 failing · 0 skipped.
 **User's data:** 0 cases. Every probe message created while verifying was removed.
 
 **Map, as of 1.7.8:** country view ~1290 ms and street level ~1685 ms, against
@@ -49,23 +49,34 @@ not built (A-058), and detectRetina was tried and reverted (A-059).
 
 ### The one thing waiting on an answer
 
-The Gmail reader fix (**A-035**) is **not yet confirmed against live Gmail**. The
-cause found from outside was that the message id sits on a `<span>` inside the
-row rather than on the row itself, and that is fixed and tested — but whether it
-is *the* cause on the user's actual inbox is unknown.
+**Nothing is reaching the backend from the browser.** `browser_watch` reads
+**0 examined and 0 failures** — and zero *failures* is the informative half: a
+watcher that was submitting and being rejected would show failures. Nothing is
+being submitted at all.
 
-**To resume:** the user reloads the extension (⟳ on `chrome://extensions`), opens
-Gmail, waits about fifteen seconds, and opens the popup. It will say one of three
-things, and they are now distinguishable:
+Ruled out from this side (A-071): the backend answers, the provisioned key
+authenticates, the content script loads cleanly when run the way Chrome loads
+it, and the service worker evaluates with all six listeners registered. The code
+is fine; something in the browser is not running it. Chrome cannot be inspected
+from here — no browser is connected to this session.
+
+**To resume:** the user reloads the extension, opens Gmail, and reads the top
+line of the popup. It now names which case applies rather than saying only that
+nothing has happened:
 
 | What the popup says | What it means | What to do |
 |---|---|---|
-| `N messages in view, M examined` | Working | Nothing — the channel is live |
-| `N rows on the page, but none carried a message id` | The row selector is right, the identifier moved again | Widen `identify()` in `mail-providers.js` |
-| `found no messages in the list` | The row selector itself no longer matches | Fix the selector in `listVisible()` |
+| `missing the permission it needs to watch tabs` | `scripting`/`tabs` were not granted | Reload on chrome://extensions and approve |
+| `No Gmail or Outlook Web tab is open` | Nothing to watch | Open mail, press ⟳ |
+| `N mail tabs are open but not being watched yet` | **The likely one.** A tab open before the reload has no content script | Press ⟳, or reload the mail tab |
+| `Watching N mail tabs; nothing examined yet` | Live, nothing new found | Nothing |
+| `N messages in view, M examined` | Working | Nothing |
+| `N rows on the page, but none carried a message id` | The identifier moved again | Widen `identify()` |
+| `found no messages in the list` | The row selector no longer matches | Fix `listVisible()` |
+| `PhishLens returned NNN: <reason>` | The backend rejected it, and says why | Fix what it names |
 
 Do not guess between these. The distinction exists precisely so it does not have
-to be guessed, and it cost a wrong diagnosis to learn that.
+to be guessed, and it has already cost two wrong diagnoses.
 
 ### Monitoring channels
 
