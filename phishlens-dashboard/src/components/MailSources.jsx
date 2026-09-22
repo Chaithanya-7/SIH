@@ -123,6 +123,18 @@ export default function MailSources() {
     const watchingCount = coverage.summary?.automatic_active ?? 0;
     const monitoring = coverage.monitoring_live_mail === true;
 
+    /**
+     * Whether to show the browser extension's setup steps.
+     *
+     * This used to hide them as soon as *any* live-mail channel was watching,
+     * which is wrong as soon as more than one channel exists: switching on the
+     * SMTP gateway hid the instructions for the browser extension, and the SMTP
+     * gateway cannot see somebody's Gmail. The steps for a channel that is not
+     * set up should not disappear because a different one is.
+     */
+    const browserChannel = (coverage.sources || []).find(s => s.id === 'browser_watch');
+    const browserWatching = browserChannel ? browserChannel.status === 'ACTIVE' : false;
+
     const card = (source) => {
         const meta = CHANNEL_META[source.id] || {};
         const Icon = meta.icon || Inbox;
@@ -201,7 +213,7 @@ export default function MailSources() {
                 </p>
             </div>
 
-            {!monitoring && (
+            {!browserWatching && (
                 <BrowserWatcherSetup extensionPath={coverage.extension_path} />
             )}
 

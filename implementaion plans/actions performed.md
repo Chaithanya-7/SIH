@@ -98,6 +98,58 @@ SMTP credentials live in `%APPDATA%\phishlens-desktop\data\channels.json`
 
 ---
 
+## 2026-09-22 — full verification pass
+
+**A-041 · Detection battery through the real SMTP channel**
+What: Eight messages — five techniques, three ordinary — sent through the
+enabled gateway and checked against expected verdicts.
+Status: `Done`
+Evidence: 7 of 8 correct on the first run. Credential form, HTML smuggling and
+paste-to-run all `HIGH_RISK` at 0.70; macro document `SUSPICIOUS` at 0.37;
+ordinary note, newsletter and PDF all `SAFE`. One genuine miss, below.
+Commit: (this commit)
+
+**A-042 · A program disguised as a PDF came back SAFE**
+What: `statement.pdf.exe`, declared `application/pdf`, with an `MZ` header.
+Status: `Done`
+Evidence: Detection was **correct** — it reported the double extension, the
+executable attachment and the declared/actual mismatch, and matched two MQL
+rules. The failure was in scoring: all of it falls in one family, that family is
+capped at 0.20, and the total reached 0.30 against a 0.35 threshold. Four
+inspector findings are now decisive — the ones describing a deliberate disguise
+or code set to run on open. `EXECUTABLE_ATTACHMENT` and `OFFICE_MACROS_PRESENT`
+are deliberately **not** decisive: both have legitimate uses. Now `HIGH_RISK` at
+0.70, with ordinary files unchanged at 0.07.
+Commit: (this commit)
+
+**A-043 · False alarm: "each message is recorded twice"**
+What: Reported 16 cases from 8 sent messages.
+Status: `Abandoned` — the diagnosis was wrong, no change made.
+Evidence: The Message-IDs were twelve seconds apart in two batches. My battery
+script sent all eight messages and *then* crashed on a file write, so I re-ran
+it and sent eight more. Deduplication correctly kept them separate because they
+were genuinely different messages. My harness, not the product.
+Commit: —
+
+**A-044 · Enabling SMTP hid the browser extension's setup steps**
+What: The setup panel was shown only when no live-mail channel was watching.
+Status: `Done`
+Evidence: Caused by A-038. Switching on the SMTP gateway hid the instructions
+for the browser extension — and the SMTP gateway cannot see somebody's Gmail.
+The steps for a channel that is not set up must not disappear because a
+different one is. Now keyed to the browser channel's own status.
+Commit: (this commit)
+
+**A-045 · Whole-console render check**
+What: Clicked through all eleven pages, checking none blanks the application.
+Status: `Done`
+Evidence: 11 of 11 render, none blank it, map loads 54/54 tiles with 0 broken,
+12 rules reported in the panel. This is what the error boundary and the console
+source tests were added for.
+Commit: (this commit)
+
+---
+
 ## 2026-09-21
 
 ### Session: open-source security tooling

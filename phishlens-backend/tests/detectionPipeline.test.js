@@ -206,6 +206,75 @@ test('a credential form inside an attachment decides the verdict', async () => {
     assert.ok(decisive, 'the reason this reached high risk must appear in the contributions');
 });
 
+test('a program disguised as a document decides the verdict', async () => {
+    // Found by running a battery through the installed application. The
+    // inspector reported all three problems - a hidden second extension, an
+    // executable attachment, and a message that declared it as application/pdf
+    // - and the case still came back SAFE at 0.30, because all three fell in
+    // one family and that family is capped at 0.20.
+    const payload = Buffer.concat([Buffer.from('MZ'), Buffer.alloc(300)]).toString('base64');
+
+    const raw = [
+        'From: "Billing" <billing@supplier-portal.example>',
+        'To: employee@company.example',
+        'Subject: Statement attached',
+        'Message-ID: <disguised-executable@supplier-portal.example>',
+        'Content-Type: multipart/mixed; boundary="B"',
+        '',
+        '--B',
+        'Content-Type: text/plain',
+        '',
+        'See the attached statement.',
+        '--B',
+        'Content-Type: application/pdf; name="statement.pdf.exe"',
+        'Content-Transfer-Encoding: base64',
+        'Content-Disposition: attachment; filename="statement.pdf.exe"',
+        '',
+        payload,
+        '--B--'
+    ].join(CRLF);
+
+    const result = await runPipeline(raw, PASSING_AUTH);
+
+    assert.strictEqual(result.detection.verdict, 'HIGH_RISK',
+        'a Windows program named .pdf.exe and declared as a PDF cannot come back SAFE');
+
+    const codes = result.attachments[0].findings.map(f => f.code);
+    assert.ok(codes.includes('DOUBLE_EXTENSION'));
+    assert.ok(codes.includes('EXECUTABLE_DECLARED_AS_DOCUMENT'));
+
+    const decisive = result.confidence.contributions.find(c => c.family === 'DECISIVE_FINDING');
+    assert.ok(decisive, 'the reason it reached high risk must be visible in the reasoning');
+});
+
+test('only deliberate disguise is decisive, not merely carrying an executable', () => {
+    const fs = require('fs');
+    const source = fs.readFileSync(require.resolve('../modules/attachmentInspector'), 'utf8');
+
+    // Read by splitting rather than by regular expression: the escaping needed
+    // for one inside a generated file is where two earlier attempts broke.
+    const decisiveCodes = source
+        .split('decisive: true')
+        .slice(0, -1)
+        .map(before => {
+            const marker = before.lastIndexOf("code: '");
+            return marker < 0 ? null : before.slice(marker + 7, before.indexOf("'", marker + 7));
+        })
+        .filter(Boolean)
+        .sort();
+
+    // Kept short on purpose. A decisive finding raises a case to high risk on
+    // its own, so it is reserved for acts with no innocent explanation: a name
+    // that lies about the file, or code set to run on open. "Contains macros"
+    // and "is an executable" both have legitimate uses and stay HIGH instead.
+    assert.deepStrictEqual(decisiveCodes, [
+        'BIDI_FILENAME',
+        'DOUBLE_EXTENSION',
+        'EXECUTABLE_DECLARED_AS_DOCUMENT',
+        'MACRO_RUNS_AUTOMATICALLY'
+    ], 'the decisive list must not drift without being noticed');
+});
+
 test('an attachment with nothing wrong with it does not move the verdict', async () => {
     const notes = Buffer.from(
         '<html><body><p>Notes from the call are below. Thursday works for me.</p></body></html>'

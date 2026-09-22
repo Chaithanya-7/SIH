@@ -202,6 +202,8 @@ class AttachmentInspector {
             inspection.findings.push({
                 code: 'BIDI_FILENAME',
                 severity: 'HIGH',
+                // No legitimate filename reverses how it is displayed.
+                decisive: true,
                 summary: 'The filename contains characters that reverse how it is displayed.',
                 detail: 'A name written this way shows one extension and carries another. There is no ordinary reason for an attachment to use these characters.'
             });
@@ -214,6 +216,8 @@ class AttachmentInspector {
             inspection.findings.push({
                 code: 'DOUBLE_EXTENSION',
                 severity: 'HIGH',
+                // Naming a program after a document is a deliberate disguise.
+                decisive: true,
                 summary: `The file is named to look like a .${doubleExtension[1]} but ends in .${doubleExtension[2]}.`,
                 detail: 'Windows hides known extensions by default, so this is displayed under the earlier one.'
             });
@@ -267,6 +271,10 @@ class AttachmentInspector {
             inspection.findings.push({
                 code: 'EXECUTABLE_DECLARED_AS_DOCUMENT',
                 severity: 'HIGH',
+                // The message said this was a document. It is a program. That
+                // is the message being wrong about its own contents, which
+                // nothing accidental produces.
+                decisive: true,
                 summary: `The message declared this as ${declaredMimeType}, but it is a Windows program.`,
                 detail: 'The declared type is part of the message and is written by the sender.'
             });
@@ -638,6 +646,8 @@ class AttachmentInspector {
             inspection.findings.push({
                 code: 'MACRO_RUNS_AUTOMATICALLY',
                 severity: 'HIGH',
+                // Code set to run on open, in a document that arrived by email.
+                decisive: true,
                 summary: 'The macro is set to run on its own when the document is opened.',
                 detail: grouped.auto_executes.map(e => `${e.keyword}: ${e.description}`).join('; '),
                 triggers: grouped.auto_executes.map(e => e.keyword)

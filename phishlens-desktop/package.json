@@ -1,6 +1,6 @@
 {
   "name": "phishlens-desktop",
-  "version": "1.7.5",
+  "version": "1.7.6",
   "description": "PhishLens desktop application - the full SOC investigation console, installed on the workstation and registered as the handler for phishlens:// deep links from the browser extension.",
   "main": "main.js",
   "scripts": {
