@@ -33,6 +33,9 @@ class PDFReportGenerator {
         doc.pipe(resStream);
 
         this.renderTitle(doc, threatObject);
+        // Before the disposition, not after it. A qualification printed below
+        // the verdict is read after the verdict has already been believed.
+        this.renderAnalysisMode(doc, threatObject);
         this.renderDisposition(doc, threatObject);
         this.renderCaseInformation(doc, threatObject);
         this.renderMessageMetadata(doc, threatObject);
@@ -84,6 +87,54 @@ class PDFReportGenerator {
     body(doc, text, color = COLORS.body, size = 9) {
         this.ensureSpace(doc, 26);
         doc.fontSize(size).fillColor(color).font('Helvetica').text(this.safe(text), { align: 'left' });
+    }
+
+    /**
+     * States, at the top, when a verdict rests on less than a live one does.
+     *
+     * A backlog scan reads mail that arrived long ago. The checks that describe
+     * infrastructure could only describe it as it is now - domain age inverts,
+     * indicator feeds have delisted what was listed, addresses have changed
+     * hands - so they are not run rather than run and recorded as having found
+     * nothing.
+     *
+     * The backend already refuses to score a check it could not honestly
+     * perform. This is the other half: a report that renders a historical SAFE
+     * identically to a live one hands the reader the same reassurance on less
+     * evidence, and a forensic report is exactly the document somebody quotes
+     * later without re-reading the case.
+     */
+    renderAnalysisMode(doc, threatObject) {
+        const mode = threatObject.analysis_mode;
+        if (!mode || mode.mode !== 'HISTORICAL') return;
+
+        this.section(doc, 'Analysed after the fact');
+
+        if (mode.age_description) this.kv(doc, 'Message age', mode.age_description);
+        this.body(doc, mode.verdict_caveat, COLORS.body);
+
+        const skipped = mode.checks_not_applicable || [];
+        if (skipped.length) {
+            doc.moveDown(0.3);
+            doc.fontSize(9).fillColor(COLORS.body).font('Helvetica-Bold')
+                .text(`Checks not performed (${skipped.length})`);
+            doc.font('Helvetica');
+
+            for (const entry of skipped) {
+                this.ensureSpace(doc, 34);
+                doc.fontSize(8.5).fillColor(COLORS.body).font('Helvetica-Bold')
+                    .text(`  ${entry.check.replace(/_/g, ' ')}`);
+                // The reason, every time. "Not applicable" with nothing after it
+                // is the same dead end as a silent skip.
+                doc.fontSize(8).fillColor(COLORS.muted).font('Helvetica')
+                    .text(`  ${this.safe(entry.reason)}`, { indent: 6 });
+            }
+        }
+
+        if (mode.remediation) {
+            doc.moveDown(0.3);
+            this.body(doc, mode.remediation, COLORS.muted, 8.5);
+        }
     }
 
     /** A limitation printed next to the finding it qualifies, not hidden at the end. */

@@ -199,6 +199,58 @@ service. Place names stay at every zoom: they are what makes photography
 legible at all.
 Commit: (this commit)
 
+**A-075 - Making the honesty visible, and attributing techniques properly**
+What: Surfaced historical-scan caveats in the console and the forensic report,
+and gave every rule an explicit MITRE technique list.
+Status: `Done` - 349 backend + 5 console tests passing, console builds
+Evidence: **A correction to A-074 first.** I told the user the console "renders
+it differently" for a backlog case. It did not. `analysis_mode` existed on the
+ThreatObject and *nothing* read it - not the console, not the forensic PDF. So a
+historical SAFE, resting on five fewer checks, looked identical to a live one.
+The backend refusing to score a check it could not honestly perform is only half
+the job; rendering the result the same way throws that half away at the last
+step. New `AnalysisModeNotice.jsx` (badge beside the verdict, full notice
+**above** the confidence card - a qualification printed after the score is read
+after the score is believed) and `renderAnalysisMode()` in the report, placed
+before the disposition for the same reason.
+
+The new detection facts needed no new UI: the rules' `matched_because` strings
+already carry the phone number, the character counts and the platform name, and
+those flow into the evidence list through the existing path.
+
+**A second correction.** I told the user 26 of 43 rules lacked the `mitre` field
+so the report "under-reports". Partly wrong: `mitreFromSource()` already parsed
+technique IDs out of the prose citation, so rules whose source named a T-number
+were attributed fine. The real gap was ~23 rules whose citation named only
+APWG/CISA/RFC/abuse.ch - those had *no* attribution at all. All 51 rules now
+declare techniques explicitly; 21 distinct techniques cited, and four names
+added to `TECHNIQUE_NAMES` so none renders as a bare number.
+
+**Then a test caught me over-claiming.** Giving all 27 rules techniques in one
+pass broke "a clean message attributes no techniques at all" - a colleague
+sending a BBC link now attributed T1566, because I had given *Missing
+Message-ID* the Phishing technique. The rule's own description concedes
+misconfigured legitimate senders omit it. Three rules had their attribution
+removed and now deliberately carry none: `MQL-AUTH-103` (missing Message-ID),
+`MQL-URL-104` (many links in a short message - newsletters do this),
+`MQL-ATT-104` (archive attachment - an archive is not obfuscation).
+
+Principle written into the module and guarded by a test: **attribute a technique
+where the rule observes the technique being performed, not where it observes
+something that often accompanies it.** An attribution hung on a weak correlate
+turns "MITRE ATT&CK T1566" into decoration, and decoration on a security report
+is worse than silence.
+
+**A latent bug in the console test suite**, found because my component tripped
+it: `every React hook a component uses is imported` matched only
+`^import React[^;]*;`. A file using `import { useState } from 'react'` - valid
+under the modern JSX transform - was reported broken, and worse, a hook
+genuinely missing from such a file could never have been caught, because the
+line being searched came back empty. Widened to all react imports and verified
+by removing a real import and watching it fail.
+Commit: (this commit)
+
+
 **A-074 - Scanning the mail that was already there**
 What: The backlog scanner, plus the historical-analysis mode that makes its
 verdicts honest.

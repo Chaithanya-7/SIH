@@ -86,6 +86,7 @@ const RULES = [
         category: 'AUTH',
         severity: 'HIGH',
         confidence: 0.80,
+        mitre: ['T1566', 'T1656'],
         source: 'APWG eCrime Trends Report (BEC reply redirection pattern); OWASP Email Security Cheat Sheet',
         description: 'Replies to this message are routed to a different domain than the one it claims to be from, a common business-email-compromise redirection technique.',
         test: (ctx) => ctx.replyToDomain && ctx.fromDomain && ctx.replyToDomain !== ctx.fromDomain &&
@@ -97,6 +98,7 @@ const RULES = [
         category: 'AUTH',
         severity: 'CRITICAL',
         confidence: 0.85,
+        mitre: ['T1566', 'T1036'],
         source: 'RFC 8601 §5 (Authentication-Results trust boundary); forged-header downstream-filter-evasion technique',
         description: 'The Authentication-Results header claims a DKIM outcome that PhishLens\' own independent signature verification does not confirm, which can indicate a forged authentication header inserted to mislead filters that trust it blindly.',
         test: (ctx) => !!ctx.auth.dkim_header_mismatch && ctx.auth.dkim_header_mismatch
@@ -117,6 +119,7 @@ const RULES = [
         category: 'AUTH',
         severity: 'CRITICAL',
         confidence: 0.90,
+        mitre: ['T1566', 'T1656'],
         source: 'RFC 7489 §6.6.2 (DMARC policy enforcement)',
         description: 'The sender domain publishes a DMARC policy that asks receivers to reject or quarantine failing mail, and this message fails DMARC evaluation - it directly defies the domain owner\'s own stated policy.',
         test: (ctx) => {
@@ -135,6 +138,7 @@ const RULES = [
         category: 'DOM',
         severity: 'HIGH',
         confidence: 0.75,
+        mitre: ['T1656', 'T1585.002'],
         source: 'APWG display-name spoofing pattern; FBI IC3 BEC public service announcements',
         description: 'The display name references a well-known organization, but the message was actually sent from a free consumer email domain, not that organization\'s own domain.',
         test: (ctx) => {
@@ -150,6 +154,7 @@ const RULES = [
         category: 'DOM',
         severity: 'HIGH',
         confidence: 0.70,
+        mitre: ['T1656', 'T1566'],
         source: 'APWG brand impersonation trend reporting',
         description: 'The display name references a well-known organization, but the sending domain does not contain that organization\'s name at all.',
         test: (ctx) => {
@@ -167,6 +172,7 @@ const RULES = [
         category: 'DOM',
         severity: 'HIGH',
         confidence: 0.65,
+        mitre: ['T1583.001', 'T1656'],
         source: 'APWG / CISA typosquatting and homograph-domain guidance',
         description: 'The sending domain matches a well-known brand name only after normalizing common look-alike character substitutions (0/o, 1/l, rn/m, etc.), suggesting a typosquatted domain.',
         test: (ctx) => {
@@ -185,6 +191,7 @@ const RULES = [
         category: 'DOM',
         severity: 'MEDIUM',
         confidence: 0.60,
+        mitre: ['T1583.001', 'T1656'],
         source: 'CISA / APWG IDN homograph attack guidance',
         description: 'The sending domain is encoded as punycode (xn--), which can be used to visually impersonate a Latin-script brand domain using look-alike Unicode characters.',
         test: (ctx) => ctx.fromDomain && ctx.fromDomain.includes('xn--')
@@ -498,6 +505,7 @@ const RULES = [
         category: 'URL',
         severity: 'HIGH',
         confidence: 0.80,
+        mitre: ['T1566.002'],
         source: 'MITRE ATT&CK T1566.002 (Phishing: Spearphishing Link); CISA phishing indicator guidance',
         description: 'A link in this message points directly to an IP address rather than a registered domain name, a pattern rarely used by legitimate correspondence and commonly used to evade domain-reputation filtering.',
         test: (ctx) => {
@@ -513,6 +521,7 @@ const RULES = [
         category: 'URL',
         severity: 'HIGH',
         confidence: 0.75,
+        mitre: ['T1566.002', 'T1583.001'],
         source: 'APWG / CISA IDN homograph attack guidance',
         description: 'A link hostname is encoded as punycode (xn--), which can render as a visually deceptive look-alike of a trusted brand domain.',
         test: (ctx) => {
@@ -528,6 +537,7 @@ const RULES = [
         category: 'URL',
         severity: 'MEDIUM',
         confidence: 0.60,
+        mitre: ['T1566.002'],
         source: 'APWG phishing infrastructure reporting (shorteners used to obscure the true destination)',
         description: 'A link uses a public URL-shortening service, which hides the true destination domain from the recipient until the link is followed.',
         test: (ctx) => {
@@ -561,6 +571,7 @@ const RULES = [
         category: 'ATT',
         severity: 'CRITICAL',
         confidence: 0.90,
+        mitre: ['T1566.001', 'T1204.002'],
         source: 'MITRE ATT&CK T1566.001 (Phishing: Spearphishing Attachment); CISA malware-delivery advisories',
         description: 'An attachment has an extension associated with directly executable or scriptable content, a leading malware-delivery vector.',
         test: (ctx) => {
@@ -574,6 +585,7 @@ const RULES = [
         category: 'ATT',
         severity: 'HIGH',
         confidence: 0.80,
+        mitre: ['T1566.001', 'T1204.002'],
         source: 'MITRE ATT&CK T1204.002 (User Execution: Malicious File); CISA',
         description: 'An attachment is a macro-enabled Office document, a common vector for delivering malicious macro payloads.',
         test: (ctx) => {
@@ -587,6 +599,7 @@ const RULES = [
         category: 'ATT',
         severity: 'HIGH',
         confidence: 0.75,
+        mitre: ['T1566.001', 'T1036.007'],
         source: 'APWG / CISA malware-delivery obfuscation reporting (e.g. invoice.pdf.exe)',
         description: 'An attachment filename has two extensions, a technique used to disguise an executable as a harmless document at a glance.',
         test: (ctx) => {
@@ -617,6 +630,7 @@ const RULES = [
         category: 'NLP',
         severity: 'HIGH',
         confidence: 0.82,
+        mitre: ['T1566.002', 'T1598.003'],
         source: 'APWG phishing lure taxonomy (credential-harvesting composite pattern)',
         description: 'The message both asks for account/credential action and directs the recipient to a link, the classic credential-harvesting combination.',
         test: (ctx) => ctx.nlpSignalTypes.has('CREDENTIAL_REQUEST') && ctx.nlpSignalTypes.has('LINK_OR_ATTACHMENT_CALL_TO_ACTION')
@@ -627,6 +641,7 @@ const RULES = [
         category: 'NLP',
         severity: 'CRITICAL',
         confidence: 0.85,
+        mitre: ['T1566'],
         source: 'FBI IC3 Business Email Compromise (BEC) public service announcements; APWG',
         description: 'The message combines a financial request (payment, transfer, gift card) with pressure to act quickly, the signature pattern of business email compromise.',
         test: (ctx) => ctx.nlpSignalTypes.has('FINANCIAL_PRESSURE') && ctx.nlpSignalTypes.has('URGENCY_PRESSURE')
@@ -637,6 +652,7 @@ const RULES = [
         category: 'NLP',
         severity: 'CRITICAL',
         confidence: 0.85,
+        mitre: ['T1656', 'T1566'],
         source: 'FBI IC3 BEC guidance ("CEO fraud"); APWG',
         description: 'The message invokes executive/organizational authority while replies are silently redirected to a different domain, a hallmark of CEO-fraud business email compromise.',
         test: (ctx) => {
@@ -661,6 +677,7 @@ const RULES = [
         category: 'NLP',
         severity: 'HIGH',
         confidence: 0.75,
+        mitre: ['T1566'],
         source: 'FBI IC3 BEC indicators (isolating the victim from independent verification)',
         description: 'The message asks the recipient to keep the request confidential or avoid discussing it with others, a technique used to prevent verification through a second channel.',
         test: (ctx) => ctx.nlpSignalTypes.has('SECRECY_PRESSURE')
@@ -684,6 +701,7 @@ const RULES = [
         // delivery, and it is still listed. There is no benign reading of a
         // message linking to it, so this finding stands on its own.
         decisive: true,
+        mitre: ['T1566.002'],
         source: 'abuse.ch URLhaus / OpenPhish / ThreatFox open indicator feeds',
         description: 'A link in this message is itself listed in an open threat-intelligence feed as malicious or phishing.',
         test: (ctx) => {
@@ -698,6 +716,7 @@ const RULES = [
         stage: 'enrichment',
         severity: 'HIGH',
         confidence: 0.85,
+        mitre: ['T1566.002', 'T1583.001'],
         source: 'abuse.ch URLhaus / OpenPhish / ThreatFox open indicator feeds',
         description: 'A link points to a host that open threat intelligence has recorded serving malicious or phishing content, though at a different path. Multi-tenant platforms are excluded from this check.',
         test: (ctx) => {
@@ -712,6 +731,7 @@ const RULES = [
         stage: 'enrichment',
         severity: 'HIGH',
         confidence: 0.85,
+        mitre: ['T1583'],
         source: 'abuse.ch Feodo Tracker (botnet C2) / Spamhaus DROP (hijacked netblocks)',
         description: 'An IP address associated with this message is listed as botnet command-and-control infrastructure, or falls inside a netblock published as hijacked or attacker-controlled.',
         test: (ctx) => {
@@ -726,6 +746,7 @@ const RULES = [
         stage: 'enrichment',
         severity: 'HIGH',
         confidence: 0.80,
+        mitre: ['T1583.001'],
         source: 'RDAP registration data (RFC 9083); APWG / CISA guidance on newly-registered domains in phishing',
         description: 'The sender domain was registered within the last 30 days. Phishing infrastructure is typically registered shortly before use, whereas an organisation a message claims to represent has usually held its domain for years.',
         test: (ctx) => {
@@ -741,6 +762,7 @@ const RULES = [
         stage: 'enrichment',
         severity: 'MEDIUM',
         confidence: 0.65,
+        mitre: ['T1583.001'],
         source: 'RDAP registration data (RFC 9083); APWG / CISA guidance on newly-registered domains in phishing',
         description: 'A domain linked in this message was registered within the last 30 days, a common characteristic of phishing landing pages.',
         test: (ctx) => {
@@ -758,6 +780,7 @@ const RULES = [
         category: 'BEC',
         severity: 'CRITICAL',
         confidence: 0.90,
+        mitre: ['T1566', 'T1656'],
         source: 'FBI IC3 Business Email Compromise public service announcements; APWG eCrime reporting',
         description: 'Several independent BEC indicators appear together in one message. BEC is typically sent from an attacker-controlled domain that passes SPF/DKIM/DMARC and carries no link or attachment, so it leaves no authentication or payload trace - the co-occurrence of these behavioural indicators is the evidence.',
         test: (ctx) => {
@@ -794,6 +817,7 @@ const RULES = [
         category: 'IMP',
         severity: 'HIGH',
         confidence: 0.75,
+        mitre: ['T1566.001', 'T1656'],
         source: 'MITRE ATT&CK T1566.001 (Phishing: Spearphishing Attachment); APWG',
         description: 'The message carries an attachment while failing SPF or DKIM, increasing the likelihood that the attachment did not originate from the claimed sender.',
         test: (ctx) => ctx.attachments.length > 0 && (ctx.auth.spf === 'fail' || ctx.auth.dkim === 'fail')
@@ -982,6 +1006,24 @@ const RULES = [
  * rewriting thirty citations by hand to add a field would have been a chance to
  * introduce a typo in every one of them. A rule that declares `mitre: [...]`
  * explicitly always wins; this is the fallback for the rest.
+ *
+ * ## When a rule should carry no technique at all
+ *
+ * Every rule now declares its techniques explicitly, except three that
+ * deliberately declare none: a missing Message-ID, an unusual number of links
+ * in a short message, and the presence of an archive attachment.
+ *
+ * The principle is to **attribute a technique where the rule observes the
+ * technique being performed, not where it observes something that often
+ * accompanies it.** A missing Message-ID does not demonstrate phishing - the
+ * rule's own description concedes that misconfigured legitimate senders omit
+ * it. A newsletter has many links. An archive is not obfuscation.
+ *
+ * That was not foresight. All three were given techniques in one pass, and a
+ * test asserting that an ordinary message - a colleague sending a news link -
+ * attributes no techniques at all failed immediately. An attribution hung on a
+ * weak correlate turns "MITRE ATT&CK T1566" into decoration, and decoration on
+ * a security report is worse than silence.
  */
 function mitreFromSource(source) {
     const found = String(source || '').match(/\bT1\d{3}(?:\.\d{3})?\b/g);
@@ -1029,7 +1071,15 @@ const TECHNIQUE_NAMES = {
     'T1586': 'Compromise Accounts',
     'T1585': 'Establish Accounts',
     'T1583': 'Acquire Infrastructure',
-    'T1583.001': 'Acquire Infrastructure: Domains'
+    'T1583.001': 'Acquire Infrastructure: Domains',
+    // Added when every rule was given an explicit technique list. A technique
+    // with no entry here renders as a bare number, which is an assertion rather
+    // than something a reader can check - so this map has to grow with the
+    // rules that cite it.
+    'T1585.002': 'Establish Accounts: Email Accounts',
+    'T1036': 'Masquerading',
+    'T1036.007': 'Masquerading: Double File Extension',
+    'T1027': 'Obfuscated Files or Information'
 };
 
 class RuleEngine {

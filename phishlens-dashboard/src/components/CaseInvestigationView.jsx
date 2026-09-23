@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { FileText, ChevronDown, ChevronRight, AlertCircle, Shield, Key, Globe, Network, Activity } from 'lucide-react';
 import ConfidenceCard from './ConfidenceCard';
+import AnalysisModeNotice, { AnalysisModeBadge } from './AnalysisModeNotice';
 import RelayTimeline from './RelayTimeline';
 import ThreatMap from './ThreatMap';
 
@@ -83,6 +84,10 @@ export default function CaseInvestigationView({ selectedCase, onOpenReport }) {
                 EXTERNAL PROVIDER UNAVAILABLE (NATIVE DETECTION ONLY)
               </span>
             )}
+            {/* Beside the verdict, because that is where the eye lands. A safe
+                verdict from a backlog scan rests on fewer checks than a live
+                one, and the two must not be read as the same reassurance. */}
+            <AnalysisModeBadge analysisMode={selectedCase.analysis_mode} />
           </div>
           <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>
             {selectedCase.message?.subject || '(No Subject)'}
@@ -102,7 +107,12 @@ export default function CaseInvestigationView({ selectedCase, onOpenReport }) {
         </button>
       </div>
 
-      {/* 2. Compact Summary Metrics Bar */}
+      {/* 2. What this verdict rests on, before the verdict's number is shown.
+             Deliberately above the confidence card: a qualification placed
+             after the score is read after the score has already been believed. */}
+      <AnalysisModeNotice analysisMode={selectedCase.analysis_mode} />
+
+      {/* 3. Compact Summary Metrics Bar */}
       <ConfidenceCard confidence={selectedCase.confidence} executiveContext={selectedCase.executive_context} />
 
       {/* 3. Section Tabs */}

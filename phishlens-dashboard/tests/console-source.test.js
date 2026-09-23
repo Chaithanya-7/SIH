@@ -91,7 +91,16 @@ test('every React hook a component uses is imported', () => {
 
     for (const file of componentFiles()) {
         const source = read(file);
-        const importLine = (source.match(/^import React[^;]*;/m) || [''])[0];
+
+        // Every import from react, in whatever form it takes.
+        //
+        // Matching only `import React, { ... }` got this wrong in both
+        // directions: it reported a file using the named-only form - which is
+        // valid and common under the modern JSX transform - as broken, and,
+        // worse, it could never have caught a hook genuinely missing from such
+        // a file, because the line it searched came back empty. A check that
+        // cannot fail on a whole class of file is not checking it.
+        const importLine = (source.match(/^import\s[^;]*from\s+['"]react['"];/gm) || []).join(' ');
 
         for (const hook of hooks) {
             // Bare usage only: React.useMemo(...) needs no named import.
@@ -117,4 +126,40 @@ test('the page switch is wrapped so one panel cannot blank the console', () => {
     const boundary = read(path.join(COMPONENTS, 'PanelBoundary.jsx'));
     assert.match(boundary, /getDerivedStateFromError/, 'it must actually be an error boundary');
     assert.match(boundary, /console\.error/, 'a contained failure must still be reported, not swallowed');
+});
+
+test('a backlog-scanned case does not read like a live one', () => {
+    // The backend already refuses to score a check it could not honestly
+    // perform on old mail - domain age, indicator feeds, address reputation,
+    // DNS, live DKIM. That is only half the job.
+    //
+    // If the console then renders the result identically to a live case, a SAFE
+    // resting on five fewer checks looks exactly like a SAFE resting on all of
+    // them, and somebody reads it as the same reassurance. The whole point of
+    // not scoring those checks is lost at the last step.
+    const notice = fs.readFileSync(path.join(SOURCE, 'components', 'AnalysisModeNotice.jsx'), 'utf8');
+    const caseView = fs.readFileSync(path.join(SOURCE, 'components', 'CaseInvestigationView.jsx'), 'utf8');
+
+    assert.match(caseView, /import AnalysisModeNotice/, 'the case view must carry the notice');
+    assert.match(caseView, /<AnalysisModeNotice analysisMode=\{selectedCase\.analysis_mode\}/);
+    assert.match(caseView, /<AnalysisModeBadge analysisMode=\{selectedCase\.analysis_mode\}/,
+        'and a badge beside the verdict, which is where the eye lands');
+
+    // Above the score, not below it. A qualification printed after the number
+    // is read after the number has already been believed.
+    const noticeAt = caseView.indexOf('<AnalysisModeNotice');
+    const cardAt = caseView.indexOf('<ConfidenceCard');
+    assert.ok(noticeAt > -1 && cardAt > -1 && noticeAt < cardAt,
+        'the caveat must appear before the confidence score, not after it');
+
+    // It has to name which checks were skipped and why, not merely say the
+    // case is old. "Not applicable" with no reason is the same dead end as a
+    // silent skip.
+    assert.match(notice, /checks_not_applicable/);
+    assert.match(notice, /entry\.reason/, 'each skipped check must show its reason');
+    assert.match(notice, /verdict_caveat/);
+
+    // And it must render nothing at all for live mail, or every ordinary case
+    // grows a warning that means nothing.
+    assert.match(notice, /analysisMode\.mode !== 'HISTORICAL'\) return null/);
 });

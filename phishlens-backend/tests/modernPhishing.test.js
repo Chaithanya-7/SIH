@@ -397,3 +397,59 @@ test('the new families are declared rather than falling through to the default',
         'device-code links are link risk; they must not be counted twice');
     assert.strictEqual(familyOf('MQL_QR'), 'URL_RISK', 'a QR code resolves to a URL');
 });
+
+// ---------------------------------------------------------------------------
+// Technique attribution
+// ---------------------------------------------------------------------------
+
+test('every rule declares its techniques, or deliberately declares none', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const source = fs.readFileSync(path.join(__dirname, '..', 'modules', 'ruleEngine.js'), 'utf8');
+    const lines = source.split('\n');
+
+    const marks = lines
+        .map((line, index) => ({ index, id: (line.match(/id: '(MQL-[^']+)'/) || [])[1] }))
+        .filter(m => m.id);
+
+    const withoutTechniques = [];
+    marks.forEach((mark, n) => {
+        const end = n + 1 < marks.length ? marks[n + 1].index : lines.length;
+        const block = lines.slice(mark.index, end).join('\n');
+        if (!/mitre: \[/.test(block)) withoutTechniques.push(mark.id);
+    });
+
+    // Three, and only these three. Each observes something that frequently
+    // accompanies phishing rather than the technique itself: misconfigured
+    // legitimate senders omit a Message-ID, newsletters carry many links, and
+    // an archive attachment is not obfuscation.
+    //
+    // This list is short on purpose. All three briefly carried techniques, and
+    // the test asserting that an ordinary message attributes none caught it -
+    // an attribution hung on a weak correlate turns a technique identifier into
+    // decoration.
+    assert.deepStrictEqual(withoutTechniques.sort(), [
+        'MQL-ATT-104',
+        'MQL-AUTH-103',
+        'MQL-URL-104'
+    ], 'a rule either observes a technique or attributes none; this list must not grow quietly');
+});
+
+test('every technique a rule cites has a name to render', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const source = fs.readFileSync(path.join(__dirname, '..', 'modules', 'ruleEngine.js'), 'utf8');
+
+    const cited = new Set(
+        [...source.matchAll(/mitre: \[([^\]]*)\]/g)]
+            .flatMap(m => m[1].match(/T1[0-9.]+/g) || [])
+    );
+
+    const nameMap = source.slice(source.indexOf('TECHNIQUE_NAMES = {'));
+    const unnamed = [...cited].filter(t => !nameMap.includes(`'${t}':`));
+
+    // A bare technique number in a report is an assertion. The name is what
+    // lets somebody check whether the attribution is reasonable.
+    assert.deepStrictEqual(unnamed, [], 'a cited technique with no name renders as a bare number');
+    assert.ok(cited.size >= 12, 'coverage should not silently collapse to a couple of techniques');
+});
