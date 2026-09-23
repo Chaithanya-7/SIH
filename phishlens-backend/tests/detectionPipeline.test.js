@@ -267,11 +267,26 @@ test('only deliberate disguise is decisive, not merely carrying an executable', 
     // its own, so it is reserved for acts with no innocent explanation: a name
     // that lies about the file, or code set to run on open. "Contains macros"
     // and "is an executable" both have legitimate uses and stay HIGH instead.
+    //
+    // SVG_EVENT_HANDLER joined when SVG attachment inspection was added, and
+    // only that one of the six SVG findings did. It is the same act as
+    // MACRO_RUNS_AUTOMATICALLY in a different format: script bound to load or
+    // error, which runs the moment the attachment is opened, with no click and
+    // no prompt. An image has no reason to execute anything on open.
+    //
+    // SVG_SCRIPT_ELEMENT deliberately did not join it, although scripted SVG
+    // attachments rose roughly fiftyfold into the third most common malicious
+    // attachment type. Carrying code is not the same act as running it
+    // unprompted, an interactive graphic sent as mail is rare but real, and the
+    // detection rule for script inside an SVG already treats mere presence as
+    // non-decisive. One fact judged two ways by two parts of one system is
+    // worse than a signal weighed slightly too low.
     assert.deepStrictEqual(decisiveCodes, [
         'BIDI_FILENAME',
         'DOUBLE_EXTENSION',
         'EXECUTABLE_DECLARED_AS_DOCUMENT',
-        'MACRO_RUNS_AUTOMATICALLY'
+        'MACRO_RUNS_AUTOMATICALLY',
+        'SVG_EVENT_HANDLER'
     ], 'the decisive list must not drift without being noticed');
 });
 

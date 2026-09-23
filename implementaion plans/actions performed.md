@@ -199,6 +199,71 @@ service. Place names stay at every zoom: they are what makes photography
 legible at all.
 Commit: (this commit)
 
+**A-073 - Detection for the four attacks that leave nothing to detect**
+What: Researched current phishing tradecraft, compared it against the 43 MQL
+rules, and built detection for the gaps found. Nine new rules, two new modules,
+two extended modules, two new evidence families.
+Status: `Done` - 338 backend tests passing, up from 323
+Evidence: The gaps were found by research rather than guessed:
+
+- **Callback phishing (TOAD).** Email whose only payload is a phone number. No
+  link, no attachment, and it usually passes SPF and DMARC because it is sent
+  from a real account. Zero prior coverage - there is nothing for a gateway to
+  inspect, which is the design. New `payloadChannel.js` + MQL-TOAD-101/102.
+- **Text-in-image bodies.** The most prevalent body-obfuscation technique
+  measured in the literature (47.0%, arXiv 2506.20228) and one of two measured
+  as significantly evading antispam. Every text-reading check here scored it at
+  zero. Detected by ratio, not by reading the image - OCR would mean a new
+  dependency and a new class of wrong answer. MQL-IMG-101/102.
+- **Authentication-passing platform abuse (LOTS).** Real Dropbox, DocuSign,
+  SharePoint and form-builder links. The AUTHENTICATION family is capped 0.30
+  and contributes *nothing* to these, correctly, because nothing about the
+  delivery is forged. New `trustedServiceAbuse.js` + MQL-LOTS-101/102/103.
+  MQL-LOTS-101 (credentials via a public form builder) is decisive.
+- **CSS-hidden bulk text.** Distinct from the zero-width characters already
+  covered: this hides whole paragraphs from the reader to move a classifier.
+  Extended `textDeception.js` + MQL-DECEPT-105.
+- **SVG attachments.** Roughly fiftyfold growth into the third most common
+  malicious attachment type, often declared `text/plain` to route around
+  scanning. Extended `attachmentInspector.js` with six findings.
+
+Two defects found while wiring it:
+
+1. **`MQL_AUTHFLOW` was never mapped to a family.** The rules carried a comment
+   placing them in URL_RISK; `confidenceEngine.evidenceFamily()` had no case for
+   them, so they fell through to the default and formed a family of their own -
+   counting as independent of the URL findings they are not independent of.
+   Fixed, with `MQL_QR` mapped the same way and `MQL_THREAD`/`MQL_ARC` declared
+   explicitly rather than left to the fallthrough.
+2. **`prose()` in payloadChannel.** A mail parser handed HTML with no text part
+   generates one, and for an image-only message it is almost entirely the URLs
+   written out in full. Measuring that as readable content inverts the answer:
+   the emptier the message, the longer its addresses loom. A single CDN URL
+   carried a wordless body over the threshold by one character. Found by my own
+   test, not by reading the code.
+
+Two judgements recorded rather than made silently:
+
+- **Only `SVG_EVENT_HANDLER` was made decisive**, not `SVG_SCRIPT_ELEMENT`.
+  Carrying code is not the act of running it unprompted, an interactive graphic
+  sent as mail is rare but real, and the existing YARA rule already treats
+  script-in-SVG as non-decisive. One fact judged two ways by two parts of one
+  system is worse than a signal weighed slightly low. The decisive-list guard
+  test caught the drift and was updated with that reasoning.
+- **PAYLOAD_CHANNEL and TRUSTED_SERVICE capped at 0.30, not 0.35.** Both reason
+  from shape rather than hard fact - a message can legitimately be a picture,
+  and a real brand can legitimately use a bulk sender. Neither should reach a
+  verdict wholly alone; the one case that must (form-builder credentials) is
+  decisive and reaches 0.70 through the visible floor instead.
+
+Half the new tests assert the detection does **not** fire: a phone number in a
+signature, an image-led newsletter with real text, an ordinary preheader, a
+catering form on the same platform as the phishing one, a brand sending its own
+mail, a plain logo SVG. Those are the tests that matter - the first two written
+both failed and exposed the two defects above.
+Commit: (this commit)
+
+
 **A-072 - A document that explains the tool to somebody who has not seen it**
 What: Wrote `PhishLens - How It Works.pdf` (26 pages) covering the architecture,
 the seven ingestion channels, all sixteen pipeline stages, evidence fusion and

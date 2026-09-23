@@ -181,6 +181,98 @@ class TextDeception {
     }
 
     /**
+     * Text the HTML renders invisible.
+     *
+     * A different technique from the invisible characters above, aimed at a
+     * different target. Zero-width characters hide *inside* a word so a
+     * substring match fails. This hides whole blocks of text from the reader
+     * while leaving them in the source, so a filter reading the source sees a
+     * message nobody receives - usually paragraphs of innocuous text padding
+     * out a short malicious one, dragging a statistical classifier towards
+     * "ordinary mail".
+     *
+     * ## Why the volume matters and the presence does not
+     *
+     * Nearly every marketing email contains hidden text: the preheader, a
+     * short line set to `display:none` that clients show in the list preview.
+     * Treating concealed text as suspicious in itself would flag most
+     * legitimate bulk mail ever sent.
+     *
+     * So what is recorded is *how much*, and the ratio against what the reader
+     * can see. Forty characters of preheader is normal. Two thousand
+     * characters of concealed prose behind three hundred visible ones is not a
+     * preheader, and there is no ordinary reason to write one.
+     *
+     * ## The limit of doing this with patterns
+     *
+     * This scans markup rather than building a document and computing styles,
+     * so it sees hiding declared on the element carrying the text and misses
+     * hiding inherited from an ancestor or applied from a stylesheet. It
+     * under-reports rather than over-reports, which is the right direction for
+     * something that feeds a score.
+     */
+    findConcealedMarkup(html) {
+        const result = { concealed_blocks: [], concealed_characters: 0, techniques: [] };
+        if (!html || typeof html !== 'string') return result;
+
+        const HIDING = [
+            { technique: 'font-size:0', pattern: /font-size\s*:\s*0(?:\.0+)?\s*(?:px|pt|em|rem|%)?\s*(?:;|!|"|')/i },
+            { technique: 'display:none', pattern: /display\s*:\s*none/i },
+            { technique: 'visibility:hidden', pattern: /visibility\s*:\s*hidden/i },
+            { technique: 'opacity:0', pattern: /opacity\s*:\s*0(?:\.0+)?\s*(?:;|!|"|')/i },
+            { technique: 'zero height', pattern: /(?:max-)?height\s*:\s*0(?:px|pt|em|%)?\s*(?:;|!|"|')/i },
+            { technique: 'line-height:0', pattern: /line-height\s*:\s*0(?:px|pt|em|%)?\s*(?:;|!|"|')/i },
+            { technique: 'positioned off-screen', pattern: /(?:left|top|text-indent)\s*:\s*-\d{4,}(?:px|pt|em)/i }
+        ];
+
+        const element = /<([a-z]+)\b([^>]*\bstyle\s*=\s*["'][^"']*["'][^>]*)>([\s\S]*?)<\/\1>/gi;
+        let match;
+        let guard = 0;
+
+        while ((match = element.exec(html)) !== null && guard++ < 2000) {
+            const [, tag, attributes, inner] = match;
+
+            const technique = HIDING.find(h => h.pattern.test(attributes));
+            if (!technique) continue;
+
+            const text = inner
+                .replace(/<[^>]+>/g, ' ')
+                .replace(/&nbsp;/gi, ' ')
+                .replace(/&[a-z]+;/gi, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+
+            if (!text) continue;
+
+            result.concealed_characters += text.length;
+            if (!result.techniques.includes(technique.technique)) result.techniques.push(technique.technique);
+            if (result.concealed_blocks.length < 10) {
+                result.concealed_blocks.push({
+                    technique: technique.technique,
+                    tag,
+                    characters: text.length,
+                    excerpt: text.slice(0, 120)
+                });
+            }
+        }
+
+        return result;
+    }
+
+    /** What the reader sees, once markup and hidden blocks are gone. */
+    visibleLength(html, plainBody) {
+        if (plainBody) return plainBody.replace(/\s+/g, ' ').trim().length;
+        if (!html) return 0;
+        return html
+            .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+            .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/&nbsp;/gi, ' ')
+            .replace(/\s+/g, ' ')
+            .trim().length;
+    }
+
+    /**
      * Analyses the parts of a message a person actually reads.
      *
      * Deliberately covers the display name and subject as well as the body.
@@ -206,9 +298,27 @@ class TextDeception {
         const bodyChanged = fields.body !== this.normalise(fields.body);
         const subjectChanged = fields.subject !== this.normalise(fields.subject);
 
+        const html = parsedEmail?.htmlBody || '';
+        const concealed = this.findConcealedMarkup(html);
+        const visible = this.visibleLength(html, fields.body);
+
+        // The ratio, not the presence. A preheader is a few dozen characters
+        // against a few hundred; padding written to move a classifier is
+        // measured in multiples of the visible message.
+        const ratio = visible > 0 ? concealed.concealed_characters / visible : (concealed.concealed_characters > 0 ? Infinity : 0);
+        const substantial = concealed.concealed_characters >= 400 && ratio >= 0.5;
+
         threatObject.text_deception = {
             hidden_characters: hidden,
             mixed_script_words: mixedScript,
+            concealed_markup: {
+                ...concealed,
+                visible_characters: visible,
+                concealed_to_visible_ratio: Number.isFinite(ratio) ? Number(ratio.toFixed(2)) : null,
+                // Below this it is a preheader and saying otherwise would flag
+                // most legitimate bulk mail ever sent.
+                substantial
+            },
             // What the rest of the pipeline should read instead of the raw text.
             normalised: {
                 display_name: this.normalise(fields.display_name),
@@ -216,18 +326,21 @@ class TextDeception {
                 body: this.normalise(fields.body)
             },
             normalisation_changed_the_text: bodyChanged || subjectChanged,
-            summary: this.summarise(hidden, mixedScript)
+            summary: this.summarise(hidden, mixedScript, { ...concealed, substantial, visible })
         };
 
         return threatObject;
     }
 
-    summarise(hidden, mixedScript) {
-        if (!hidden.length && !mixedScript.length) {
+    summarise(hidden, mixedScript, concealed) {
+        if (!hidden.length && !mixedScript.length && !concealed?.substantial) {
             return 'No invisible characters or mixed-script words were found. The text means to a filter what it shows to a reader.';
         }
 
         const parts = [];
+        if (concealed?.substantial) {
+            parts.push(`${concealed.concealed_characters} character(s) of text are present in the markup but hidden from the reader (${concealed.techniques.join(', ')}), against ${concealed.visible} visible`);
+        }
         if (hidden.length) {
             const total = hidden.reduce((sum, h) => sum + h.count, 0);
             const where = [...new Set(hidden.map(h => h.field))].join(', ');

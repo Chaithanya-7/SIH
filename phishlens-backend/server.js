@@ -25,6 +25,8 @@ const connectionEvidence = require('./modules/connectionEvidence');
 const yaraRules = require('./modules/yaraRules');
 const iocExtractor = require('./modules/iocExtractor');
 const nlpAnalyzer = require('./modules/nlpAnalyzer');
+const payloadChannel = require('./modules/payloadChannel');
+const trustedServiceAbuse = require('./modules/trustedServiceAbuse');
 const ruleEngine = require('./modules/ruleEngine');
 const customDetectionConfig = require('./modules/customDetectionConfig');
 const ingestionRegistry = require('./modules/ingestionRegistry');
@@ -236,6 +238,23 @@ async function processPipeline(emailContent, source = 'MANUAL_API', clientMessag
 
         // 7. Explainable NLP / social-engineering signal analysis
         threatObject = nlpAnalyzer.analyze(threatObject, parsedEmail);
+
+        // 7b. Where the payload actually is. Everything above this line assumes
+        //     there is something to read: the language analysis needs text, the
+        //     link checks need links, the inspector needs a file. Two families
+        //     of attack are built so that none of those have anything to work
+        //     on - the message whose only action is a phone number, and the
+        //     message that is a picture. Both score near zero on every check
+        //     above, and both are common. This records the shape instead.
+        threatObject = payloadChannel.analyze(threatObject, parsedEmail);
+
+        // 7c. Abuse of services that cannot be blocked. The mirror image of the
+        //     authentication family: these messages pass SPF, DKIM and DMARC
+        //     because they genuinely were sent by the platform they claim to
+        //     come from, so the strongest evidence here contributes nothing to
+        //     them. What is left wrong is structural, and that is what this
+        //     looks for.
+        threatObject = trustedServiceAbuse.analyze(threatObject, parsedEmail);
 
         // 8. Native MQL / detection-rule engine
         threatObject = ruleEngine.evaluate(threatObject, parsedEmail);

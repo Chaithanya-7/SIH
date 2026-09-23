@@ -6,7 +6,39 @@ class ConfidenceEngine {
         if (['CAMPAIGN_ASSOCIATION', 'REPEATED_IP', 'REPEATED_DOMAIN', 'SHARED_INFRASTRUCTURE', 'EXECUTIVE_TARGETING_PATTERN'].includes(type)) return 'CAMPAIGN';
         if (type === 'IDENTITY_SPOOF' || type === 'MQL_DOM' || type === 'MQL_IMP') return 'IDENTITY';
         if (['INFRASTRUCTURE_ANOMALY', 'REPUTATION_RISK'].includes(type)) return 'INFRASTRUCTURE';
-        if (type === 'MQL_URL') return 'URL_RISK';
+        // Authentication-flow abuse and QR links are link risks: the QR code
+        // resolves to a URL, and every URL in a device-code message is to a
+        // genuine provider endpoint. The AUTHFLOW rules carried a comment
+        // saying they belonged to URL_RISK while nothing mapped them, so they
+        // were silently forming a family of their own and counting as
+        // independent of URL findings they are not independent of.
+        if (type === 'MQL_URL' || type === 'MQL_AUTHFLOW' || type === 'MQL_QR') return 'URL_RISK';
+
+        // Where the payload lives when there is nothing conventional to
+        // inspect: a telephone number and no link, or a message rendered as a
+        // picture. This family exists precisely for attacks that leave every
+        // other family with nothing to contribute, so capping it low would
+        // mean they could never reach a verdict - which is the gap they are
+        // built to exploit.
+        if (type === 'MQL_TOAD' || type === 'MQL_IMAGE') return 'PAYLOAD_CHANNEL';
+
+        // Abuse of a legitimate platform. Same reasoning inverted: these
+        // messages authenticate correctly and genuinely, so AUTHENTICATION -
+        // the strongest family here - contributes nothing to them.
+        if (type === 'MQL_LOTS') return 'TRUSTED_SERVICE';
+
+        // Deliberate obfuscation of the text, kept apart from what the text
+        // says. Hiding from the reader is a different act from the content,
+        // and folding it into LANGUAGE would let one message's obfuscation
+        // crowd out its own words under a shared cap.
+        if (type === 'MQL_DECEPTION') return 'DECEPTION';
+
+        // Declared rather than left to the fallthrough. These were already
+        // forming families of their own at the default cap; naming them makes
+        // that a decision rather than an accident of ordering.
+        if (type === 'MQL_THREAD') return 'THREAD_INTEGRITY';
+        if (type === 'MQL_ARC') return 'AUTHENTICATION';
+
         // Both belong to the same family: the MQL rules judge an attachment by
         // its name and declared type, the inspector and the detection rules by
         // its contents. Kept apart they would count as two independent kinds of
@@ -53,7 +85,38 @@ class ConfidenceEngine {
             CUSTOM: 0.30,
             // Impersonating a named executive is among the most consequential
             // things a message can do, so this weighs with the strongest families.
-            EXECUTIVE: 0.35, GENERAL: 0.20
+            EXECUTIVE: 0.35,
+
+            // The two families that exist to cover attacks the rest of the
+            // system cannot see.
+            //
+            // A callback message has no link, no attachment and valid
+            // authentication; a platform-abuse message has genuine, correct
+            // authentication by definition. In both, the families that would
+            // normally carry a verdict contribute nothing - not because the
+            // message is safe, but because it was built so they would have
+            // nothing to say. Capping these low would preserve exactly the
+            // blind spot they were added to close.
+            //
+            // Held at 0.30 rather than 0.35 because both reason from shape
+            // rather than from a hard fact: a message can legitimately be a
+            // picture, and a real brand can legitimately use a bulk sender.
+            // Neither should reach a verdict entirely alone - the one case
+            // that must is credentials through a form builder, and that is
+            // marked decisive and reaches 0.70 through the visible floor
+            // instead of through its cap.
+            PAYLOAD_CHANNEL: 0.30, TRUSTED_SERVICE: 0.30,
+
+            // Obfuscation is a deliberate act with no accidental version, but
+            // it says nothing about what the message wants - so it corroborates
+            // strongly and decides nothing.
+            DECEPTION: 0.25,
+
+            // Structural conversation evidence, unaffected by how well the
+            // prose reads.
+            THREAD_INTEGRITY: 0.25,
+
+            GENERAL: 0.20
         };
         const contributions = [];
         let threatScore = 0;

@@ -797,6 +797,181 @@ const RULES = [
         source: 'MITRE ATT&CK T1566.001 (Phishing: Spearphishing Attachment); APWG',
         description: 'The message carries an attachment while failing SPF or DKIM, increasing the likelihood that the attachment did not originate from the claimed sender.',
         test: (ctx) => ctx.attachments.length > 0 && (ctx.auth.spf === 'fail' || ctx.auth.dkim === 'fail')
+    },
+
+    // ---------------------------------------------------------------
+    // TELEPHONE-ORIENTED ATTACK DELIVERY  (family: PAYLOAD_CHANNEL)
+    //
+    // The email carries no link and no malicious file. The payload is a
+    // number to ring, and the attack happens on the call: remote-access
+    // software, a "refund" that needs a banking session, a code read aloud.
+    //
+    // It is not that these evade detection well. There is nothing to detect.
+    // A gateway looking for a malicious payload finds none and delivers the
+    // message, and it usually passes SPF and DMARC too, because it is often
+    // sent from a real account on a real provider. The only thing wrong with
+    // it is its shape.
+    // ---------------------------------------------------------------
+    {
+        id: 'MQL-TOAD-101',
+        name: 'The only thing to act on is a telephone number',
+        category: 'TOAD',
+        severity: 'HIGH',
+        confidence: 0.60,
+        mitre: ['T1566', 'T1598'],
+        source: 'MITRE ATT&CK T1566 (Phishing), T1598 (Phishing for Information); FBI IC3 and CISA advisories on callback phishing; Proofpoint TOAD reporting',
+        description: 'The message offers a telephone number as its only call to action, with no link to follow and nothing to open. Ordinary mail that gives a number nearly always gives a link as well, or arrives inside a conversation already under way. A message where the number is the entire payload is the established shape of callback phishing, and it is the shape specifically because it leaves a mail gateway nothing to inspect.',
+        test: (ctx) => {
+            const channel = ctx.payloadChannel || {};
+            if (!channel.phone_is_only_channel) return false;
+            const first = (channel.phone_numbers || [])[0];
+            if (!first) return false;
+            return `The message asks the reader to ring ${first.number} (quoted near "${first.intent_term}") and offers no link or other action. There is no payload for a gateway to examine, which is the point of building it this way.`;
+        }
+    },
+    {
+        id: 'MQL-TOAD-102',
+        name: 'Telephone-only payload alongside a billing or account alarm',
+        category: 'TOAD',
+        severity: 'CRITICAL',
+        confidence: 0.80,
+        mitre: ['T1566', 'T1598'],
+        source: 'FBI IC3 callback-phishing advisories; Proofpoint and Abnormal TOAD attack-sequence reporting',
+        description: 'A telephone number presented as the only action, in a message about money or an account being at risk. This is the standard callback lure: an unexpected charge, a renewal the reader did not order, a subscription about to auto-bill, with a number to ring to dispute it. The alarm supplies the motive to call and the absence of any link is what carried it past the gateway.',
+        test: (ctx) => {
+            const channel = ctx.payloadChannel || {};
+            if (!channel.phone_is_only_channel) return false;
+            const alarming = ['FINANCIAL_PRESSURE', 'ACCOUNT_THREAT', 'URGENCY_PRESSURE']
+                .filter(t => ctx.nlpSignalTypes.has(t));
+            if (!alarming.length) return false;
+            const first = (channel.phone_numbers || [])[0];
+            return `A number to ring (${first ? first.number : 'present'}) is the only action offered, in a message carrying ${alarming.join(' and ')} language. Nothing here can be checked by following a link, because there is none.`;
+        }
+    },
+
+    // ---------------------------------------------------------------
+    // THE MESSAGE IS A PICTURE  (family: PAYLOAD_CHANNEL)
+    //
+    // Text-in-image is the most prevalent body-obfuscation technique measured
+    // in the literature (47.0% of the sampled corpus) and one of the two
+    // measured as significantly reducing antispam scores. Every text-reading
+    // check in this system - the language analysis, the deception folding, the
+    // rules over the body - sees an almost empty message and scores it near
+    // zero. The ratio is the signal, and it costs nothing to measure.
+    // ---------------------------------------------------------------
+    {
+        id: 'MQL-IMG-101',
+        name: 'Message body is an image with almost nothing to read',
+        category: 'IMAGE',
+        severity: 'MEDIUM',
+        confidence: 0.55,
+        mitre: ['T1566.001'],
+        source: 'arXiv 2506.20228 "Measuring Modern Phishing Tactics" (Text-in-Image, 47.0% prevalence, significant antispam evasion); Microsoft Security trend-spotting guidance on image-only mail',
+        description: 'What the reader sees is a picture; what any text analysis sees is an almost empty message. Rendering the content as an image defeats every check that reads words, without changing anything the recipient experiences. PhishLens does not read the image - deliberately, since that would mean optical recognition, a new dependency and a new class of wrong answer - but the shape is measurable and cannot be hidden by changing the words inside the picture.',
+        test: (ctx) => {
+            const channel = ctx.payloadChannel || {};
+            if (!channel.body_is_image_only) return false;
+            return `The body renders as ${channel.image_count} image(s) with only ${channel.visible_text_length} character(s) of readable text, so no text-based check in this system can see what the message actually says.`;
+        }
+    },
+    {
+        id: 'MQL-IMG-102',
+        name: 'Image-only body carrying a link',
+        category: 'IMAGE',
+        severity: 'HIGH',
+        confidence: 0.70,
+        mitre: ['T1566.001', 'T1566.002'],
+        source: 'arXiv 2506.20228 (Text-in-Image prevalence and filter impact); APWG phishing lure taxonomy',
+        description: 'The whole message is a clickable picture. The reader cannot see where the link goes without inspecting it, no text explains what is being asked, and nothing readable remains for a filter to judge. Legitimate senders using image-led templates include text alternatives; a message that has none is withholding the only part a filter could read.',
+        test: (ctx) => {
+            const channel = ctx.payloadChannel || {};
+            if (!channel.image_dominant || !channel.outbound_link_count) return false;
+            if (channel.linked_image_only || channel.body_is_image_only) {
+                return `The body is an image (${channel.visible_text_length} character(s) of text) wrapped in or accompanied by ${channel.outbound_link_count} outbound link(s). There is no readable text stating what the reader is being asked to do.`;
+            }
+            return false;
+        }
+    },
+
+    // ---------------------------------------------------------------
+    // TEXT HIDDEN FROM THE READER  (family: LANGUAGE)
+    //
+    // Distinct from the invisible characters above. Those hide inside a word
+    // so a substring match fails. This hides whole paragraphs from the reader
+    // while leaving them in the source, so that what a filter reads is not the
+    // message anybody receives.
+    // ---------------------------------------------------------------
+    {
+        id: 'MQL-DECEPT-105',
+        name: 'Substantial text is concealed from the reader in the markup',
+        category: 'DECEPTION',
+        severity: 'HIGH',
+        confidence: 0.70,
+        mitre: ['T1566'],
+        source: 'MITRE ATT&CK T1566 (Phishing); Microsoft Security Blog on zero-font and hidden-text mail; arXiv 2506.20228 body-obfuscation measurement',
+        description: 'The message carries more hidden text than visible text. A short hidden line is an ordinary preheader and is not reported; this is bulk prose set to render invisibly, which exists to move a statistical classifier towards "ordinary mail" while the reader sees something entirely different. There is no legitimate reason to write a message whose invisible half outweighs its visible one.',
+        test: (ctx) => {
+            const concealed = ctx.deception?.concealed_markup;
+            if (!concealed?.substantial) return false;
+            return `${concealed.concealed_characters} character(s) of text are hidden from the reader (${concealed.techniques.join(', ')}) against ${concealed.visible_characters} visible. A filter reading the source is not reading the message that was delivered.`;
+        }
+    },
+
+    // ---------------------------------------------------------------
+    // ABUSE OF SERVICES NOBODY CAN BLOCK  (family: TRUSTED_SERVICE)
+    //
+    // These messages authenticate correctly because they genuinely were sent
+    // by the service they claim to come from. The authentication family - the
+    // strongest evidence in this system - contributes nothing to them, by
+    // design and correctly. What remains wrong is structural.
+    // ---------------------------------------------------------------
+    {
+        id: 'MQL-LOTS-101',
+        name: 'Sign-in details requested through a public form builder',
+        category: 'LOTS',
+        severity: 'CRITICAL',
+        confidence: 0.90,
+        decisive: true,
+        mitre: ['T1566.002', 'T1598.003'],
+        source: 'MITRE ATT&CK T1566.002 (Spearphishing Link), T1598.003 (Spearphishing Link for Information); CISA and Microsoft reporting on legitimate-platform abuse in credential phishing',
+        description: 'A password or sign-in is being requested through a public form-building service. No organisation collects credentials this way - the platforms themselves forbid it - and the reason it is used is that the link is to a real, reputable, correctly certificated domain that every reputation check will clear. There is no benign reading of this combination.',
+        test: (ctx) => {
+            const service = ctx.trustedService || {};
+            if (!service.credentials_via_form_builder) return false;
+            const form = (service.form_builder_links || [])[0];
+            return `The message asks for sign-in details and links to ${form ? form.name : 'a public form builder'}${form ? ` (${form.url})` : ''}. Credentials are never collected through a form builder by the organisation that owns the account.`;
+        }
+    },
+    {
+        id: 'MQL-LOTS-102',
+        name: 'Message speaks for a brand that did not send it, and authenticated anyway',
+        category: 'LOTS',
+        severity: 'HIGH',
+        confidence: 0.75,
+        mitre: ['T1656', 'T1566'],
+        source: 'MITRE ATT&CK T1656 (Impersonation), T1566 (Phishing); Microsoft threat intelligence on authentication-passing phishing; Cofense reporting on cloud-collaboration abuse',
+        description: 'The message presents itself as one brand while being delivered, genuinely and with valid authentication, by an unrelated platform. The delivery is not forged - that is what makes it hard. Real brands send their own transactional and security mail; one that arrives through a bulk sender or a design tool is not what it says it is, and no authentication check will ever object because nothing about the authentication is false.',
+        test: (ctx) => {
+            const mismatch = ctx.trustedService?.brand_platform_mismatch;
+            if (!mismatch) return false;
+            return `The message speaks for ${mismatch.claimed.join(', ')} but was delivered through ${mismatch.delivered_by}, and it passed authentication. The delivery is genuine; the identity it claims is not.`;
+        }
+    },
+    {
+        id: 'MQL-LOTS-103',
+        name: 'Document-sharing notice that asks for a sign-in first',
+        category: 'LOTS',
+        severity: 'MEDIUM',
+        confidence: 0.55,
+        mitre: ['T1566.002'],
+        source: 'MITRE ATT&CK T1566.002 (Spearphishing Link); Microsoft reporting on file-hosting-service abuse in BEC; Cofense cloud-collaboration phishing analysis',
+        description: 'A notification that a document has been shared, which also asks the reader to confirm their identity or sign in. A genuine sharing notice takes the reader to the document; the platform already knows who they are. An intermediate sign-in step is the oldest shape in credential phishing, wearing an envelope that authenticates perfectly.',
+        test: (ctx) => {
+            const service = ctx.trustedService || {};
+            if (!service.sharing_notice_requesting_signin) return false;
+            const via = service.sending_platform?.name || (service.linked_platforms || [])[0]?.name;
+            return `A document-sharing notice${via ? ` involving ${via}` : ''} also asks the reader to confirm their identity or sign in before viewing it.`;
+        }
     }
 ];
 
@@ -878,7 +1053,13 @@ class RuleEngine {
             qr: threatObject.qr || { codes: [], codes_found: 0, not_scanned: [] },
             deception: threatObject.text_deception || { hidden_characters: [], mixed_script_words: [] },
             thread: threatObject.thread || { findings: [] },
-            arc: threatObject.forensics?.arc || { status: 'ABSENT' }
+            arc: threatObject.forensics?.arc || { status: 'ABSENT' },
+            // Where the actionable payload lives - a link, a file, a picture,
+            // or a telephone number and nothing else.
+            payloadChannel: threatObject.payload_channel || { channels: [], phone_numbers: [], phone_is_only_channel: false, image_dominant: false },
+            // Legitimate platforms carrying the message, and what that implies
+            // when the authentication is genuine.
+            trustedService: threatObject.trusted_service || { linked_platforms: [], form_builder_links: [], credentials_via_form_builder: false, brand_platform_mismatch: null }
         };
     }
 

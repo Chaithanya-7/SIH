@@ -140,6 +140,8 @@ class AttachmentInspector {
             this.inspectOle2(readable, inspection);
         } else if (inspection.format.detected === 'PDF') {
             this.inspectPdf(readable, inspection);
+        } else if (inspection.format.detected === 'SVG') {
+            this.inspectSvg(readable, declaredMimeType, inspection);
         }
 
         inspection.macro_analysis = await this.deepMacroAnalysis(inspection, readable);
@@ -468,6 +470,80 @@ class AttachmentInspector {
                 summary: 'The workbook may contain an Excel 4.0 macro sheet.',
                 detail: 'This older macro format still runs and is often missed by checks that look only for the modern one.'
             });
+        }
+    }
+
+    /**
+     * SVG attachments, which are documents wearing the costume of a picture.
+     *
+     * An SVG is XML that a browser renders, and a browser will run script
+     * inside one exactly as it would inside a page. Nothing about the file
+     * announces that: it arrives with an image icon, it previews as a graphic,
+     * and mail filters that skip images skip it.
+     *
+     * That gap has been found and industrialised. Malicious SVG attachments
+     * rose roughly fiftyfold between 2024 and 2025 and are now the third most
+     * common malicious attachment type after PDF and HTML, with single
+     * campaigns measured in the millions of messages. The usual disguise is a
+     * voicemail or missed-call notification.
+     *
+     * Two things are worth separating here:
+     *
+     *   - **Script inside the image.** A static graphic does not need script,
+     *     an event handler, or a chunk of base64 to decode at render time. A
+     *     mail attachment that carries them is not being used as a picture, and
+     *     there is no ordinary workflow in which it is. Recorded as decisive.
+     *
+     *   - **A declared type that hides what it is.** Attackers label these
+     *     `text/plain` so that scanners routing by MIME type never treat the
+     *     content as markup. The file itself begins `<svg`, so the declaration
+     *     is simply false, and a false declaration is a deliberate act rather
+     *     than a misconfiguration.
+     */
+    inspectSvg(bytes, declaredMimeType, inspection) {
+        const text = bytes.toString('utf8');
+        const declared = (declaredMimeType || '').toLowerCase().split(';')[0].trim();
+
+        // Labelled as something other than what it is, to route around scanning.
+        if (declared && !/^image\/svg/.test(declared) && declared !== 'application/octet-stream') {
+            inspection.findings.push({
+                code: 'SVG_DECLARED_AS_ANOTHER_TYPE',
+                severity: 'HIGH',
+                summary: `This is an SVG document but was declared as "${declared}".`,
+                detail: 'The content begins with an SVG root element while the message labels it as something else. Scanners that decide what to inspect from the declared type will not treat it as markup, which is the purpose of mislabelling it.'
+            });
+        }
+
+        // Which of these is decisive follows the precedent already set for
+        // Office documents, and deliberately does not widen it: carrying code
+        // is HIGH, code bound to run on open is decisive. OFFICE_MACROS_PRESENT
+        // and MACRO_RUNS_AUTOMATICALLY draw the line in exactly that place, and
+        // the detection rule for script inside an SVG treats mere presence as
+        // non-decisive too. One fact must not be judged two different ways by
+        // two parts of the same system.
+        const ACTIVE = [
+            { code: 'SVG_SCRIPT_ELEMENT', pattern: /<script[\s>]/i, decisive: false, summary: 'The image carries a script element.', detail: 'A browser opening this file runs that script. Static graphics do not need one, and an interactive graphic sent as mail is rare enough to be worth a look - but it exists, so this is weighed rather than treated as proof.' },
+            { code: 'SVG_EVENT_HANDLER', pattern: /\s\bon(?:load|error|begin)\s*=/i, decisive: true, summary: 'The image runs code as soon as it is opened.', detail: 'Script bound to load or error runs the moment the file is opened, with no click and no prompt. An image has no reason to execute anything on open.' },
+            { code: 'SVG_INTERACTION_HANDLER', pattern: /\s\bon(?:click|mouseover|mouseenter|focus)\s*=/i, decisive: false, summary: 'The image runs code when it is clicked or hovered.', detail: 'Interaction-bound script needs the reader to do something first, so it is weighed rather than treated as proof.' },
+            { code: 'SVG_FOREIGN_OBJECT', pattern: /<foreignObject[\s>]/i, decisive: false, summary: 'The image embeds foreign markup.', detail: 'foreignObject carries HTML inside the vector image, which is how a login form is delivered as a picture.' },
+            { code: 'SVG_EMBEDDED_DECODER', pattern: /\batob\s*\(|\beval\s*\(|\bdecodeURIComponent\s*\(\s*escape\s*\(/i, decisive: false, summary: 'The image decodes content at render time.', detail: 'The readable file is not the payload; something is assembled when it opens, which defeats scanning of the file as delivered.' },
+            { code: 'SVG_NAVIGATES_AWAY', pattern: /window\.location|location\.(?:href|replace|assign)|top\.location/i, decisive: false, summary: 'The image redirects the browser.', detail: 'Opening the attachment sends the reader somewhere else, which is the behaviour of a redirect page, not an image.' },
+            { code: 'SVG_EXTERNAL_LINK', pattern: /<a[^>]+(?:xlink:)?href\s*=\s*["']https?:\/\//i, decisive: false, summary: 'The image contains a clickable external link.', detail: 'The whole graphic can be made clickable, so the reader follows a link without seeing where it goes.' }
+        ];
+
+        for (const marker of ACTIVE) {
+            if (!marker.pattern.test(text)) continue;
+            const finding = {
+                code: marker.code,
+                severity: marker.decisive ? 'CRITICAL' : 'HIGH',
+                summary: marker.summary,
+                detail: marker.detail
+            };
+            // Only set where it is true. A `decisive: false` property would be
+            // read as a decisive finding by the guard that scans this file for
+            // the list, and that guard is the thing keeping the list short.
+            if (marker.decisive) finding.decisive = true;
+            inspection.findings.push(finding);
         }
     }
 
