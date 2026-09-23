@@ -496,3 +496,23 @@ h2 {
 @media (prefers-reduced-motion: reduce) {
   #btn-refresh.spinning { animation: none; opacity: 0.45; }
 }
+
+/* The backlog scan.
+   Set apart from the recent list above it with a rule, because it is a
+   different kind of thing: an occasional deliberate action that runs for
+   hours, rather than a view of what has already happened. */
+.backlog {
+  border-top: 1px solid var(--border);
+  margin-top: 10px;
+  padding-top: 10px;
+}
+
+/* Carries the progress of a scan measured in hours, so it is the part of this
+   block that has to stay readable - a long operation with no visible progress
+   is indistinguishable from one that has died. */
+.backlog-state {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}

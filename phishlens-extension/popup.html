@@ -79,6 +79,17 @@
             <li class="empty">No messages analyzed yet.</li>
           </ul>
 
+          <!-- The backlog scan.
+               Inside the drawer because it is a deliberate, occasional action
+               that runs for hours, not something to reach for on a normal
+               opening. The line above the button says what is happening: a
+               scan that takes hours must never look like one that stalled. -->
+          <div class="backlog">
+            <div id="backlog-state" class="backlog-state">Existing mail has not been scanned.</div>
+            <button id="btn-backlog" class="btn-secondary full" type="button">Scan existing mail</button>
+            <button id="btn-backlog-stop" class="link-btn hidden" type="button">Stop the scan</button>
+          </div>
+
           <div class="footer">
             <button id="btn-more-info" class="btn-primary full">More info &rarr;</button>
             <button id="btn-web-console" class="link-btn">Desktop app not installed? Open web console</button>

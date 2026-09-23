@@ -199,6 +199,59 @@ service. Place names stay at every zoom: they are what makes photography
 legible at all.
 Commit: (this commit)
 
+**A-074 - Scanning the mail that was already there**
+What: The backlog scanner, plus the historical-analysis mode that makes its
+verdicts honest.
+Status: `Done` - 347 backend + 33 desktop tests passing
+Evidence: The scanner itself is the small half. Fetching a message by its id
+never needed the row on screen, so the work was paging the list to collect ids
+(`provider.pageHash()`, Gmail's `#inbox/p2` fragment), pacing, resume, and a
+tab of its own so it does not yank the page out from under someone reading.
+
+The larger half was that **running old mail through the live pipeline is
+wrong**, and in one place actively harmful. New `historicalMode.js`:
+
+1. **The DKIM trap.** PhishLens re-verifies DKIM itself and the key comes from
+   DNS at check time. Domains rotate selectors as routine maintenance, so an old
+   message often names one that is gone: the header says `dkim=pass`, live
+   verification finds nothing, and the disagreement fires **MQL-AUTH-102 at
+   CRITICAL / 0.85** - a rule written for headers forged to mislead filters. A
+   retired key is not a forged header. Untreated this would have flagged a large
+   share of ordinary old mail, and a scan that cries wolf across two thousand
+   messages gets switched off and buries the real findings with it. Suppressed
+   only for the exact shape (`claimed pass` + `none/unknown/temperror`); a
+   signature that actively *fails* against a key still published survives,
+   because age does not explain that.
+2. **Live enrichment is not run at all.** Domain age inverts outright - a domain
+   three days old when it attacked you is two years old now, so the signal that
+   would have caught it is the one that cannot fire. Feeds have delisted what
+   was listed. Addresses have changed hands. Marked `NOT_APPLICABLE_HISTORICAL`
+   with a reason each, rather than run and recorded as finding nothing.
+3. **Remediation suppressed.** The decision is computed and recorded so a case
+   says what *would* have happened; nothing is done to a mailbox for mail
+   somebody dealt with two years ago.
+4. **Adaptive learning gated off**, so the model does not learn from a
+   mailbox-sized batch of reduced-evidence verdicts. The behavioural baseline
+   deliberately still runs - recording what a sender's mail looks like is
+   exactly what history is good for, and it is why the scan goes oldest first.
+
+Verified rather than assumed: **SPF and DMARC need no special handling.**
+`authAnalyzer` already takes them from the receiving server's
+Authentication-Results header because it cannot re-derive SPF after delivery
+without the live connecting IP. That header was written at delivery, which makes
+it *more* authoritative for old mail, not less.
+
+The asymmetry is stated on every backlog case: a HIGH_RISK means what it always
+means, because every decisive finding is time-independent; a SAFE rests on less
+than a live one, and says so.
+
+Refusals recorded rather than papered over: `pageHash` is implemented for Gmail
+only. Outlook pages differently, and a guess would be the worst outcome - the
+scan would re-read page one and report a whole mailbox examined. The scanner
+checks for the function and refuses out loud.
+Commit: (this commit)
+
+
 **A-073 - Detection for the four attacks that leave nothing to detect**
 What: Researched current phishing tradecraft, compared it against the 43 MQL
 rules, and built detection for the gaps found. Nine new rules, two new modules,

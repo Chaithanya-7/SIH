@@ -299,6 +299,241 @@
         report({ rowsSeen: rowsOnPage, identified: visible.length, examined, phase: 'done' });
     }
 
+    // ======================================================================
+    // The backlog scan
+    //
+    // Everything above watches what arrives. This reads what is already there.
+    //
+    // ## Why it is a separate thing rather than a bigger sweep
+    //
+    // The watcher can only see rows the mail client has rendered, and a webmail
+    // list is virtualised: roughly fifty rows exist in the page at any moment,
+    // however many the mailbox holds. A sweep therefore covers what somebody
+    // has scrolled past, not the thousands behind it.
+    //
+    // What makes a backlog scan possible at all is that fetching a message by
+    // its identifier does not need the row to be on screen. So the scan pages
+    // through the list to collect identifiers, and fetches each message exactly
+    // the way the watcher does.
+    //
+    // ## Why it is slow on purpose
+    //
+    // A full mailbox is thousands of requests to the mail provider from the
+    // signed-in session. Issued quickly that is indistinguishable from
+    // scraping, and the realistic outcomes are throttling or a security
+    // challenge on the person's own account. A tool that gets somebody's
+    // mailbox flagged has done more damage than the phishing it was looking
+    // for. So there is a deliberate pause between messages and the scan is
+    // measured in hours running quietly, not minutes running hard.
+    //
+    // ## What it does to the tab it runs in
+    //
+    // It navigates that tab through the pages of the list, which is visible and
+    // disruptive if it is the tab somebody is reading. Opening a separate tab
+    // for it is the worker's job; this code only refuses to start a second scan
+    // in a tab already running one.
+    //
+    // ## Resuming
+    //
+    // Progress is the page number, kept in extension storage, so closing the
+    // tab loses at most one page. Messages already examined are deliberately
+    // not tracked across sessions: the backend deduplicates on the message
+    // itself and returns the existing case, which is a stronger guarantee than
+    // any list kept here, and it means a resumed scan costs repeated fetches
+    // rather than duplicate cases.
+    // ======================================================================
+
+    /** Between messages. Slow deliberately - see above. */
+    const BACKLOG_PACE_MS = 1500;
+    /** After moving to a new page, before reading rows from it. */
+    const BACKLOG_SETTLE_MS = 2600;
+    /** How long to wait for a page to actually change before giving up on it. */
+    const BACKLOG_PAGE_TIMEOUT_MS = 15000;
+    /** A stop, so an unusual list cannot loop forever. */
+    const BACKLOG_MAX_PAGES = 400;
+    /** Consecutive pages yielding nothing new before concluding the end was reached. */
+    const BACKLOG_EMPTY_PAGES_BEFORE_STOP = 2;
+
+    const backlog = {
+        running: false,
+        cancelled: false,
+        page: 0,
+        examined: 0,
+        failed: 0,
+        pagesWithNothingNew: 0,
+        startedAt: null,
+        finishedAt: null,
+        lastError: null
+    };
+
+    function backlogReport(phase) {
+        report({
+            phase: `backlog:${phase}`,
+            backlog: {
+                running: backlog.running,
+                page: backlog.page,
+                examined: backlog.examined,
+                failed: backlog.failed,
+                startedAt: backlog.startedAt,
+                finishedAt: backlog.finishedAt,
+                lastError: backlog.lastError
+            }
+        });
+        try {
+            ext.storage?.local.set({
+                phishlensBacklog: {
+                    host: location.hostname,
+                    running: backlog.running,
+                    page: backlog.page,
+                    examined: backlog.examined,
+                    failed: backlog.failed,
+                    startedAt: backlog.startedAt,
+                    finishedAt: backlog.finishedAt,
+                    lastError: backlog.lastError,
+                    updatedAt: new Date().toISOString()
+                }
+            });
+        } catch (e) {
+            // Storage being unavailable loses the resume point, not the scan.
+        }
+    }
+
+    const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+    /** A cheap fingerprint of what is listed, used to tell that a page really changed. */
+    function listSignature() {
+        return provider.listVisible(document).map(r => r.id).join(',');
+    }
+
+    /**
+     * Moves to a page of the list and waits for it to become a different page.
+     *
+     * Navigation in a webmail client is a hash change and an asynchronous
+     * re-render, so there is no load event to wait on. A fixed wait would
+     * either be too short on a slow connection - reading the old page twice and
+     * concluding the end had been reached - or needlessly slow on a fast one.
+     */
+    async function goToPage(pageNumber, previousSignature) {
+        if (typeof provider.pageHash !== 'function') return false;
+
+        const hash = provider.pageHash(pageNumber);
+        if (!hash) return false;
+
+        location.hash = hash;
+
+        const until = Date.now() + BACKLOG_PAGE_TIMEOUT_MS;
+        while (Date.now() < until) {
+            await pause(400);
+            if (backlog.cancelled) return false;
+            const signature = listSignature();
+            if (signature && signature !== previousSignature) {
+                // Rendered, but rows can still be settling into place.
+                await pause(BACKLOG_SETTLE_MS);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Examines one message as part of a backlog scan.
+     *
+     * Separate from examine() for one reason: the submission is labelled
+     * HISTORICAL. That is what tells the backend not to run the checks that
+     * would describe today's infrastructure rather than the state when the
+     * message arrived, and not to act on mail the recipient dealt with long
+     * ago.
+     */
+    async function examineHistorical(entry) {
+        const key = `${location.hostname}:${entry.id}`;
+        const raw = await originalMessage(entry.id);
+
+        const payload = raw
+            ? { source: location.hostname, provider_message_id: entry.id, raw, evidence: 'FULL_HEADERS', analysis_mode: 'HISTORICAL' }
+            : { source: location.hostname, provider_message_id: entry.id, evidence: 'BODY_ONLY', analysis_mode: 'HISTORICAL', ...provider.fallback(entry) };
+
+        const result = await submit(payload);
+        remember(key);
+        if (result?.verdict) flag(entry.row, result.verdict, result.confidence);
+        return result;
+    }
+
+    async function runBacklog(startPage) {
+        if (backlog.running) return { ok: false, error: 'A backlog scan is already running in this tab.' };
+        if (typeof provider.pageHash !== 'function') {
+            // Said plainly rather than silently doing nothing. Paging is
+            // provider-specific and only claimed where it is known to work.
+            return { ok: false, error: `Backlog scanning is not implemented for ${provider.id || 'this provider'} yet. The live watcher still runs here.` };
+        }
+
+        backlog.running = true;
+        backlog.cancelled = false;
+        backlog.page = Number(startPage) > 0 ? Number(startPage) : 1;
+        backlog.examined = 0;
+        backlog.failed = 0;
+        backlog.pagesWithNothingNew = 0;
+        backlog.startedAt = new Date().toISOString();
+        backlog.finishedAt = null;
+        backlog.lastError = null;
+        backlogReport('started');
+
+        try {
+            let signature = listSignature();
+
+            while (!backlog.cancelled && backlog.page <= BACKLOG_MAX_PAGES) {
+                if (backlog.page > 1) {
+                    const moved = await goToPage(backlog.page, signature);
+                    // Either the end of the list or a page that would not
+                    // render. Both mean stopping; neither is an error.
+                    if (!moved) break;
+                }
+
+                signature = listSignature();
+                const rows = provider.listVisible(document);
+                const fresh = rows.filter(r => !seen.has(`${location.hostname}:${r.id}`));
+
+                if (!fresh.length) {
+                    backlog.pagesWithNothingNew += 1;
+                    if (backlog.pagesWithNothingNew >= BACKLOG_EMPTY_PAGES_BEFORE_STOP) break;
+                } else {
+                    backlog.pagesWithNothingNew = 0;
+                }
+
+                for (const entry of fresh) {
+                    if (backlog.cancelled) break;
+                    try {
+                        await examineHistorical(entry);
+                        backlog.examined += 1;
+                        consecutiveFailures = 0;
+                    } catch (e) {
+                        backlog.failed += 1;
+                        backlog.lastError = String(e && e.message || e).slice(0, 200);
+                        noteFailure();
+                        // A backend that is down will refuse the next thousand
+                        // messages exactly as it refused this one. Wait out the
+                        // backoff rather than burning through a mailbox
+                        // failing, and give up if it never comes back.
+                        if (consecutiveFailures >= 5) throw new Error(`Stopped after 5 consecutive failures: ${backlog.lastError}`);
+                        await pause(Math.max(0, quietUntil - Date.now()));
+                    }
+                    await pause(BACKLOG_PACE_MS);
+                    if (backlog.examined % 10 === 0) backlogReport('running');
+                }
+
+                backlog.page += 1;
+                backlogReport('page');
+            }
+        } catch (e) {
+            backlog.lastError = String(e && e.message || e).slice(0, 200);
+        } finally {
+            backlog.running = false;
+            backlog.finishedAt = new Date().toISOString();
+            backlogReport(backlog.cancelled ? 'cancelled' : 'finished');
+        }
+
+        return { ok: true, examined: backlog.examined, failed: backlog.failed, pages: backlog.page, error: backlog.lastError };
+    }
+
     // Sweep on request, not only on the timer.
     //
     // Without this the refresh button could only promise "it will look within
@@ -308,6 +543,27 @@
             // Answers "is a watcher in this tab", which is how the popup tells
             // a tab with no content script from one that simply found nothing.
             if (request?.type === 'phishlens:ping') { sendResponse({ ok: true }); return false; }
+
+            if (request?.type === 'phishlens:backlog-start') {
+                // Deliberately not awaited: this runs for hours, and a message
+                // handler that does not answer promptly is treated as a dead
+                // one by the caller.
+                runBacklog(request.startPage);
+                sendResponse({ ok: true, started: true, pace_ms: BACKLOG_PACE_MS });
+                return false;
+            }
+
+            if (request?.type === 'phishlens:backlog-stop') {
+                backlog.cancelled = true;
+                sendResponse({ ok: true, stopping: backlog.running });
+                return false;
+            }
+
+            if (request?.type === 'phishlens:backlog-status') {
+                sendResponse({ ok: true, backlog: { ...backlog } });
+                return false;
+            }
+
             if (request?.type !== 'phishlens:sweep-now') return;
             // Clear any backoff: the person is asking now, and an earlier
             // failure should not make them wait out its penalty.

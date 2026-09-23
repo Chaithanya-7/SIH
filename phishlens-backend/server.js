@@ -27,6 +27,7 @@ const iocExtractor = require('./modules/iocExtractor');
 const nlpAnalyzer = require('./modules/nlpAnalyzer');
 const payloadChannel = require('./modules/payloadChannel');
 const trustedServiceAbuse = require('./modules/trustedServiceAbuse');
+const historicalMode = require('./modules/historicalMode');
 const ruleEngine = require('./modules/ruleEngine');
 const customDetectionConfig = require('./modules/customDetectionConfig');
 const ingestionRegistry = require('./modules/ingestionRegistry');
@@ -105,7 +106,12 @@ console.log('='.repeat(70));
  * an argument the pipeline did not accept - they simply were not carried
  * through to the object that needed them.
  */
-async function processPipeline(emailContent, source = 'MANUAL_API', clientMessageKey = null, provenance = null) {
+async function processPipeline(emailContent, source = 'MANUAL_API', clientMessageKey = null, provenance = null, options = {}) {
+    // A backlog scan runs this same pipeline deliberately - a second detection
+    // path would be a second thing to keep correct. What changes is only the
+    // handful of checks that describe the present rather than the moment the
+    // message arrived. See modules/historicalMode.js for which and why.
+    const historical = historicalMode.isHistorical(options.mode);
     console.log(`\n📨 ===== AUTOMATED FORENSIC PIPELINE TRIGGERED (${source}) =====`);
     let messageKey = null;
     try {
@@ -196,6 +202,20 @@ async function processPipeline(emailContent, source = 'MANUAL_API', clientMessag
         //     failure caused by ordinary forwarding rather than by spoofing.
         threatObject = arcAnalyzer.analyze(threatObject, emailContent);
 
+        // 4c. On a backlog scan, reconcile the DKIM result before anything
+        //     reasons about it. The signing key is fetched live, domains rotate
+        //     selectors routinely, and an old message whose selector is gone
+        //     produces a header-versus-verification disagreement that fires a
+        //     CRITICAL rule written for forged headers. A retired key is not a
+        //     forged header, and untreated this would flag a large share of
+        //     ordinary old mail.
+        if (historical) {
+            historicalMode.markSkippedChecks(threatObject, parsedEmail?.date);
+            threatObject = historicalMode.reconcileDkim(threatObject);
+        } else {
+            historicalMode.markLive(threatObject);
+        }
+
         // 5. Safe attachment metadata and hash analysis (no execution)
         threatObject = await attachmentAnalyzer.analyze(threatObject, parsedEmail);
 
@@ -274,10 +294,16 @@ async function processPipeline(emailContent, source = 'MANUAL_API', clientMessag
         // Branch 3 - IOC + infrastructure   ]  mutually independent,
         //            + threat intelligence  ]  so run concurrently
         // Each enriches a different region of the same ThreatObject.
+        // On a backlog scan the two enrichment branches are not run at all.
+        // They would answer about the infrastructure as it is today, and for an
+        // old message that is a different question from the one being asked -
+        // domain age inverts, feeds have delisted what was listed, addresses
+        // have changed hands. Recorded as not applicable rather than run and
+        // scored as having found nothing.
         await Promise.all([
             Promise.resolve(behavioralAnalyzer.analyze(threatObject, parsedEmail)),
-            infraEnricher.enrich(threatObject),
-            threatIntelEnricher.enrich(threatObject)
+            historical ? Promise.resolve(null) : infraEnricher.enrich(threatObject),
+            historical ? Promise.resolve(null) : threatIntelEnricher.enrich(threatObject)
         ]);
 
         // Branch 4 - Campaign correlation across cases (persistent SQLite graph)
@@ -306,8 +332,20 @@ async function processPipeline(emailContent, source = 'MANUAL_API', clientMessag
         // 13. Contextual Policy Engine Evaluation
         const policyDecision = policyEngine.evaluate(threatObject);
 
-        // 14. Active Disruption & Real Remediation Lifecycle Execution
-        threatObject = await remediationEngine.executePolicyDecision(threatObject, policyDecision);
+        // 14. Active Disruption & Real Remediation Lifecycle Execution.
+        //     Suppressed on a backlog scan. The decision is still computed and
+        //     recorded, so a case says what would have happened - but a scan of
+        //     old mail must not quarantine forty messages the recipient read
+        //     two years ago. It reports; it does not act.
+        if (historical) {
+            threatObject.remediation = {
+                status: 'SUPPRESSED_HISTORICAL',
+                would_have_been: policyDecision?.action || 'NONE',
+                detail: 'This message was analysed as part of a backlog scan. The policy decision was computed and is recorded, but no action was taken against a mailbox for mail that was delivered long ago.'
+            };
+        } else {
+            threatObject = await remediationEngine.executePolicyDecision(threatObject, policyDecision);
+        }
 
         // 15. Persistent Case Storage & Deduplication Binding
         threatObject = caseManager.saveCase(threatObject);
@@ -322,7 +360,17 @@ async function processPipeline(emailContent, source = 'MANUAL_API', clientMessag
         // hijacker's address as a legitimate thread participant would make the
         // next message in that conversation look normal.
         threadIntegrity.record(threatObject, parsedEmail);
-        adaptiveLearning.learnFromDetection(threatObject, parsedEmail);
+
+        // The adaptive model does not learn from a backlog scan. Those verdicts
+        // rest on a deliberately reduced evidence set, and a mailbox-sized batch
+        // of them would teach the model from the weakest output this system
+        // produces. The behavioural baseline above is different and does run:
+        // it records what a sender's mail looks like, which is exactly what
+        // history is good for, and it is why a backlog is processed oldest
+        // first rather than newest.
+        if (!historical) {
+            adaptiveLearning.learnFromDetection(threatObject, parsedEmail);
+        }
 
         console.log(`🎉 AUTOMATED PIPELINE COMPLETE! Case ID: ${threatObject.case_id} | Verdict: ${threatObject.detection.verdict} | Threat Confidence: ${threatObject.confidence.threat} | Remediation: ${threatObject.remediation.status}`);
 
@@ -892,7 +940,7 @@ app.post('/api/ingest/email', async (req, res) => {
 // plus encoding overhead.
 app.post('/api/ingest/browser', express.json({ limit: '35mb' }), async (req, res) => {
     try {
-        const { raw, evidence, source, provider_message_id: providerMessageId, subject, sender, snippet } = req.body || {};
+        const { raw, evidence, source, provider_message_id: providerMessageId, subject, sender, snippet, analysis_mode: analysisMode } = req.body || {};
         const complete = evidence !== 'BODY_ONLY' && typeof raw === 'string' && raw.trim().length > 0;
 
         let message = raw;
@@ -915,13 +963,19 @@ app.post('/api/ingest/browser', express.json({ limit: '35mb' }), async (req, res
             ].filter(Boolean).join('\r\n');
         }
 
+        // A backlog sweep says so, and the pipeline then declines to run the
+        // checks that would describe today's infrastructure rather than the
+        // state when the message arrived. Only this exact value switches it;
+        // anything else is treated as live mail.
+        const mode = analysisMode === 'HISTORICAL' ? 'HISTORICAL' : 'LIVE';
+
         const label = `BROWSER:${String(source || 'webmail').slice(0, 80)}`;
         const threatObject = await processPipeline(message, label, null, {
             provider: 'BROWSER_EXTENSION',
             provider_account: String(source || 'webmail'),
             provider_message_id: providerMessageId ? String(providerMessageId) : null,
             evidence_completeness: complete ? 'FULL_HEADERS' : 'BODY_ONLY'
-        });
+        }, { mode });
 
         ingestionRegistry.recordMessage('browser_watch');
         ingestionRegistry.heartbeat('browser_watch');
@@ -934,7 +988,10 @@ app.post('/api/ingest/browser', express.json({ limit: '35mb' }), async (req, res
             case_id: threatObject.case_id,
             verdict: threatObject.detection?.verdict || 'UNKNOWN',
             confidence: threatObject.confidence?.threat ?? null,
-            evidence_completeness: complete ? 'FULL_HEADERS' : 'BODY_ONLY'
+            evidence_completeness: complete ? 'FULL_HEADERS' : 'BODY_ONLY',
+            // So the extension can label a backlog result differently from a
+            // live one rather than showing them as the same kind of answer.
+            analysis_mode: mode
         });
     } catch (error) {
         // Logged with its stack, not only recorded as a count. The registry

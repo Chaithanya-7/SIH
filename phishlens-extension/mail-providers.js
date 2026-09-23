@@ -128,6 +128,26 @@
                 + `&view=om&permmsgid=msg-f:${encodeURIComponent(id)}`;
         },
 
+        /**
+         * The address of a numbered page of the list, for a backlog scan.
+         *
+         * Gmail pages the list through the fragment - `#inbox` is the first
+         * page and `#inbox/p2` onward are the rest - which is what makes
+         * walking a whole mailbox possible without touching an internal API or
+         * scrolling a virtualised list fifty rows at a time.
+         *
+         * Only implemented here. Outlook Web pages differently, and a
+         * `pageHash` that guessed at it would produce a scan that silently
+         * read the first page over and over and reported a whole mailbox
+         * examined. The backlog scanner checks for this function and says
+         * plainly that it cannot scan a provider that lacks one.
+         */
+        pageHash(pageNumber) {
+            const n = Number(pageNumber);
+            if (!Number.isFinite(n) || n < 1) return null;
+            return n === 1 ? '#inbox' : `#inbox/p${n}`;
+        },
+
         /** The per-session key Gmail embeds in the page, needed by the address above. */
         inboxKey(doc) {
             const html = doc.documentElement.innerHTML;

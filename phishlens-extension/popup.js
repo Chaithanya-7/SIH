@@ -306,11 +306,110 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // ---- The backlog scan --------------------------------------------------
+  //
+  // The live watcher covers mail as it arrives. This covers what was already
+  // in the mailbox before the extension was installed, which on a real account
+  // is almost all of it.
+  //
+  // The state line matters more than the button. The scan is paced so it does
+  // not look like scraping to the mail provider, which means a full mailbox
+  // takes hours - and an operation that takes hours with no visible progress
+  // is indistinguishable from one that has quietly died.
+  const backlogButton = document.getElementById('btn-backlog');
+  const backlogStop = document.getElementById('btn-backlog-stop');
+  const backlogState = document.getElementById('backlog-state');
+
+  function ask(message) {
+    return new Promise(resolve => {
+      if (!ext?.runtime?.sendMessage) return resolve(null);
+      try {
+        ext.runtime.sendMessage(message, answer => {
+          void ext.runtime.lastError;
+          resolve(answer || null);
+        });
+      } catch (e) {
+        resolve(null);
+      }
+    });
+  }
+
+  function renderBacklog(answer) {
+    if (!backlogState) return;
+
+    const state = answer?.backlog;
+    if (!state || (!state.running && !state.examined && !state.startedAt)) {
+      backlogState.textContent = 'Existing mail has not been scanned.';
+      backlogStop?.classList.add('hidden');
+      if (backlogButton) backlogButton.textContent = 'Scan existing mail';
+      return;
+    }
+
+    if (state.running && !answer.stale) {
+      backlogState.textContent = `Scanning existing mail: ${state.examined} examined, page ${state.page}.`
+        + (state.failed ? ` ${state.failed} could not be read.` : '');
+      backlogStop?.classList.remove('hidden');
+      if (backlogButton) backlogButton.textContent = 'Scanning…';
+      return;
+    }
+
+    backlogStop?.classList.add('hidden');
+    if (backlogButton) backlogButton.textContent = state.page > 1 ? `Resume from page ${state.page}` : 'Scan existing mail';
+
+    if (answer.stale && state.running) {
+      // The distinction that matters: a scan whose tab was closed is stopped,
+      // not running. Reporting "running" here would be a lie that hides hours
+      // of work never happening.
+      backlogState.textContent = `Scan stopped after ${state.examined} message(s) - the tab it ran in was closed. Resuming starts from page ${state.page}.`;
+      return;
+    }
+
+    backlogState.textContent = state.lastError
+      ? `Scan stopped after ${state.examined} message(s): ${state.lastError}`
+      : `Scanned ${state.examined} existing message(s)${state.failed ? `, ${state.failed} could not be read` : ''}.`;
+  }
+
+  async function refreshBacklog() {
+    renderBacklog(await ask({ type: 'phishlens:backlog-status' }));
+  }
+
+  if (backlogButton) {
+    backlogButton.addEventListener('click', async () => {
+      backlogButton.disabled = true;
+      if (backlogState) backlogState.textContent = 'Opening a tab for the scan…';
+
+      const current = await ask({ type: 'phishlens:backlog-status' });
+      const startPage = current?.backlog?.page > 1 ? current.backlog.page : 1;
+
+      const answer = await ask({ type: 'phishlens:backlog-start', startPage });
+      backlogButton.disabled = false;
+
+      if (!answer?.ok) {
+        if (backlogState) backlogState.textContent = answer?.error || 'The scan could not be started.';
+        return;
+      }
+      if (backlogState) {
+        backlogState.textContent = 'Scan started in a background tab. It is paced deliberately, so a full mailbox takes hours. You can close this popup.';
+      }
+      backlogStop?.classList.remove('hidden');
+    });
+  }
+
+  if (backlogStop) {
+    backlogStop.addEventListener('click', async () => {
+      backlogStop.disabled = true;
+      await ask({ type: 'phishlens:backlog-stop' });
+      backlogStop.disabled = false;
+      setTimeout(refreshBacklog, 600);
+    });
+  }
+
   async function loadSummary() {
     // Always, and before anything else that can return early. Whether the page
     // watcher is running is independent of whether the backend answers, and it
     // matters most in the cases below where this function gives up.
     showWatchState();
+    refreshBacklog();
 
     const settings = await readSettings();
 
