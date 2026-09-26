@@ -291,3 +291,30 @@ test('the fix is offered where the fault is reported', () => {
     const handler = worker.slice(worker.indexOf("phishlens:use-provisioned-key"));
     assert.match(handler.slice(0, 400), /apiKey: ''/);
 });
+
+test('the backlog scan waits for the list instead of assuming it is there', () => {
+    const worker = fs.readFileSync(path.join(EXTENSION, 'background.js'), 'utf8');
+    const content = fs.readFileSync(path.join(EXTENSION, 'content-gmail.js'), 'utf8');
+
+    // What this replaces: a fixed six-second wait, in a tab the browser
+    // throttles, for a large application - and then reporting success
+    // regardless. The scan read an empty document, concluded the mailbox was
+    // empty and stopped, while the popup said "Scan started" and the backend
+    // received nothing. Zero examined *and* zero failures, which is what
+    // "nothing was even attempted" looks like.
+    assert.match(content, /phishlens:reader-status/, 'the tab must be able to say whether it can see mail');
+    assert.match(worker, /async function waitForReader/, 'and the worker must ask before starting');
+    assert.match(worker, /BACKLOG_READY_TIMEOUT_MS/);
+
+    // It must not claim to have started when the reader never saw anything.
+    const start = worker.slice(worker.indexOf('async function startBacklogScan'));
+    assert.match(start.slice(0, 2500), /if \(!ready\.ok\)/, 'a reader that never became ready must stop the scan');
+    assert.match(start.slice(0, 2500), /tabs\.remove/, 'and the tab it opened must not be left behind');
+
+    // A tab that never answers and one that answers seeing nothing are
+    // different faults needing different things done about them.
+    const waiter = worker.slice(worker.indexOf('async function waitForReader'), worker.indexOf('async function startBacklogScan'));
+    assert.match(waiter, /never reported back/, 'no answer means the script is not running there');
+    assert.match(waiter, /no message list appeared/, 'an answer with no rows is the other case');
+    assert.match(waiter, /reader: last\.reader/, 'and it must carry the census, so the reader can be widened');
+});

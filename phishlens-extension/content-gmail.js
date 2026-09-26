@@ -564,6 +564,26 @@
             // a tab with no content script from one that simply found nothing.
             if (request?.type === 'phishlens:ping') { sendResponse({ ok: true }); return false; }
 
+            // Whether this tab can actually see mail yet.
+            //
+            // A background tab is throttled by the browser and a mail client is
+            // a large application, so "the script is injected" and "the list has
+            // rendered" can be a minute apart. Asking is the only way to know.
+            if (request?.type === 'phishlens:reader-status') {
+                let rows = 0;
+                let identified = 0;
+                let reader = null;
+                try {
+                    rows = typeof provider.countRows === 'function' ? provider.countRows(document) : 0;
+                    identified = provider.listVisible(document).length;
+                    if (!rows && typeof provider.describeReader === 'function') reader = provider.describeReader(document);
+                } catch (e) {
+                    reader = { error: String(e && e.message || e).slice(0, 200) };
+                }
+                sendResponse({ ok: true, rows, identified, reader, readyState: document.readyState });
+                return false;
+            }
+
             if (request?.type === 'phishlens:backlog-start') {
                 // Deliberately not awaited: this runs for hours, and a message
                 // handler that does not answer promptly is treated as a dead

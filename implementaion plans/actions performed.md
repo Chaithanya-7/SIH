@@ -199,6 +199,43 @@ service. Place names stay at every zoom: they are what makes photography
 legible at all.
 Commit: (this commit)
 
+**A-085 - The scan said it started and had not**
+What: Made the backlog scan wait for the message list to exist before claiming
+to be running.
+Status: `Done` - 405 backend + 20 console + 39 desktop tests passing
+Evidence: The popup reported *"Scan started in a background tab. It is paced
+deliberately, so a full mailbox takes hours"* - and the backend held **0 cases,
+0 ingested, 0 failures**.
+
+Zero *failures* is the informative number, for the third time on this project.
+Submitting and being refused produces failures; zero of both means nothing was
+attempted.
+
+**Cause:** `startBacklogScan` opened a background tab, waited a fixed **6
+seconds**, injected, and returned `ok: true` regardless. Both halves were wrong.
+A browser throttles tabs it is not showing and a mail client is a large
+application, so six seconds is optimistic - and starting anyway meant the scan
+read a document with no list in it, concluded the mailbox was empty, stopped,
+and reported success.
+
+**Fix:** injection still happens early, since it only needs a document. Then
+`waitForReader()` polls a new `phishlens:reader-status` request in the tab until
+the reader can actually see rows, for up to **75 seconds** - generous because
+the cost of scanning in a tab nobody is looking at is paid in patience here, not
+in a scan that silently reads an empty page. It only reports started once mail
+is visible, closes the tab it opened when it is not, and distinguishes two
+failures that needed telling apart: a tab that never answers (the content script
+is not running there) and one that answers seeing nothing (the list never
+rendered, or the layout no longer matches). The second carries the census from
+A-082 so the reader can be widened without guessing.
+
+Answering the user's question directly: yes, a completed scan populates the app -
+the flow list, the map, counts and reports. Backlog cases carry
+`analysis_mode: HISTORICAL`, so they show the "Analysed after the fact" notice
+and deliberately raise no desktop notifications.
+Commit: (this commit)
+
+
 **A-084 - The rejected key, root-caused: the app was attaching to the wrong backend**
 What: Found why the API key kept being rejected after every install, and stopped
 it recurring.

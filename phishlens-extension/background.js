@@ -50,6 +50,50 @@ let backlogTabId = null;
  * for however many hours it takes. The new tab opens in the background, so the
  * scan starts without taking over the screen.
  */
+/**
+ * How long to give a background tab to render its message list.
+ *
+ * Generous on purpose. The browser throttles tabs it is not showing, and the
+ * whole point of scanning in a separate tab is not to take over the screen -
+ * so the cost of that choice is paid in patience here rather than in a scan
+ * that silently reads an empty page.
+ */
+const BACKLOG_READY_TIMEOUT_MS = 75000;
+
+/** Polls the injected reader until it can see mail, or says why it never could. */
+async function waitForReader(tabId, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  let last = null;
+
+  while (Date.now() < deadline) {
+    const status = await sendToTab(tabId, { type: 'phishlens:reader-status' });
+
+    // No answer at all means the content script is not running in that tab.
+    if (!status) {
+      await new Promise(r => setTimeout(r, 1500));
+      continue;
+    }
+
+    last = status;
+    if (status.rows > 0) return { ok: true, rows: status.rows, identified: status.identified };
+    await new Promise(r => setTimeout(r, 1500));
+  }
+
+  if (!last) {
+    return { ok: false, error: 'The scanning tab never reported back, so the reader is not running in it. Reloading the extension usually fixes this.' };
+  }
+
+  // It answered and saw nothing. That is the informative case, and the census
+  // travels with it so the reader can be widened without guessing.
+  return {
+    ok: false,
+    error: `The scanning tab opened but no message list appeared in ${Math.round(timeoutMs / 1000)}s. `
+      + 'The browser throttles tabs it is not showing, so a slow connection can exceed this - trying again often works. '
+      + 'If it keeps happening, the page layout no longer matches what the reader expects.',
+    reader: last.reader
+  };
+}
+
 async function startBacklogScan(startPage) {
   if (!ext.tabs?.create || !ext.scripting?.executeScript) {
     return { ok: false, error: 'This browser build cannot open a tab for the scan.' };
@@ -67,15 +111,32 @@ async function startBacklogScan(startPage) {
     const tab = await ext.tabs.create({ url: 'https://mail.google.com/mail/u/0/#inbox', active: false });
     backlogTabId = tab.id;
 
-    // Wait for the page to be far enough along to inject into. A mail client
-    // is a large application; injecting the instant the tab exists lands in a
-    // document that has not started rendering the list yet.
-    await new Promise(resolve => setTimeout(resolve, 6000));
+    // Enough for the document to exist, which is all injection needs.
+    await new Promise(resolve => setTimeout(resolve, 2500));
 
     await ext.scripting.executeScript({
       target: { tabId: tab.id },
       files: ['mail-providers.js', 'content-gmail.js']
     });
+
+    // Then wait for the list to actually be there.
+    //
+    // This was a fixed six seconds, and it reported success regardless. Both
+    // halves were wrong. A background tab is throttled by the browser and a mail
+    // client is a large application, so six seconds is optimistic - and starting
+    // anyway meant the scan read an empty document, concluded the mailbox had no
+    // messages, and stopped, while the popup said "Scan started" and the backend
+    // received nothing. Zero examined *and* zero failures, which is what
+    // "nothing was even attempted" looks like.
+    //
+    // So it asks, repeatedly, and only claims to have started once the reader
+    // can see mail.
+    const ready = await waitForReader(tab.id, BACKLOG_READY_TIMEOUT_MS);
+    if (!ready.ok) {
+      try { ext.tabs.remove(tab.id); } catch (e) { /* already gone */ }
+      backlogTabId = null;
+      return { ok: false, error: ready.error, reader: ready.reader };
+    }
 
     const started = await sendToTab(tab.id, { type: 'phishlens:backlog-start', startPage });
     if (!started?.ok) {

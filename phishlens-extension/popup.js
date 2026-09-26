@@ -395,7 +395,14 @@ document.addEventListener('DOMContentLoaded', () => {
       backlogButton.disabled = false;
 
       if (!answer?.ok) {
-        if (backlogState) backlogState.textContent = answer?.error || 'The scan could not be started.';
+        // The census travels with the failure when the reader saw nothing, for
+        // the same reason the sweep sends one: "no messages found" is the
+        // report that most needs acting on and says the least on its own.
+        const census = answer?.reader
+          ? ` Carriers of a message id on that page: ${answer.reader.identifier_carriers}; row-like elements: ${answer.reader.row_like_elements}.`
+            + (answer.reader.data_attributes_seen?.length ? ` Attributes present: ${answer.reader.data_attributes_seen.slice(0, 4).join(', ')}.` : '')
+          : '';
+        if (backlogState) backlogState.textContent = (answer?.error || 'The scan could not be started.') + census;
         return;
       }
       if (backlogState) {
