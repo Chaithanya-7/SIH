@@ -199,6 +199,36 @@ service. Place names stay at every zoom: they are what makes photography
 legible at all.
 Commit: (this commit)
 
+**A-083 - A reader that works even if Gmail publishes no identifier**
+What: Added a third, shape-based strategy beneath the two that depend on
+attributes.
+Status: `Done` - 404 backend + 20 console + 37 desktop tests passing
+Evidence: A-082 inverted the search to find identifier-carrying elements rather
+than a class name, which is the right dependency - but it is still a
+*dependency*. Both strategies assume Gmail publishes a message or thread id in
+the DOM. It always has; if it ever stops, both find nothing and the inbox reads
+as empty again, which is the exact failure just fixed.
+
+So `findRowsByShape()` sits beneath them. A message list has a shape no restyle
+changes: many sibling elements, of the same kind, inside the main region, each
+carrying several pieces of text. The identifier is then derived from what the
+row displays, which `identify()` already falls back to and marks `derived-` so
+it is never mistaken for one Gmail issued.
+
+Deliberately conservative: the largest group of same-kind siblings, and only
+when there are **at least three** of them, each with more than twelve characters
+of text and two or more children. A group of one or two is far more likely to be
+a toolbar or a banner than an inbox, and reading those as messages would submit
+page furniture for analysis. Both halves are tested - a three-row list with no
+ids at all is found, a two-item toolbar is not.
+
+Honest limit: the reader now has three independent ways to find rows, and none
+of them has been checked against the page that actually broke. What makes the
+next attempt precise rather than another guess is the census from A-082, which
+reports what the page really carries.
+Commit: (this commit)
+
+
 **A-082 - A reader that stopped matching Gmail, and reported it as an empty inbox**
 What: Inverted row discovery so it no longer depends on a class name, and made
 the failure self-describing.

@@ -95,7 +95,62 @@
                 rows.push(row);
             }
 
-            return rows;
+            if (rows.length) return rows;
+
+            // Last resort: find the rows by shape.
+            //
+            // Both strategies above assume Gmail publishes an identifier in the
+            // DOM. It always has, and if it ever stops, everything above finds
+            // nothing and the inbox reads as empty again - the exact failure
+            // this reader has already had once.
+            //
+            // A message list has a shape no restyle changes: many sibling
+            // elements, of the same kind, inside the main region, each carrying
+            // several pieces of text. That is enough to find the rows; the
+            // identifier is then derived from what each row displays, which
+            // `identify()` already falls back to.
+            return this.findRowsByShape(doc);
+        },
+
+        /**
+         * Rows found by structure alone, for when no identifier is published.
+         *
+         * Deliberately conservative. It takes the largest group of same-kind
+         * siblings inside the main region, and only when there are at least
+         * three of them - a list of one or two is far more likely to be a
+         * toolbar or a banner than an inbox.
+         */
+        findRowsByShape(doc) {
+            const containers = doc.querySelectorAll('[role="main"] [role="list"], [role="main"] [role="grid"], [role="main"] table, [role="list"], [role="grid"]');
+            let best = [];
+
+            for (const container of containers) {
+                const groups = new Map();
+
+                for (const child of container.querySelectorAll('tr, [role="listitem"], [role="row"]')) {
+                    // Grouped by parent and tag, so rows of one list are not
+                    // mixed with rows of another that happens to be nested.
+                    const key = `${child.tagName}:${child.getAttribute('role') || ''}`;
+                    const parent = child.parentElement;
+                    if (!parent) continue;
+
+                    const groupKey = key + ':' + (parent.id || parent.className || '') + ':' + Array.from(container.children).indexOf(parent);
+                    if (!groups.has(groupKey)) groups.set(groupKey, []);
+                    groups.get(groupKey).push(child);
+                }
+
+                for (const group of groups.values()) {
+                    // A row shows several things: who it is from, what it is
+                    // about, when it arrived. One text node is a heading.
+                    const substantial = group.filter(row => {
+                        const text = (row.textContent || '').trim();
+                        return text.length > 12 && row.children.length >= 2;
+                    });
+                    if (substantial.length >= 3 && substantial.length > best.length) best = substantial;
+                }
+            }
+
+            return best;
         },
 
         /**

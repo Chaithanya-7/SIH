@@ -308,3 +308,45 @@ test('the class selector is still preferred when it matches', () => {
     assert.strictEqual(described.matched_by, 'class selector');
     assert.ok(described.rows_by_class > 0);
 });
+
+test('rows are still found when Gmail publishes no identifier at all', () => {
+    const providers = loadProviders();
+
+    // Both earlier strategies assume an identifier is published in the DOM.
+    // Gmail always has, and if it ever stops, everything above finds nothing
+    // and the inbox reads as empty again - the exact failure this reader has
+    // already had once. The shape of a message list survives a restyle: many
+    // sibling elements of the same kind, each carrying several pieces of text.
+    const dom = new JSDOM(`
+        <div role="main"><div role="list">
+          <div role="listitem"><span email="a@x.example">Ann</span><span>Invoice for September</span><span>09:14</span></div>
+          <div role="listitem"><span email="b@x.example">Ben</span><span>Thursday delivery confirmed</span><span>09:20</span></div>
+          <div role="listitem"><span email="c@x.example">Cal</span><span>Your membership has paused</span><span>09:31</span></div>
+        </div></div>
+    `);
+
+    const rows = providers.gmail.listVisible(dom.window.document);
+    assert.strictEqual(rows.length, 3, 'the rows must be found from their shape');
+
+    // With nothing published, every id must be a derived one - and marked, so
+    // it is never mistaken for an identifier Gmail issued.
+    assert.ok(rows.every(r => r.id.startsWith('derived-')), 'ids must be marked as derived');
+    assert.strictEqual(new Set([...rows.map(r => r.id)]).size, 3, 'and must differ between messages');
+});
+
+test('the shape fallback does not mistake a toolbar for an inbox', () => {
+    const providers = loadProviders();
+
+    // Conservative on purpose: a group of one or two is far more likely to be a
+    // banner or a toolbar than a list of mail. Reading those as messages would
+    // submit page furniture for analysis.
+    const dom = new JSDOM(`
+        <div role="main"><div role="list">
+          <div role="listitem"><span>Compose</span><span>button</span></div>
+          <div role="listitem"><span>Refresh</span><span>button</span></div>
+        </div></div>
+    `);
+
+    assert.strictEqual(providers.gmail.findRowsByShape(dom.window.document).length, 0,
+        'two items is not a mailbox');
+});
