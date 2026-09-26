@@ -11,6 +11,7 @@ data/imap_state.json
 *.log
 **/*.log
 dist/
+<<<<<<< HEAD
 # Builds go to dist-<version> when Windows holds a lock on dist/win-unpacked,
 # which it does after most builds. Same output, so the same rule applies.
 dist-*/
@@ -44,3 +45,8 @@ PhishLens_Report_*.pdf
 
 # Planning archives dropped in the working directory.
 *architecture-v*.zip
+=======
+**/dist/
+.vscode/
+.idea/
+>>>>>>> f7f1f4d8e33400ea5fae1975653db1ac88ff5dcc

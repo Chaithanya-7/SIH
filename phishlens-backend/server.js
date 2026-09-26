@@ -28,6 +28,9 @@ const nlpAnalyzer = require('./modules/nlpAnalyzer');
 const payloadChannel = require('./modules/payloadChannel');
 const trustedServiceAbuse = require('./modules/trustedServiceAbuse');
 const historicalMode = require('./modules/historicalMode');
+const networkObserver = require('./modules/networkObserver');
+const connectionWatchlist = require('./modules/connectionWatchlist');
+const connectionFollowUp = require('./modules/connectionFollowUp');
 const ruleEngine = require('./modules/ruleEngine');
 const customDetectionConfig = require('./modules/customDetectionConfig');
 const ingestionRegistry = require('./modules/ingestionRegistry');
@@ -347,9 +350,42 @@ async function processPipeline(emailContent, source = 'MANUAL_API', clientMessag
             threatObject = await remediationEngine.executePolicyDecision(threatObject, policyDecision);
         }
 
+        // 14b. Whether this case is worth asking a later question about: did this
+        //      machine go where the message pointed?
+        //
+        //      The answer cannot be had now. A case is scored as the message
+        //      arrives, before anybody has read it, so at this instant no link in
+        //      it has been clicked - a check here would find nothing, every
+        //      time. The useful question is asked minutes later by the follow-up
+        //      sweep, which reopens the stored case if it finds a match.
+        //
+        //      Decided before the case is written so the stored case carries the
+        //      answer's status rather than being silently amended afterwards. A
+        //      backlog scan is excluded: nothing observed on the network today
+        //      bears on a message from two years ago.
+        const watchDecision = historical ? null : connectionWatchlist.decide(threatObject);
+        if (watchDecision) {
+            threatObject.connection_evidence = watchDecision.watch
+                ? {
+                    status: 'AWAITING_OBSERVATION',
+                    indicators_watched: watchDecision.indicators.length,
+                    detail: networkObserver.isObserving()
+                        ? 'Watching for traffic from this machine to the destinations this message named. A result will be added to this case if one appears.'
+                        : 'Network observation is not running, so no connection evidence will be collected for this message. Nothing will be known about whether the destinations were reached.'
+                }
+                : { status: 'NOT_WATCHED', detail: watchDecision.reason };
+        }
+
         // 15. Persistent Case Storage & Deduplication Binding
         threatObject = caseManager.saveCase(threatObject);
         dedupStore.bindCaseId(messageKey, threatObject.case_id);
+
+        // Enrolled with the case id that was actually stored. saveCase can
+        // reassign one on collision, and a watchlist entry keyed to an id no
+        // case has would quietly never resolve.
+        if (watchDecision?.watch) {
+            connectionWatchlist.enrol(threatObject, watchDecision);
+        }
 
         // 16. Post-verdict learning. The behavioural baseline records what this
         //     sender looks like, and a corroborated high-risk verdict teaches the
@@ -1095,6 +1131,10 @@ app.get('/api/security-tools', async (req, res) => {
             // absence changes what a report can claim rather than how deeply it
             // can look.
             connection_evidence: await connectionEvidence.availability(),
+            // Whether observation is actually running, which is a different
+            // question from whether TShark is installed. Both matter and only
+            // one of them was reported before.
+            network_observation: connectionFollowUp.state(),
             // Rule matching is not optional and is not in the tool list: the
             // rules ship with PhishLens and run on an engine that is already
             // here. Installing YARA does not switch it on, it only widens what a
@@ -1372,6 +1412,14 @@ app.get('/api/overview', (req, res) => {
                     asn: point.asn,
                     isp: point.isp,
                     role: point.role,
+                    // Only a CONTACTED point has these. They are what makes that
+                    // role mean something different from the rest: every other
+                    // marker is somewhere a message came from, this one is
+                    // somewhere this machine went afterwards.
+                    observed_host: point.observed_host || null,
+                    port: point.port ?? null,
+                    protocol: point.protocol || null,
+                    observed_at: point.observed_at || null,
                     severity,
                     observations: 1,
                     case_ids: [caseItem.case_id],
@@ -1750,7 +1798,40 @@ function scheduleThreatIntelSync() {
     setInterval(runIfStale, intervalHours * 3600 * 1000).unref?.();
 }
 
+/**
+ * Network observation, which does not start on its own.
+ *
+ * Capturing packets needs a driver and administrator rights, and it observes
+ * every destination this machine contacts. A security tool that quietly began
+ * recording that because it had been installed would be doing something nobody
+ * asked for, so it is switched on deliberately - and when it is off, cases say
+ * that connection evidence was not collected rather than that no connection
+ * happened.
+ *
+ * The follow-up sweep starts either way. It still has to close the windows of
+ * cases that were waiting, and mark them as unobserved rather than leaving them
+ * pending forever.
+ */
+async function startNetworkObservation() {
+    connectionFollowUp.start();
+
+    if (String(process.env.ENABLE_NETWORK_OBSERVER || '').toLowerCase() !== 'true') {
+        console.log('[NetworkObserver] Off. Set ENABLE_NETWORK_OBSERVER=true to collect connection evidence (needs a capture driver and administrator rights).');
+        return;
+    }
+
+    const status = await networkObserver.start({
+        interfaceName: process.env.NETWORK_OBSERVER_INTERFACE || null
+    });
+
+    // Every failure names itself, because "no driver" and "not administrator"
+    // are fixed by completely different actions and the difference is the only
+    // useful part of the message.
+    console.log(`[NetworkObserver] ${status.state}: ${status.detail}`);
+}
+
 app.listen(PORT, () => {
     console.log(`✅ PhishLens Platform active on port ${PORT}`);
     scheduleThreatIntelSync();
+    startNetworkObservation();
 });

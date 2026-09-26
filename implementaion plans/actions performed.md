@@ -199,6 +199,76 @@ service. Place names stay at every zoom: they are what makes photography
 legible at all.
 Commit: (this commit)
 
+**A-076 - Wireshark network intelligence, wired in at last**
+What: Made the TShark capability actually run, and reach a verdict.
+Status: `Done` - 368 backend + 5 console + 33 desktop tests passing
+Evidence: **Most of the requested spec already existed.** Inspected first, as
+the spec itself required. Already present: TShark backend with no GUI
+(`connectionEvidence.js` - dst address, ports, TLS SNI, DNS question, protocol,
+timing), GeoIP with lat/long/ASN/org/city/region (`geoIntelAdapter.js`, ipwho.is,
+free), IP extraction, relay/protocol forensics, private/reserved/loopback/IPv6
+handling (`ipClassifier.js`), the world map fed from `infrastructure.geo_points`,
+severity colours, reports, notifications, campaign analysis.
+
+**The real gap: `connectionEvidence.js` was dead code.** It was `require`d in
+server.js solely to answer `availability()` for the tools panel. It never ran on
+a message. A well-written packet-analysis module that had never analysed
+anything.
+
+**And it could not simply be called.** `capture()` is a bounded one-shot, and
+the ordering defeats it: a case is scored *as the message arrives*, before
+anybody has read it, so at that instant no link has been clicked. Correlating at
+analysis time finds nothing, every time - it would have shipped as a feature
+incapable of firing once. The useful question is asked minutes later: *did this
+machine go there after the warning?*
+
+So three new modules:
+- **`networkObserver.js`** - a long-running TShark process, line-buffered (`-l`,
+  without which output blocks up and the observer looks alive holding nothing),
+  streamed into a rolling memory bounded by age *and* count. Reuses
+  `connectionEvidence.parseFields` and its capture filter, so one place knows
+  what the fields mean and the narrow field set is enforced rather than intended.
+- **`connectionWatchlist.js`** - the cases waiting for an answer. **Only
+  HIGH_RISK and SUSPICIOUS, and only the hosts those messages named.** That
+  limit is the difference between a security tool and surveillance: enrolling
+  everything would mean holding every destination every message ever mentioned
+  and matching it against everywhere the machine goes, for no benefit.
+- **`connectionFollowUp.js`** - sweeps one against the other, and on a match
+  reopens the case: evidence appended, destination geolocated onto the existing
+  map as role `CONTACTED`, re-fused, re-scored, audit entry written. Same case
+  id - one incident learning something new, not a second case.
+
+New `CONNECTION` family at cap 0.35 with the strongest, and the finding marked
+decisive. No MQL rule was written for it: the observation already enters through
+fusion, and a rule asserting the same fact would be one event counted twice.
+
+An ordering bug caught while wiring: I first set `connection_evidence` *after*
+`caseManager.saveCase()`, so the stored case would not have carried it. But
+enrolling before the save risks keying the watchlist to a case id `saveCase`
+reassigns on collision. Split `decide()` from `enrol()`: decide and record
+before the write, enrol with the id that survived. Guarded by a test asserting
+the order.
+
+Three honesty properties, each with a test:
+1. **Watching and seeing nothing produces no evidence at all.** Not even a weak
+   positive. A link opened on a phone, a DNS-over-HTTPS resolver, a VPN and
+   nobody clicking produce identical silence; "we watched and saw nothing" would
+   read as exoneration.
+2. **A window nobody watched is recorded as a gap**, at LOW/0.1 - present in the
+   evidence because a gap belongs there, weighted at nearly nothing because not
+   knowing is no reason to raise a verdict.
+3. **It never claims to identify a person.** The capture observes the machine,
+   not a browser or an account, and the case says so in its own text.
+
+Not done, stated rather than faked: **accuracy radius is not captured** -
+ipwho.is does not return one, and inventing a number for a field called
+"accuracy" would be worse than leaving it out. Observation is **off by default**
+(`ENABLE_NETWORK_OBSERVER=true`): capturing needs a driver and administrator
+rights, and a tool that silently began recording every destination a machine
+contacts because it was installed would be doing something nobody asked for.
+Commit: (this commit)
+
+
 **A-075 - Making the honesty visible, and attributing techniques properly**
 What: Surfaced historical-scan caveats in the console and the forensic report,
 and gave every rule an explicit MITRE technique list.

@@ -244,6 +244,68 @@ class EvidenceFusion {
             }
         });
 
+        // 12. Whether this machine actually went where the message pointed.
+        //
+        //     The only evidence here that does not come from the message. Every
+        //     other source reasons about text a sender wrote, and a sender can
+        //     write anything; none of it can say what happened afterwards. A
+        //     packet capture can, and that is the whole reason for having one in
+        //     a mail tool.
+        //
+        //     It arrives late by necessity. A case is scored when the message
+        //     lands, before anybody has read it, so this is added when the
+        //     follow-up sweep finds a match and the case is fused again.
+        const connection = threatObject.connection_evidence;
+        if (connection?.status === 'OBSERVED' && (connection.matches || []).length) {
+            const first = connection.matches[0];
+            const destination = first.observed_host || first.observed_address;
+            const timing = first.delay_seconds !== null && first.delay_seconds !== undefined
+                ? ` ${first.delay_seconds} second(s) after the message arrived`
+                : '';
+
+            evidenceList.push(new EvidenceObject({
+                evidence_type: 'CONNECTION_OBSERVED',
+                source: 'PHISHLENS_NETWORK_OBSERVER',
+                finding: `This machine connected to ${destination}`,
+                severity: 'CRITICAL',
+                confidence: 0.95,
+                explanation: `Traffic from this host reached ${destination}`
+                    + `${first.port ? ` on port ${first.port}` : ''}${first.protocol ? ` over ${first.protocol}` : ''}`
+                    + `${timing}, matching the indicator ${first.indicator} carried by this message. `
+                    + 'Observed by packet capture on this machine, not inferred from the message. '
+                    + 'The capture sees the host, not a browser or an account, so this records that the '
+                    + 'destination was reached and not who reached it.',
+                // A confirmed connection to a destination a flagged message
+                // named is the strongest fact this system can hold: the warning
+                // was issued and the machine went there anyway. Not capped down
+                // to "suspicious" for want of corroboration, because there is no
+                // benign reading of it.
+                decisive: true,
+                provenance: {
+                    source_type: 'PACKET_CAPTURE',
+                    source_reference: `${first.kind || 'observation'} at ${first.at || 'unknown time'}`
+                }
+            }));
+        }
+
+        // A window nobody watched is a gap in the analysis and belongs in the
+        // evidence rather than in a log - but it carries almost no weight,
+        // because absent observation says nothing about whether the link was
+        // followed. NOT_OBSERVED is deliberately not recorded as evidence at
+        // all: "we watched and saw nothing" would read as exoneration, and a
+        // link opened on a phone produces exactly that.
+        if (connection?.status === 'NOT_COLLECTED') {
+            evidenceList.push(new EvidenceObject({
+                evidence_type: 'ANALYSIS_LIMITATION',
+                source: 'PHISHLENS_NETWORK_OBSERVER',
+                finding: 'Whether this machine contacted the destination is unknown',
+                severity: 'LOW',
+                confidence: 0.1,
+                explanation: connection.detail,
+                provenance: { source_type: 'PACKET_CAPTURE', source_reference: 'observation not running' }
+            }));
+        }
+
         threatObject.evidence = evidenceList;
         return threatObject;
     }

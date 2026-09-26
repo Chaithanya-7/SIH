@@ -39,6 +39,15 @@ class ConfidenceEngine {
         if (type === 'MQL_THREAD') return 'THREAD_INTEGRITY';
         if (type === 'MQL_ARC') return 'AUTHENTICATION';
 
+        // The one family whose evidence does not come from the message. A packet
+        // capture on this machine observed traffic reaching a destination the
+        // message named - so unlike everything else here, it cannot have been
+        // written by the sender.
+        // Deliberately one member. No MQL rule was written for the same fact:
+        // the observation already enters through fusion as a decisive finding,
+        // and a rule asserting it again would be one event counted twice.
+        if (type === 'CONNECTION_OBSERVED') return 'CONNECTION';
+
         // Both belong to the same family: the MQL rules judge an attachment by
         // its name and declared type, the inspector and the detection rules by
         // its contents. Kept apart they would count as two independent kinds of
@@ -106,6 +115,14 @@ class ConfidenceEngine {
             // marked decisive and reaches 0.70 through the visible floor
             // instead of through its cap.
             PAYLOAD_CHANNEL: 0.30, TRUSTED_SERVICE: 0.30,
+
+            // Capped with the strongest families, and the only one here whose
+            // evidence is an observation rather than a reading of the message.
+            // A warning was issued and the machine went there anyway; nothing
+            // else this system can know is more consequential than that. The
+            // finding is also marked decisive, so it reaches a verdict through
+            // the visible floor rather than needing the cap to carry it.
+            CONNECTION: 0.35,
 
             // Obfuscation is a deliberate act with no accidental version, but
             // it says nothing about what the message wants - so it corroborates

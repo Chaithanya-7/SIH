@@ -715,9 +715,32 @@ export default function GlobalThreatMap({ points = [], coverage }) {
                                             {point.ip}{point.isp ? ` · ${point.isp}` : ''}{point.asn ? ` (${point.asn})` : ''}
                                         </div>
 
-                                        <div style={{ fontWeight: 700, fontSize: '0.74rem', marginBottom: '5px' }}>
-                                            {point.observations} message{point.observations === 1 ? '' : 's'} sent from here
-                                        </div>
+                                        {/* A contacted destination is not a place a
+                                            message came from, and saying "sent from
+                                            here" over it would invert its meaning:
+                                            this is somewhere this machine went after
+                                            being warned about it. */}
+                                        {point.role === 'CONTACTED' ? (
+                                            <div style={{ marginBottom: '5px' }}>
+                                                <div style={{ fontWeight: 700, fontSize: '0.74rem', color: '#b3261e' }}>
+                                                    This machine connected here
+                                                </div>
+                                                <div style={{ fontSize: '0.7rem', color: '#555', marginTop: '2px' }}>
+                                                    {point.observed_host ? `${point.observed_host}` : point.ip}
+                                                    {point.port ? ` · port ${point.port}` : ''}
+                                                    {point.protocol ? ` · ${point.protocol}` : ''}
+                                                    {point.observed_at ? ` · ${new Date(point.observed_at).toLocaleString()}` : ''}
+                                                </div>
+                                                <div style={{ fontSize: '0.67rem', color: '#777', marginTop: '3px', lineHeight: 1.4 }}>
+                                                    Observed by packet capture on this machine. It records that the
+                                                    destination was reached, not who reached it.
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div style={{ fontWeight: 700, fontSize: '0.74rem', marginBottom: '5px' }}>
+                                                {point.observations} message{point.observations === 1 ? '' : 's'} sent from here
+                                            </div>
+                                        )}
 
                                         <div style={{ maxHeight: '190px', overflowY: 'auto' }}>
                                             {messages.length === 0 ? (
