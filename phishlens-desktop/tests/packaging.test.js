@@ -385,3 +385,49 @@ test('the notifier is stopped when the app quits', () => {
     assert.match(main, /before-quit['"]\s*,\s*\(\)\s*=>\s*\{\s*notifier\.stop\(\)/,
         'the poll must stop on quit, or the process will not exit');
 });
+
+test('the supervisor will not attach to a backend that rejects its key', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const source = fs.readFileSync(path.join(__dirname, '..', 'backendSupervisor.js'), 'utf8');
+
+    // The fault this prevents, which recurred after three separate installs:
+    //
+    // An installer stops the app, replaces it and relaunches it - and the
+    // backend the *old* app spawned can still hold the port for a few seconds.
+    // The new app attached to it, inheriting a key it never set. Every request
+    // from the extension and console was then refused permanently, while the
+    // app reported READY and the backend reported OPERATIONAL. The only visible
+    // symptom was "the configured API key was rejected" in a popup.
+    //
+    // Attaching is still right - two backends over one data directory would
+    // corrupt the case store. What was missing was checking it is ours.
+    assert.match(source, /keyFingerprint\(/, 'it must be able to compare keys without moving one');
+    assert.match(source, /api_key_fingerprint/, 'by asking the health route which key that backend accepts');
+
+    const startFn = source.slice(source.indexOf('async start()'), source.indexOf('channelEnvironment'));
+    assert.match(startFn, /theirs === mine/, 'it must compare before attaching');
+    assert.match(startFn, /STALE_BACKEND_WAIT_MS/,
+        'and wait a little first, because the usual case is an old backend still shutting down');
+
+    // An older backend publishes no fingerprint. Refusing those would break
+    // attaching to a version predating the field, which is the worse outcome.
+    assert.match(startFn, /!theirs \|\| theirs === mine/, 'a backend that cannot be checked is trusted');
+
+    // And when it really is not ours, it must fail loudly rather than attach.
+    assert.match(startFn, /setStatus\('FAILED'/, 'a foreign backend is a failure, not a silent attach');
+    assert.match(startFn, /does not accept this installation's key/,
+        'and the message must name the cause, not just report a failure');
+});
+
+test('the health check reads the body it needs rather than discarding it', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const source = fs.readFileSync(path.join(__dirname, '..', 'backendSupervisor.js'), 'utf8');
+
+    const fn = source.slice(source.indexOf('checkHealth('), source.indexOf('keyFingerprint('));
+    // It used to resume() the stream and throw the body away, so the
+    // fingerprint was unavailable at the one moment it decides something.
+    assert.match(fn, /this\.lastHealth = JSON\.parse/, 'the health body must be kept');
+    assert.match(fn, /statusCode !== 200/, 'and a non-200 must still be a plain failure');
+});

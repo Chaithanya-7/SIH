@@ -199,6 +199,56 @@ service. Place names stay at every zoom: they are what makes photography
 legible at all.
 Commit: (this commit)
 
+**A-084 - The rejected key, root-caused: the app was attaching to the wrong backend**
+What: Found why the API key kept being rejected after every install, and stopped
+it recurring.
+Status: `Done` - 404 backend + 20 console + 39 desktop tests passing; 1.7.13
+installed
+Evidence: **The fingerprint added in A-081 paid for itself in one request.**
+Against the freshly installed 1.7.13:
+
+    backend expects  : 5145e2b19987
+    key file         : 873edc69f1e8
+    provisioned.js   : 873edc69f1e8   (agree with each other)
+
+The key file and the extension agreed; the **backend** was the odd one out. Ruled
+out by measurement rather than reasoning: only one `desktop-api-key` exists on
+the machine, and the backend's value is not `undefined`, `null`, `''` or any
+degenerate string - it is a genuine random key.
+
+**Root cause, at `backendSupervisor.js` line 169.** `start()` checks whether a
+backend is already listening and, if so, **attaches to it**. That is the right
+move - two backends over one data directory would corrupt the case store - but
+nothing checked that the running one was *ours*.
+
+An installer stops the application, replaces it, and relaunches it; the backend
+the **old** application spawned can still hold port 3001 for a few seconds. The
+new application attaches to it and inherits a key it never set. Every request
+from the extension and console is then refused, permanently, while the
+application reports READY and the backend reports OPERATIONAL. The only visible
+symptom is "the configured API key was rejected" in a popup - which is what
+appeared after **each of three installs**.
+
+Proved by a clean restart: killing every PhishLens process, confirming the port
+free, and starting again gave `873edc69f1e8` - matching the key file and the
+extension - and `/api/cases`, `/api/flow` and `/api/summary` all returned **200**.
+The app also republished `provisioned.js` at that moment, which it had not done
+since 09:43.
+
+**The fix:** attaching now compares the fingerprint the health route publishes
+against this installation's key first. A match attaches as before. A mismatch
+waits up to twelve seconds - the usual case is an old backend shutting down -
+and then fails *loudly*, naming both fingerprints and the remedy, rather than
+attaching into a permanently broken state. A backend that publishes no
+fingerprint is trusted, since refusing those would break attaching to any
+version predating the field.
+
+`checkHealth()` also had to stop discarding the response body it now needs; it
+was calling `resume()` on the stream at the one moment the body decides
+something.
+Commit: (this commit)
+
+
 **A-083 - A reader that works even if Gmail publishes no identifier**
 What: Added a third, shape-based strategy beneath the two that depend on
 attributes.

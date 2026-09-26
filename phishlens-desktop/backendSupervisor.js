@@ -33,6 +33,16 @@ const { EventEmitter } = require('events');
  */
 
 const HEALTH_TIMEOUT_MS = 1500;
+
+/**
+ * How long to wait for a backend that is not ours to release the port.
+ *
+ * An installer relaunches the application while the backend the previous
+ * version spawned may still be holding it. Seconds, not minutes: past that
+ * it is a stray process rather than one shutting down, and saying so beats
+ * waiting in silence.
+ */
+const STALE_BACKEND_WAIT_MS = 12000;
 const STARTUP_TIMEOUT_MS = 45000;
 const MAX_RESTARTS = 3;
 /** A process that survives this long is considered to have started properly. */
@@ -126,12 +136,26 @@ class BackendSupervisor extends EventEmitter {
     checkHealth(timeoutMs = HEALTH_TIMEOUT_MS) {
         return new Promise(resolve => {
             const request = http.get(`${this.baseUrl}/api/health`, { timeout: timeoutMs }, response => {
-                response.resume();
-                resolve(response.statusCode === 200);
+                if (response.statusCode !== 200) { response.resume(); return resolve(false); }
+                // The body is read now rather than discarded, because it names
+                // which key that backend accepts - and attaching to one that
+                // accepts a different key is silently fatal. See start().
+                let body = '';
+                response.on('data', chunk => { body += chunk; });
+                response.on('end', () => {
+                    try { this.lastHealth = JSON.parse(body); } catch (e) { this.lastHealth = null; }
+                    resolve(true);
+                });
             });
             request.on('timeout', () => { request.destroy(); resolve(false); });
             request.on('error', () => resolve(false));
         });
+    }
+
+    /** The same truncated digest the backend publishes, for comparing keys without moving one. */
+    keyFingerprint(key) {
+        if (!key) return 'NO_KEY_SET';
+        return crypto.createHash('sha256').update(String(key)).digest('hex').slice(0, 12);
     }
 
     async waitUntilHealthy(deadlineMs) {
@@ -166,11 +190,58 @@ class BackendSupervisor extends EventEmitter {
         // Attaching rather than duplicating: two backends over one data
         // directory would corrupt the case store and break the audit chain.
         this.setStatus('STARTING', 'Checking whether a PhishLens backend is already running…');
-        if (await this.checkHealth()) {
-            this.attachedToExisting = true;
-            this.record(`A backend is already running on ${this.baseUrl}; attaching to it instead of starting another.`);
-            this.setStatus('READY', `Attached to the PhishLens backend already running on ${this.baseUrl}.`);
-            return true;
+
+        /**
+         * Attaching is right, but only to a backend that will accept this
+         * installation's key.
+         *
+         * Two backends over one data directory would corrupt the case store, so
+         * finding one already listening and joining it is the correct move. What
+         * was missing was any check that it is *ours*.
+         *
+         * An installer stops the application, replaces it and relaunches it, and
+         * the backend the old application spawned can still be holding the port
+         * for a few seconds. The new application would attach to that one - which
+         * is running with the key the *old* one generated. Every request from the
+         * extension and the console is then refused, permanently, and nothing
+         * says why: the application reports READY, the backend reports
+         * OPERATIONAL, and the only visible symptom is "the configured API key
+         * was rejected" in a popup.
+         *
+         * That is exactly what happened after each of three installs. The health
+         * route now publishes a fingerprint of the key it accepts, so the
+         * question can be asked before attaching.
+         */
+        const mine = this.keyFingerprint(this.apiKey);
+        const deadline = Date.now() + STALE_BACKEND_WAIT_MS;
+
+        while (await this.checkHealth()) {
+            const theirs = this.lastHealth?.api_key_fingerprint;
+
+            // An older backend publishes no fingerprint. It cannot be checked,
+            // so it is trusted - refusing would break attaching to a version
+            // that predates this field, which is worse than the risk.
+            if (!theirs || theirs === mine) {
+                this.attachedToExisting = true;
+                this.record(`A backend is already running on ${this.baseUrl}; attaching to it instead of starting another.`);
+                this.setStatus('READY', `Attached to the PhishLens backend already running on ${this.baseUrl}.`);
+                return true;
+            }
+
+            // Not ours. Almost always an older one still shutting down, so it is
+            // given a few seconds to release the port before this is called a
+            // failure.
+            if (Date.now() >= deadline) {
+                const detail = `A PhishLens backend is running on ${this.baseUrl} that does not accept this installation's key `
+                    + `(it expects ${theirs}, this application has ${mine}). It is probably left over from a previous version. `
+                    + 'Close PhishLens completely and start it again; if it persists, end any stray PhishLens process.';
+                this.record(`[Supervisor] ${detail}`);
+                this.setStatus('FAILED', detail);
+                return false;
+            }
+
+            this.setStatus('STARTING', 'A previous PhishLens backend is still shutting down; waiting for it to release the port…');
+            await new Promise(r => setTimeout(r, 1000));
         }
 
         const backendDir = this.backendPath();
