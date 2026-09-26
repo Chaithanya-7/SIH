@@ -308,8 +308,20 @@ test('the backlog scan waits for the list instead of assuming it is there', () =
 
     // It must not claim to have started when the reader never saw anything.
     const start = worker.slice(worker.indexOf('async function startBacklogScan'));
-    assert.match(start.slice(0, 2500), /if \(!ready\.ok\)/, 'a reader that never became ready must stop the scan');
-    assert.match(start.slice(0, 2500), /tabs\.remove/, 'and the tab it opened must not be left behind');
+    assert.match(start.slice(0, 3500), /if \(!ready\.ok\)/, 'a reader that never became ready must stop the scan');
+
+    // The scan runs in the tab already open, not one of its own.
+    //
+    // A tab of its own kept the list from moving under somebody reading their
+    // mail, and cost more than it saved: a browser throttles a tab it is not
+    // showing, so the list frequently never rendered there and the scan read an
+    // empty document and stopped, having reported that it had started.
+    assert.match(start.slice(0, 3500), /tabs\.query\(\{ url: MAIL_HOSTS \}\)/,
+        'it must use the mail tab that is already open');
+    assert.ok(!/tabs\.create/.test(start.slice(0, 3500)),
+        'and must not open one of its own');
+    assert.match(start.slice(0, 3500), /No Gmail or Outlook tab is open/,
+        'with a plain answer when there is no mail tab to use');
 
     // A tab that never answers and one that answers seeing nothing are
     // different faults needing different things done about them.
@@ -317,4 +329,23 @@ test('the backlog scan waits for the list instead of assuming it is there', () =
     assert.match(waiter, /never reported back/, 'no answer means the script is not running there');
     assert.match(waiter, /no message list appeared/, 'an answer with no rows is the other case');
     assert.match(waiter, /reader: last\.reader/, 'and it must carry the census, so the reader can be widened');
+});
+
+test('scan progress is only shown against a real total', () => {
+    const providers = require('fs').readFileSync(path.join(EXTENSION, 'mail-providers.js'), 'utf8');
+    const content = fs.readFileSync(path.join(EXTENSION, 'content-gmail.js'), 'utf8');
+    const popup = fs.readFileSync(path.join(EXTENSION, 'popup.js'), 'utf8');
+    const html = fs.readFileSync(path.join(EXTENSION, 'popup.html'), 'utf8');
+
+    // The denominator is Gmail's own "1-50 of 2,267". It is the only honest
+    // basis for a percentage; anything else is a bar moving at a rate nobody
+    // can justify, which implies knowledge of how much is left.
+    assert.match(providers, /totalCount\(doc\)/, 'the total must come from the page');
+    assert.match(content, /function backlogPercent/, 'and a percentage computed from it');
+    assert.match(content, /if \(!backlog\.total \|\| backlog\.total <= 0\) return null/,
+        'with no total, there is no percentage');
+
+    assert.match(html, /id="backlog-progress"/, 'the bar must exist');
+    assert.match(popup, /renderProgress/, 'and be driven from the reported state');
+    assert.match(popup, /percent === null/, 'and hidden entirely when the total is unknown');
 });

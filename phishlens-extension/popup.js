@@ -329,6 +329,29 @@ document.addEventListener('DOMContentLoaded', () => {
   const backlogButton = document.getElementById('btn-backlog');
   const backlogStop = document.getElementById('btn-backlog-stop');
   const backlogState = document.getElementById('backlog-state');
+  const backlogProgress = document.getElementById('backlog-progress');
+  const backlogBarFill = document.getElementById('backlog-bar-fill');
+  const backlogPercent = document.getElementById('backlog-percent');
+
+  /**
+   * Draws progress, and only when there is something honest to draw against.
+   *
+   * The denominator is Gmail's own "1-50 of 2,267". Where that cannot be read
+   * the bar is hidden entirely and the count is shown instead - a bar moving
+   * against a made-up total looks like knowledge of how much is left, and there
+   * would be none.
+   */
+  function renderProgress(state) {
+    if (!backlogProgress) return;
+    const percent = state?.running && typeof state.percent === 'number' ? state.percent : null;
+    if (percent === null) {
+      backlogProgress.classList.add('hidden');
+      return;
+    }
+    backlogProgress.classList.remove('hidden');
+    if (backlogBarFill) backlogBarFill.style.width = `${percent}%`;
+    if (backlogPercent) backlogPercent.textContent = `${percent}%`;
+  }
 
   function ask(message) {
     return new Promise(resolve => {
@@ -350,18 +373,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const state = answer?.backlog;
     if (!state || (!state.running && !state.examined && !state.startedAt)) {
       backlogState.textContent = 'Existing mail has not been scanned.';
+      renderProgress(null);
       backlogStop?.classList.add('hidden');
       if (backlogButton) backlogButton.textContent = 'Scan existing mail';
       return;
     }
 
     if (state.running && !answer.stale) {
-      backlogState.textContent = `Scanning existing mail: ${state.examined} examined, page ${state.page}.`
-        + (state.failed ? ` ${state.failed} could not be read.` : '');
+      backlogState.textContent = state.total
+        ? `Scanning your mail: ${state.examined} of ${state.total} examined, page ${state.page}.`
+          + (state.failed ? ` ${state.failed} could not be read.` : '')
+        : `Scanning your mail: ${state.examined} examined, page ${state.page}.`
+          + (state.failed ? ` ${state.failed} could not be read.` : '');
+      renderProgress(state);
       backlogStop?.classList.remove('hidden');
       if (backlogButton) backlogButton.textContent = 'Scanning…';
       return;
     }
+    renderProgress(null);
 
     backlogStop?.classList.add('hidden');
     if (backlogButton) backlogButton.textContent = state.page > 1 ? `Resume from page ${state.page}` : 'Scan existing mail';
@@ -386,7 +415,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (backlogButton) {
     backlogButton.addEventListener('click', async () => {
       backlogButton.disabled = true;
-      if (backlogState) backlogState.textContent = 'Opening a tab for the scan…';
+      if (backlogState) backlogState.textContent = 'Checking your mail tab…';
 
       const current = await ask({ type: 'phishlens:backlog-status' });
       const startPage = current?.backlog?.page > 1 ? current.backlog.page : 1;
@@ -406,7 +435,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       if (backlogState) {
-        backlogState.textContent = 'Scan started in a background tab. It is paced deliberately, so a full mailbox takes hours. You can close this popup.';
+        backlogState.textContent = answer.note
+          || 'Scan started in your open mail tab. It is paced deliberately, so a full mailbox takes hours. You can close this popup.';
       }
       backlogStop?.classList.remove('hidden');
     });

@@ -1072,7 +1072,36 @@ app.post('/api/ingest/browser', express.json({ limit: '35mb' }), async (req, res
         // extension had already reduced to a status code.
         console.error('[BrowserIngest] Failed to examine a submitted message:', error);
         ingestionRegistry.recordFailure('browser_watch', error);
-        res.status(500).json({ success: false, error: error.message });
+
+        /**
+         * A 500 that says what went wrong.
+         *
+         * This returned `error.message` alone, and the extension reported
+         * "PhishLens returned 500." with nothing after it - which is what a
+         * *blank* message looks like. Not every throw carries one: a TypeError
+         * on a missing property does, but a rejected promise with no reason, a
+         * thrown string, or an AggregateError do not.
+         *
+         * So the reply carries the error's name and the first frame of its
+         * stack as well. That names the file and line, which is the difference
+         * between a fault somebody can find and a status code.
+         *
+         * Deliberately no message content: the reply travels to a script
+         * running inside a mail page, and the point of failing is not to hand
+         * somebody's mail back out through the error path.
+         */
+        // Built from a character code: a literal newline inside this
+        // expression is what an earlier edit injected here, and it is not
+        // visible in a diff.
+        const NEWLINE = String.fromCharCode(10);
+        const firstFrame = String(error?.stack || '').split(NEWLINE).find(line => line.trim().startsWith('at ')) || '';
+        const described = [
+            error?.name && error.name !== 'Error' ? error.name : null,
+            error?.message || null,
+            firstFrame ? firstFrame.trim().slice(0, 160) : null
+        ].filter(Boolean).join(' - ') || 'The pipeline threw without a message. Check the desktop application log.';
+
+        res.status(500).json({ success: false, error: described });
     }
 });
 

@@ -373,8 +373,18 @@
         pagesWithNothingNew: 0,
         startedAt: null,
         finishedAt: null,
-        lastError: null
+        lastError: null,
+        // Gmail's own count, so the percentage means something. Null when it
+        // cannot be read, and then no percentage is shown at all - a bar moving
+        // against an invented total implies knowledge of how much is left.
+        total: null
     };
+
+    /** Progress as a percentage, or null when there is no honest denominator. */
+    function backlogPercent() {
+        if (!backlog.total || backlog.total <= 0) return null;
+        return Math.min(100, Math.round((backlog.examined / backlog.total) * 100));
+    }
 
     function backlogReport(phase) {
         report({
@@ -384,6 +394,8 @@
                 page: backlog.page,
                 examined: backlog.examined,
                 failed: backlog.failed,
+                total: backlog.total,
+                percent: backlogPercent(),
                 startedAt: backlog.startedAt,
                 finishedAt: backlog.finishedAt,
                 lastError: backlog.lastError
@@ -397,6 +409,8 @@
                     page: backlog.page,
                     examined: backlog.examined,
                     failed: backlog.failed,
+                    total: backlog.total,
+                    percent: backlogPercent(),
                     startedAt: backlog.startedAt,
                     finishedAt: backlog.finishedAt,
                     lastError: backlog.lastError,
@@ -485,6 +499,10 @@
         backlog.startedAt = new Date().toISOString();
         backlog.finishedAt = null;
         backlog.lastError = null;
+        // Read once, from Gmail's own "1-50 of 2,267". Re-reading each page
+        // would make the denominator move as mail arrives, and a progress bar
+        // that goes backwards is worse than none.
+        backlog.total = typeof provider.totalCount === 'function' ? provider.totalCount(document) : null;
         backlogReport('started');
 
         try {
@@ -537,7 +555,7 @@
                         await pause(Math.max(0, quietUntil - Date.now()));
                     }
                     await pause(BACKLOG_PACE_MS);
-                    if (backlog.examined % 10 === 0) backlogReport('running');
+                    if (backlog.examined % 3 === 0) backlogReport('running');
                 }
 
                 backlog.page += 1;

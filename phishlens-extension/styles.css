@@ -516,3 +516,37 @@ h2 {
   color: var(--text-dim);
   margin-bottom: 8px;
 }
+
+/* Scan progress.
+   Only rendered when there is a real denominator - Gmail prints "1-50 of
+   2,267" and that count is the only honest basis for a percentage. */
+.backlog-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.backlog-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background-color: var(--bg-raised);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.backlog-bar-fill {
+  height: 100%;
+  width: 0%;
+  background-color: var(--accent);
+  transition: width 0.4s ease;
+}
+
+.backlog-percent {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+  min-width: 34px;
+  text-align: right;
+}

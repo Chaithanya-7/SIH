@@ -58,7 +58,7 @@ let backlogTabId = null;
  * so the cost of that choice is paid in patience here rather than in a scan
  * that silently reads an empty page.
  */
-const BACKLOG_READY_TIMEOUT_MS = 75000;
+const BACKLOG_READY_TIMEOUT_MS = 25000;
 
 /** Polls the injected reader until it can see mail, or says why it never could. */
 async function waitForReader(tabId, timeoutMs) {
@@ -95,63 +95,82 @@ async function waitForReader(tabId, timeoutMs) {
 }
 
 async function startBacklogScan(startPage) {
-  if (!ext.tabs?.create || !ext.scripting?.executeScript) {
-    return { ok: false, error: 'This browser build cannot open a tab for the scan.' };
+  if (!ext.tabs?.query) {
+    return { ok: false, error: 'This browser build cannot reach the mail tab.' };
   }
 
-  // Already running somewhere: say so rather than starting a second one, which
-  // would double the request rate at the mail provider - the one thing the
-  // pacing exists to avoid.
+  // Already running: say so rather than starting a second one, which would
+  // double the request rate at the mail provider - the one thing the pacing
+  // exists to avoid.
   const existing = await forwardToBacklogTab({ type: 'phishlens:backlog-status' });
   if (existing?.ok && existing.backlog?.running) {
     return { ok: false, error: 'A backlog scan is already running.', backlog: existing.backlog };
   }
 
+  /**
+   * The scan runs in the mail tab that is already open.
+   *
+   * It used to open a tab of its own, so that paging through the list would not
+   * move the page under somebody reading their mail. That turned out to cost
+   * more than it saved: a browser throttles a tab it is not showing, and a mail
+   * client is a large application, so the list frequently never rendered there
+   * at all - the scan read an empty document and stopped, having reported that
+   * it had started.
+   *
+   * Using the open tab is also what was asked for. The cost is honest and
+   * visible: the list will page through the mailbox while it runs, which is
+   * disruptive if you are reading. The popup says so before it starts.
+   */
+  let tabs = [];
   try {
-    const tab = await ext.tabs.create({ url: 'https://mail.google.com/mail/u/0/#inbox', active: false });
-    backlogTabId = tab.id;
-
-    // Enough for the document to exist, which is all injection needs.
-    await new Promise(resolve => setTimeout(resolve, 2500));
-
-    await ext.scripting.executeScript({
-      target: { tabId: tab.id },
-      files: ['mail-providers.js', 'content-gmail.js']
-    });
-
-    // Then wait for the list to actually be there.
-    //
-    // This was a fixed six seconds, and it reported success regardless. Both
-    // halves were wrong. A background tab is throttled by the browser and a mail
-    // client is a large application, so six seconds is optimistic - and starting
-    // anyway meant the scan read an empty document, concluded the mailbox had no
-    // messages, and stopped, while the popup said "Scan started" and the backend
-    // received nothing. Zero examined *and* zero failures, which is what
-    // "nothing was even attempted" looks like.
-    //
-    // So it asks, repeatedly, and only claims to have started once the reader
-    // can see mail.
-    const ready = await waitForReader(tab.id, BACKLOG_READY_TIMEOUT_MS);
-    if (!ready.ok) {
-      try { ext.tabs.remove(tab.id); } catch (e) { /* already gone */ }
-      backlogTabId = null;
-      return { ok: false, error: ready.error, reader: ready.reader };
-    }
-
-    const started = await sendToTab(tab.id, { type: 'phishlens:backlog-start', startPage });
-    if (!started?.ok) {
-      return { ok: false, error: started?.error || 'The scan did not start in the new tab.' };
-    }
-
-    return {
-      ok: true,
-      tabId: tab.id,
-      pace_ms: started.pace_ms,
-      note: 'Running in a background tab. It is paced deliberately, so a full mailbox takes hours; closing that tab stops it and the next run resumes from the last completed page.'
-    };
+    tabs = await ext.tabs.query({ url: MAIL_HOSTS });
   } catch (e) {
-    return { ok: false, error: String(e && e.message || e).slice(0, 300) };
+    return { ok: false, error: `Could not look for a mail tab: ${e.message}` };
   }
+
+  if (!tabs.length) {
+    return { ok: false, error: 'No Gmail or Outlook tab is open. Open your mail and try again - the scan runs in that tab.' };
+  }
+
+  // The active one where there is a choice, since that is the one somebody
+  // means by "my mail".
+  const tab = tabs.find(t => t.active) || tabs[0];
+  backlogTabId = tab.id;
+
+  // The watcher is usually already in this tab. Injecting again is harmless -
+  // the content script carries a single-run guard - and covers a tab that was
+  // open before the extension last reloaded.
+  try {
+    if (ext.scripting?.executeScript) {
+      await ext.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ['mail-providers.js', 'content-gmail.js']
+      });
+    }
+  } catch (e) {
+    return { ok: false, error: `Could not start the reader in the mail tab: ${e.message}` };
+  }
+
+  // The list is normally already rendered in a tab somebody has open, so this
+  // is a short confirmation rather than the long wait a background tab needed.
+  const ready = await waitForReader(tab.id, BACKLOG_READY_TIMEOUT_MS);
+  if (!ready.ok) {
+    backlogTabId = null;
+    return { ok: false, error: ready.error, reader: ready.reader };
+  }
+
+  const started = await sendToTab(tab.id, { type: 'phishlens:backlog-start', startPage });
+  if (!started?.ok) {
+    return { ok: false, error: started?.error || 'The scan did not start in the mail tab.' };
+  }
+
+  return {
+    ok: true,
+    tabId: tab.id,
+    pace_ms: started.pace_ms,
+    rows_visible: ready.rows,
+    note: 'Running in your open mail tab. It pages through the mailbox as it goes, so the list will move while it runs. It is paced deliberately, so a full mailbox takes hours.'
+  };
 }
 
 function sendToTab(tabId, message) {

@@ -259,6 +259,44 @@
             return this.findRows(doc).length;
         },
 
+        /**
+         * How many messages the mailbox holds, from Gmail's own count.
+         *
+         * Gmail prints "1-50 of 2,267" above the list. That is the only honest
+         * denominator available for a progress figure: anything else would be a
+         * bar that moves at a rate nobody can justify.
+         *
+         * Returns null when it cannot be read, and a percentage is then not
+         * shown at all. A progress bar with an invented total is worse than a
+         * count, because it implies knowledge of how much is left.
+         */
+        totalCount(doc) {
+            // The element Gmail uses for the range, and a text fallback for
+            // when that class changes - which is exactly what happened to the
+            // row selector.
+            const candidates = [];
+            const labelled = doc.querySelector('.Dj, [aria-label*="of"][role="button"], .ts');
+            if (labelled) candidates.push(labelled.textContent || '');
+
+            for (const el of doc.querySelectorAll('span, div')) {
+                const text = (el.textContent || '').trim();
+                if (text.length < 5 || text.length > 40) continue;
+                if (/\bof\b/i.test(text) && /\d/.test(text)) candidates.push(text);
+                if (candidates.length > 40) break;
+            }
+
+            for (const text of candidates) {
+                // "1-50 of 2,267" or "1–50 of 2,267"
+                const m = text.replace(/,/g, '').match(/of\s+([\d]+)\s*$/i)
+                    || text.replace(/,/g, '').match(/of\s+about\s+([\d]+)/i);
+                if (m) {
+                    const total = Number(m[1]);
+                    if (Number.isFinite(total) && total > 0) return total;
+                }
+            }
+            return null;
+        },
+
         /** The account index in the URL, so a second signed-in account is not read as the first. */
         userIndex(loc) {
             const m = (loc.pathname || '').match(/\/mail\/u\/(\d+)/);

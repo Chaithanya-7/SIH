@@ -86,6 +86,13 @@
                scan that takes hours must never look like one that stalled. -->
           <div class="backlog">
             <div id="backlog-state" class="backlog-state">Existing mail has not been scanned.</div>
+            <!-- Shown only while a scan is running and only when Gmail's own
+                 message count could be read. A bar with an invented total
+                 implies knowledge of how much is left. -->
+            <div id="backlog-progress" class="backlog-progress hidden">
+              <div class="backlog-bar"><div id="backlog-bar-fill" class="backlog-bar-fill"></div></div>
+              <div id="backlog-percent" class="backlog-percent">0%</div>
+            </div>
             <button id="btn-backlog" class="btn-secondary full" type="button">Scan existing mail</button>
             <button id="btn-backlog-stop" class="link-btn hidden" type="button">Stop the scan</button>
           </div>
