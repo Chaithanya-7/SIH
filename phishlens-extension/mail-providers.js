@@ -30,19 +30,112 @@
          * for a row and `zE` for unread have been stable for years.
          */
         listVisible(doc) {
-            const rows = doc.querySelectorAll('tr.zA, div[role="listitem"][data-legacy-message-id]');
             const found = [];
-            rows.forEach(row => {
+            const seen = new Set();
+
+            for (const row of this.findRows(doc)) {
                 const id = this.identify(row);
-                if (!id) return;
+                if (!id || seen.has(id)) continue;
+                seen.add(id);
                 const label = row.getAttribute('aria-label') || '';
                 found.push({
                     id,
                     unread: row.classList.contains('zE') || /(^|,\s*)unread/i.test(label),
                     row
                 });
-            });
+            }
             return found;
+        },
+
+        /**
+         * The message rows on the page, found without depending on a class name.
+         *
+         * The reader used to search for `tr.zA`, the class Gmail had used for a
+         * row for years. It stopped matching, and the result was a 2,267-message
+         * inbox reported as "found no messages in the list" - which reads as an
+         * empty inbox rather than as a broken reader.
+         *
+         * A class name is the wrong thing to depend on. Gmail generates most of
+         * them and is free to change any of them in a release nobody announces.
+         *
+         * So the search is inverted. Rather than finding rows and then looking
+         * for an identifier inside each, it finds the elements *carrying* a
+         * message or thread identifier - which Gmail must publish somewhere for
+         * its own code to work - and climbs to the row that contains each. That
+         * survives every class rename, and it fails only if Gmail stops
+         * publishing identifiers in the DOM at all, which would be a far larger
+         * change than a restyle.
+         *
+         * The class-based selector is kept as a first pass because it is exact
+         * and cheap when it works.
+         */
+        findRows(doc) {
+            const byClass = Array.from(doc.querySelectorAll('tr.zA, div[role="listitem"][data-legacy-message-id]'));
+            if (byClass.length) return byClass;
+
+            const ID_ATTRIBUTES = ['data-legacy-message-id', 'data-legacy-thread-id', 'data-thread-id'];
+            const carriers = doc.querySelectorAll('[' + ID_ATTRIBUTES.join('],[') + ']');
+
+            const rows = [];
+            const seen = new Set();
+
+            for (const carrier of carriers) {
+                // The row that holds this identifier. A table row or an
+                // explicit list item where one exists, and otherwise the
+                // nearest ancestor that looks like a row of a list.
+                const row = carrier.closest('tr, [role="listitem"], [role="row"]') || carrier.parentElement || carrier;
+                if (!row || seen.has(row)) continue;
+
+                // A carrier in the reading pane or a menu is not a list row.
+                // Requiring an ancestor list keeps those out without naming a
+                // single class.
+                if (!row.closest('[role="list"], [role="grid"], [role="main"], table')) continue;
+
+                seen.add(row);
+                rows.push(row);
+            }
+
+            return rows;
+        },
+
+        /**
+         * What the reader can see, for when it can see nothing.
+         *
+         * "Found no messages in the list" gives nobody anything to act on, and
+         * it is the report that matters most because it means the reader no
+         * longer matches the page. This says which strategy matched, and when
+         * none did, what identifier-bearing attributes exist on the page at all
+         * - which is the fact needed to widen the reader without guessing.
+         */
+        describeReader(doc) {
+            const byClass = doc.querySelectorAll('tr.zA, div[role="listitem"][data-legacy-message-id]').length;
+            const ID_ATTRIBUTES = ['data-legacy-message-id', 'data-legacy-thread-id', 'data-thread-id'];
+            const carriers = doc.querySelectorAll('[' + ID_ATTRIBUTES.join('],[') + ']').length;
+            const rows = this.findRows(doc).length;
+
+            // A short census of data-attributes actually present, so a reader
+            // that matches nothing can still report what the page does carry.
+            const attributes = new Map();
+            let scanned = 0;
+            for (const el of doc.querySelectorAll('[role="listitem"], [role="row"], tr')) {
+                if (scanned++ > 400) break;
+                for (const attribute of el.getAttributeNames ? el.getAttributeNames() : []) {
+                    if (!attribute.startsWith('data-')) continue;
+                    attributes.set(attribute, (attributes.get(attribute) || 0) + 1);
+                }
+            }
+
+            return {
+                matched_by: byClass ? 'class selector' : (rows ? 'identifier attributes' : 'nothing'),
+                rows_by_class: byClass,
+                identifier_carriers: carriers,
+                rows_found: rows,
+                row_like_elements: scanned,
+                data_attributes_seen: Array.from(attributes.entries())
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 8)
+                    .map(([name, count]) => `${name} (${count})`)
+            };
         },
 
         /**
@@ -108,7 +201,7 @@
 
         /** How many rows were on the page, regardless of whether any could be identified. */
         countRows(doc) {
-            return doc.querySelectorAll('tr.zA, div[role="listitem"][data-legacy-message-id]').length;
+            return this.findRows(doc).length;
         },
 
         /** The account index in the URL, so a second signed-in account is not read as the first. */

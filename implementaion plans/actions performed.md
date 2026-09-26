@@ -199,6 +199,58 @@ service. Place names stay at every zoom: they are what makes photography
 legible at all.
 Commit: (this commit)
 
+**A-082 - A reader that stopped matching Gmail, and reported it as an empty inbox**
+What: Inverted row discovery so it no longer depends on a class name, and made
+the failure self-describing.
+Status: `Done` - 402 backend + 20 console + 37 desktop tests passing
+Evidence: The popup said *"Running on mail.google.com but found no messages in
+the list"* over an inbox of **2,267 messages**, and the backlog scan sat on
+"Scanning..." reporting `0 examined, page 1`.
+
+That is the third of the three messages built into the popup for exactly this,
+and it was right: `listVisible()` and `countRows()` both searched
+`tr.zA, div[role="listitem"][data-legacy-message-id]`, and neither matched.
+`zA` had been Gmail's row class for years. Gmail is free to change it in any
+release, and did.
+
+**A class name was the wrong thing to depend on.** The search is now inverted:
+rather than finding rows and looking for an identifier inside each, it finds the
+elements *carrying* a message or thread id - which Gmail must publish somewhere
+for its own code to work - and climbs to the row containing each
+(`closest('tr, [role="listitem"], [role="row"]')`). That survives every class
+rename and fails only if Gmail stops publishing identifiers in the DOM at all.
+The class selector is kept as a first pass because it is exact and cheap when it
+works.
+
+Two traps handled in the same change:
+- **One id on several nested elements yields one row.** Climbing from every
+  carrier would otherwise submit the same message once per element mentioning it.
+- **An identifier in the reading pane is not a list row.** Requiring an ancestor
+  `[role="list"] / [role="grid"] / [role="main"] / table` excludes the open
+  message without naming a single class.
+
+**The failure now describes itself.** "Found no messages in the list" is
+unactionable and is the one report that most needs acting on - a reader that has
+stopped matching reads exactly like an empty inbox. `describeReader()` reports
+which strategy matched, how many identifier carriers exist, how many row-like
+elements were examined, and a census of the `data-` attributes the page actually
+carries. The popup shows it. That is the fact needed to widen the reader without
+having the page.
+
+**The backlog scan stops instead of pretending.** With no rows on page one it
+was paging on regardless, spending fifteen seconds per page waiting for a list
+that would never appear while displaying "Scanning...". It now breaks
+immediately and says the layout no longer matches, rather than that the mailbox
+is empty.
+
+A test-only defect found on the way: `assert.deepStrictEqual` compares
+prototypes, and `mail-providers.js` is evaluated in a `vm` context - so an array
+it returns carries that context's `Array` prototype and fails against an
+identical array from the test realm. The production code was correct; the
+comparison spreads into a local array now.
+Commit: (this commit)
+
+
 **A-081 - 8.3 GB reclaimed, and the rejected-key dead end fixed**
 What: Deleted the superseded build output, then diagnosed and fixed the
 extension's "Not authorized" state.

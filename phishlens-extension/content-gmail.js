@@ -272,10 +272,20 @@
         // which reads as the reader not matching the page, when in fact it
         // matched every row and threw them all away.
         const rowsOnPage = typeof provider.countRows === 'function' ? provider.countRows(document) : visible.length;
+
+        // When the reader finds nothing, what it *can* see is the only useful
+        // thing to send. "No messages in the list" reads as an empty inbox and
+        // is the one report that actually means the reader no longer matches
+        // the page - so it travels with a census of what the page carries.
+        const reader = (rowsOnPage === 0 && typeof provider.describeReader === 'function')
+            ? provider.describeReader(document)
+            : null;
+
         report({
             rowsSeen: rowsOnPage,
             identified: visible.length,
             provider: provider.id || 'unknown',
+            reader,
             phase: 'listed'
         });
         // Unread first. Those are the ones not yet opened, which is the whole
@@ -490,6 +500,16 @@
 
                 signature = listSignature();
                 const rows = provider.listVisible(document);
+
+                // A reader that matches nothing will match nothing on page two
+                // as well. Paging on regardless spends fifteen seconds per page
+                // waiting for a list that will never appear, and reports
+                // "scanning" throughout - which looks like progress and is not.
+                if (backlog.page === 1 && rows.length === 0 && (provider.countRows?.(document) || 0) === 0) {
+                    backlog.lastError = 'The reader found no messages on this page, so there is nothing to scan. This means the page layout no longer matches what the reader expects, not that the mailbox is empty.';
+                    break;
+                }
+
                 const fresh = rows.filter(r => !seen.has(`${location.hostname}:${r.id}`));
 
                 if (!fresh.length) {

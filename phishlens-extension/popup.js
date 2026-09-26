@@ -105,7 +105,17 @@ document.addEventListener('DOMContentLoaded', () => {
           watchState.textContent = `Watching ${status.host}, but the last sweep stopped: ${status.error}`;
         } else if (seen === 0) {
           // Nothing on the page the reader recognises as a message row.
-          watchState.textContent = `Running on ${status.host} but found no messages in the list ${ago}s ago. If mail is on screen, this reader no longer matches that page.`;
+          //
+          // The sweep now sends a census of what the page does carry, because
+          // this sentence on its own is unactionable and describes the one
+          // failure that most needs acting on: a reader that has stopped
+          // matching reads exactly like an empty inbox.
+          const reader = status.reader;
+          const census = reader
+            ? ` Carriers of a message id on the page: ${reader.identifier_carriers}; row-like elements examined: ${reader.row_like_elements}.`
+              + (reader.data_attributes_seen?.length ? ` Attributes present: ${reader.data_attributes_seen.slice(0, 4).join(', ')}.` : '')
+            : '';
+          watchState.textContent = `Running on ${status.host} but found no messages in the list ${ago}s ago. If mail is on screen, this reader no longer matches that page.${census}`;
         } else if (Number(status.identified ?? seen) === 0) {
           // Rows were found and none could be identified. A different fault
           // from the one above, and it used to look exactly like it.

@@ -203,3 +203,108 @@ test('the fallback reads something usable when the raw message cannot be fetched
     assert.ok(typeof fallback.sender === 'string');
     assert.ok(fallback.subject || fallback.sender || fallback.snippet, 'the fallback read nothing at all');
 });
+
+test('rows are found when the class name has changed underneath us', () => {
+    const providers = loadProviders();
+
+    // The fault the user hit: a 2,267-message inbox reported as "found no
+    // messages in the list", which reads as an empty inbox rather than as a
+    // broken reader.
+    //
+    // The reader searched for `tr.zA`, a class Gmail had used for years and is
+    // free to change in any release. This markup carries identifiers exactly
+    // as Gmail does and uses none of the class names the old selector knew.
+    const dom = new JSDOM(`
+        <div role="main">
+          <div role="list">
+            <div role="listitem" class="XyZ9q">
+              <span data-legacy-message-id="18f3a1b2c3d4e5f6"></span>
+              <span class="bog">Funds/Securities Balance</span>
+            </div>
+            <div role="listitem" class="XyZ9q">
+              <span data-legacy-thread-id="18f3a1b2c3d4e5f7"></span>
+              <span class="bog">Quick check</span>
+            </div>
+          </div>
+        </div>
+    `);
+
+    const rows = providers.gmail.listVisible(dom.window.document);
+    assert.strictEqual(rows.length, 2, 'the rows must be found without any known class name');
+    assert.strictEqual(rows[0].id, '18f3a1b2c3d4e5f6');
+    assert.strictEqual(providers.gmail.countRows(dom.window.document), 2,
+        'and the count must agree, or the popup reports an empty inbox');
+});
+
+test('one identifier carried on several nested elements yields one row', () => {
+    const providers = loadProviders();
+
+    // Climbing from every carrier to its row would otherwise submit the same
+    // message once per nested element that mentions it.
+    const dom = new JSDOM(`
+        <div role="main"><div role="list">
+          <div role="listitem">
+            <span data-legacy-message-id="18aaa"></span>
+            <div><span data-thread-id="#thread-f:18aaa"></span></div>
+            <span class="bog">Only one message here</span>
+          </div>
+        </div></div>
+    `);
+
+    assert.strictEqual(providers.gmail.findRows(dom.window.document).length, 1);
+    assert.strictEqual(providers.gmail.listVisible(dom.window.document).length, 1);
+});
+
+test('an identifier outside the list is not read as a row', () => {
+    const providers = loadProviders();
+
+    // The open message in the reading pane carries the same attributes. Treating
+    // it as a list row would examine whatever is on screen over and over.
+    const dom = new JSDOM(`
+        <div role="main">
+          <div role="list">
+            <div role="listitem"><span data-legacy-message-id="18real"></span></div>
+          </div>
+        </div>
+        <aside><div data-legacy-message-id="18inpane">open message</div></aside>
+    `);
+
+    // Spread into an array of this realm before comparing. The providers module
+    // is evaluated in a vm context, so the array it returns carries that
+    // context's Array prototype - and deepStrictEqual compares prototypes, so
+    // two arrays with identical contents fail against each other.
+    const ids = [...providers.gmail.listVisible(dom.window.document).map(r => r.id)];
+    assert.deepStrictEqual(ids, ['18real']);
+});
+
+test('the reader can say what it sees when it sees nothing', () => {
+    const providers = loadProviders();
+
+    // "Found no messages in the list" is unactionable and describes the failure
+    // that most needs acting on. The census is what makes it fixable without
+    // having the page in front of you.
+    const dom = new JSDOM(`
+        <div role="main"><div role="list">
+          <div role="listitem" data-something-else="1">a row this reader does not understand</div>
+        </div></div>
+    `);
+
+    const described = providers.gmail.describeReader(dom.window.document);
+
+    assert.strictEqual(described.matched_by, 'nothing');
+    assert.strictEqual(described.rows_found, 0);
+    assert.strictEqual(described.identifier_carriers, 0);
+    assert.ok(described.row_like_elements > 0, 'it must report that row-like elements do exist');
+    assert.ok(described.data_attributes_seen.some(a => a.startsWith('data-something-else')),
+        'and name the attributes the page actually carries, which is what widens the reader');
+});
+
+test('the class selector is still preferred when it matches', () => {
+    const providers = loadProviders();
+
+    // Exact and cheap when it works; the census only earns its cost when it
+    // does not.
+    const described = providers.gmail.describeReader(fixtureDocument());
+    assert.strictEqual(described.matched_by, 'class selector');
+    assert.ok(described.rows_by_class > 0);
+});
