@@ -199,6 +199,71 @@ service. Place names stay at every zoom: they are what makes photography
 legible at all.
 Commit: (this commit)
 
+**A-077 - Proof behind a clean verdict, notification on this machine, and the truth about map recency**
+What: Addressed the restated objective in three parts.
+Status: `Done` - 379 backend + 37 desktop + 5 console tests passing
+Evidence:
+
+**1. A clean verdict had nothing behind it.** Measured: a message with SPF,
+DKIM and DMARC all passing produced *verdict SAFE, evidence items 0,
+contributions 0*. A green label with literally nothing to read, which is
+indistinguishable from an analysis that fell over - and the reassuring reading
+is the more common one. New `assuranceEvidence.js` records ten checks with, for
+each, what it concluded and **what passing it does not rule out**. A clean
+message now shows nine substantiated checks.
+
+**It must never reduce a threat score**, and several tests exist only to hold
+that line. This system already detects phishing sent through real platforms and
+compromised accounts - all of which passes every authentication check because
+nothing about it is forged. Netting assurance off against suspicion would mean
+the better an attacker's infrastructure, the safer their mail looked. It runs
+*after* `confidenceEngine.calculate`, touches neither `confidence` nor
+`detection`, and a test asserts the pipeline order.
+
+A check that did not run is never reported as one that passed. The feed check
+says so explicitly - an empty match list from feeds never loaded looks identical
+to one from feeds that were.
+
+**2. Notification was webhook-only.** `SOC_WEBHOOK_URL` is right for a security
+team and does nothing for somebody watching their own mail on their own laptop -
+a verdict reached them only if they went and looked. New
+`phishlens-desktop/threatNotifier.js`: native OS notification on HIGH_RISK and
+SUSPICIOUS, clicking one focuses the window and opens the case through the
+`phishlens:navigate` route the deep-link handler already had. Never says a
+message is safe (that would train trust in the absence of one, which also
+happens when the backend is down); never shows body text (a notification is
+rendered by the OS and can appear on a lock screen); never fires for historical
+cases, and summarises a burst rather than firing individually - a mailbox scan
+would otherwise produce hundreds of toasts about mail from years ago and get
+notifications switched off entirely.
+
+The desktop packaging test caught that `threatNotifier.js` was absent from
+`build.files`, which would have shipped an installer that died on launch.
+
+**3. Map recency - measured, and the answer is not what was asked for.**
+Followed the Esri Clarity endpoint, found it redirects to Esri **Wayback**
+(versioned imagery releases), fetched Esri's release config (196 releases; the
+keys are *not* date-ordered - 64776 is 2023, 64001 is 2026) and found the newest
+release: **26334, dated 2026-08-05**.
+
+Then compared four tiles from that newest release against the standard World
+Imagery layer already in use: **byte-identical, all four.** The map already
+serves the newest photography Esri publishes. Wayback also measured **~1600 ms
+against ~450-720 ms** for the same twelve tiles across three runs - 3x slower
+for identical pixels, because of a 301 per tile. Not adopted.
+
+So the honest improvements were different from the request:
+- Added **Sentinel-2 cloudless 2024** (EOX, free) as a basemap. Not sharper -
+  10 m/px, stops at zoom 14, no buildings - but *uniformly* recent everywhere.
+  Where Esri's mosaic has nothing newer than 2012 (parts of Siberia), this is
+  genuinely the more current picture.
+- **Split the caption.** Streets, boundaries and place names are vector data and
+  are current (OSM edits appear within days). Photography is whenever it was
+  last flown. One caption was blurring the two, so "recent" could not be
+  correctly attributed to either half.
+Commit: (this commit)
+
+
 **A-076 - Wireshark network intelligence, wired in at last**
 What: Made the TShark capability actually run, and reach a verdict.
 Status: `Done` - 368 backend + 5 console + 33 desktop tests passing

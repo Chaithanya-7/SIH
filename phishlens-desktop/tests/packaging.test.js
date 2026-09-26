@@ -332,3 +332,56 @@ test('the extension source can be pointed at a checkout, and a bad pointer is ig
     assert.doesNotMatch(source, /process\.env\.PHISHLENS_EXTENSION/,
         'the source folder is not taken from the environment');
 });
+
+test('the notifier never tells anybody a message is safe', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const source = fs.readFileSync(path.join(__dirname, '..', 'threatNotifier.js'), 'utf8');
+
+    // A notification reading "this email is fine" would train somebody to trust
+    // the absence of one - and the absence also happens when the backend is
+    // down, the poll failed, or the message never reached the system at all.
+    assert.match(source, /NOTIFY_VERDICTS = new Set\(\['HIGH_RISK', 'SUSPICIOUS'\]\)/,
+        'only high-risk and suspicious may raise a notification');
+    assert.ok(!/SAFE/.test(source.replace(/\*[\s\S]*?\*\//g, '')),
+        'a safe verdict must not appear in the notifier logic at all');
+});
+
+test('the notifier does not put message bodies on the screen', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const source = fs.readFileSync(path.join(__dirname, '..', 'threatNotifier.js'), 'utf8');
+
+    // A notification is rendered by the operating system, may be logged by it,
+    // and can appear on a lock screen in front of whoever is standing there. The
+    // subject and sender are already visible in the person's mail client; the
+    // body is not.
+    for (const forbidden of ['textBody', 'htmlBody', 'snippet', '_raw_email_string', 'body_preview']) {
+        assert.ok(!source.includes(forbidden), `the notification must not read ${forbidden}`);
+    }
+});
+
+test('a backlog scan does not produce a storm of notifications', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const source = fs.readFileSync(path.join(__dirname, '..', 'threatNotifier.js'), 'utf8');
+
+    // Scanning a mailbox can produce hundreds of verdicts about mail from years
+    // ago in one afternoon. Every one would be a toast about something long
+    // since dealt with, and the result is that notifications get switched off
+    // altogether - taking the live ones with them.
+    assert.match(source, /analysis_mode\?\.mode === 'HISTORICAL'\) return false/,
+        'historical cases must not notify');
+    assert.match(source, /MAX_MESSAGE_AGE_MS/, 'nor should a case about genuinely old mail');
+    assert.match(source, /BURST_THRESHOLD/, 'and a burst of live ones must be summarised, not fired one by one');
+});
+
+test('the notifier is stopped when the app quits', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
+
+    // A timer left running holds the process and the app does not exit.
+    assert.match(main, /before-quit['"]\s*,\s*\(\)\s*=>\s*\{\s*notifier\.stop\(\)/,
+        'the poll must stop on quit, or the process will not exit');
+});

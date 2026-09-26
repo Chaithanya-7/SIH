@@ -168,6 +168,39 @@ const BASEMAPS = [
         ]
     },
     {
+        id: 'uniform',
+        label: 'Uniform 2024',
+        // The honest answer to "I do not want old imagery".
+        //
+        // The satellite layer above is already the newest photography Esri
+        // publishes - verified by fetching the same tiles from Esri's own
+        // newest archived release and comparing them byte for byte: identical.
+        // There is no newer free source to switch to, and there is no paid one
+        // with globally current coverage either.
+        //
+        // What can be fixed is the *unevenness*. Esri's mosaic is assembled from
+        // flights and passes of wildly different ages: a city may be months old
+        // while parts of Siberia have nothing newer than 2012. This layer is a
+        // single cloud-free Sentinel-2 composite for one stated year, so every
+        // place on earth is from the same recent period.
+        //
+        // The trade is resolution: 10 metres per pixel against sub-metre in
+        // cities, so it stops at zoom 14 and shows no buildings. Offered beside
+        // the others rather than instead of them, because for a location where
+        // Esri's photography is a decade old this is genuinely the more current
+        // picture, and for a city centre it is plainly the worse one.
+        url: 'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/g/{z}/{y}/{x}.jpg',
+        attribution: 'Sentinel-2 cloudless 2024 by EOX IT Services, contains modified Copernicus Sentinel data',
+        maxZoom: 14,
+        maxNativeZoom: 14,
+        // Same treatment as the satellite layer: a drawn map underneath so
+        // nowhere is ever blank, and streets on top, because a 10 m composite
+        // has no roads a person can follow.
+        fallbackUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+        fallbackMaxZoom: 12,
+        uniformYear: 2024
+    },
+    {
         id: 'terrain',
         label: 'Terrain',
         url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
@@ -492,6 +525,24 @@ export default function GlobalThreatMap({ points = [], coverage }) {
                                 {imagery.resolution ? ` · ${imagery.resolution} m per pixel` : ''}
                             </span>
                         )}
+                        {basemap.uniformYear && (
+                            <span style={{ display: 'block', marginTop: '3px' }}>
+                                Photography from {basemap.uniformYear} everywhere · 10 m per pixel, so no buildings
+                            </span>
+                        )}
+                        {/* Two different datasets with two different ages, which
+                            one caption used to blur together.
+
+                            Roads, boundaries and place names are vector data and
+                            are genuinely current: OpenStreetMap edits appear
+                            within days and Esri's reference layers refresh on
+                            their own schedule. Aerial photography is not, cannot
+                            be made so, and is the thing above that carries a
+                            date. Somebody told the map is "recent" deserves to
+                            know which half that applies to. */}
+                        <span style={{ display: 'block', marginTop: '3px', color: 'var(--text-dim)' }}>
+                            Streets, boundaries and place names are kept current. Photography is whenever it was last flown, which varies by place and is stated above.
+                        </span>
                     </div>
                 </div>
                 <div style={{ display: 'flex', gap: '14px', fontSize: '0.7rem', alignItems: 'center' }}>

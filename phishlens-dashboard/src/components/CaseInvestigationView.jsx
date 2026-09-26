@@ -28,6 +28,10 @@ export default function CaseInvestigationView({ selectedCase, onOpenReport }) {
   const qr = selectedCase.qr || null;
   const arc = selectedCase.forensics?.arc || null;
   const nlp = selectedCase.nlp || { status: 'NOT_ANALYZED', signals: [], score: 0 };
+  // The record of what was checked and came back clean. For a safe case this
+  // is the only thing there is to read - the evidence list is empty by
+  // definition - so it is a tab of its own rather than a footnote.
+  const assurance = selectedCase.assurance || null;
   const behavioral = selectedCase.behavioral || { status: 'NOT_ANALYZED', signals: [] };
   const adaptive = selectedCase.adaptive || { status: 'NOT_SCORED', contributions: [] };
   const threatIntel = selectedCase.threat_intelligence || { status: 'NOT_ANALYZED', matches: [], domain_ages: [] };
@@ -126,6 +130,7 @@ export default function CaseInvestigationView({ selectedCase, onOpenReport }) {
           { id: 'threatintel', label: `Threat Intel (${threatIntel.matches?.length || 0})` },
           { id: 'infrastructure', label: 'Infrastructure' },
           { id: 'evidence', label: `Evidence (${evidence.length})` },
+          { id: 'assurance', label: assurance ? `What was checked (${assurance.passed}/${assurance.total})` : 'What was checked' },
           { id: 'iocs', label: 'IOCs' },
           { id: 'attachments', label: `Attachments (${attachments.length})` },
           { id: 'campaign', label: 'Campaign' },
@@ -458,10 +463,61 @@ export default function CaseInvestigationView({ selectedCase, onOpenReport }) {
       )}
 
       {/* EVIDENCE SECTION */}
+      {activeSection === 'assurance' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {!assurance ? (
+            <div style={{ color: 'var(--text-dim)', fontSize: '0.78rem', fontStyle: 'italic' }}>
+              This case was analysed before the record of checks existed.
+            </div>
+          ) : (
+            <>
+              <div style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border)', borderRadius: '6px', padding: '11px 13px' }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-primary)', lineHeight: 1.55 }}>{assurance.summary}</div>
+                {/* The limit belongs with the list, not in a footnote. A page of
+                    green ticks is exactly what mail from a compromised account
+                    produces. */}
+                <div style={{ fontSize: '0.71rem', color: 'var(--text-dim)', marginTop: '7px', lineHeight: 1.5 }}>
+                  {assurance.limitation}
+                </div>
+              </div>
+
+              {assurance.checks.map((item, idx) => {
+                const tone = item.result === 'PASSED'
+                  ? { colour: 'var(--success)', mark: 'Checked, clean' }
+                  : item.result === 'NOT_RUN'
+                    ? { colour: 'var(--warning)', mark: 'Not checked' }
+                    : { colour: 'var(--text-dim)', mark: 'Does not apply' };
+
+                return (
+                  <div key={idx} style={{ backgroundColor: 'var(--bg-panel)', borderRadius: '6px', border: '1px solid var(--border)', borderLeft: `3px solid ${tone.colour}`, padding: '10px 12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'baseline' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>{item.check}</span>
+                      <span style={{ fontSize: '0.66rem', fontWeight: 700, color: tone.colour, whiteSpace: 'nowrap' }}>{tone.mark}</span>
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px', lineHeight: 1.5 }}>{item.detail}</div>
+                    {item.does_not_rule_out && (
+                      /* Beside the pass, never below the list. A reader who sees
+                         "clean" and stops reading is the reader this is for. */
+                      <div style={{ fontSize: '0.71rem', color: 'var(--text-dim)', marginTop: '5px', lineHeight: 1.5, fontStyle: 'italic' }}>
+                        Does not rule out: {item.does_not_rule_out}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </>
+          )}
+        </div>
+      )}
+
       {activeSection === 'evidence' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {evidence.length === 0 ? (
-            <div style={{ color: 'var(--text-dim)', fontSize: '0.78rem', fontStyle: 'italic' }}>No forensic evidence items generated.</div>
+            <div style={{ color: 'var(--text-dim)', fontSize: '0.78rem', fontStyle: 'italic' }}>
+              Nothing was found against this message. What was examined is under
+              &ldquo;What was checked&rdquo; &mdash; an empty list here is not the
+              same as nothing having been looked at.
+            </div>
           ) : (
             evidence.map((ev, idx) => (
               <div key={idx} style={{ backgroundColor: 'var(--bg-panel)', borderRadius: '6px', border: '1px solid var(--border)', padding: '10px 12px' }}>

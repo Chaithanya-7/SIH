@@ -3,6 +3,7 @@ const publishExtension = require('./publishExtension');
 const path = require('path');
 const fs = require('fs');
 const BackendSupervisor = require('./backendSupervisor');
+const ThreatNotifier = require('./threatNotifier');
 
 /**
  * PhishLens desktop application.
@@ -27,6 +28,35 @@ const DEV_MODE = process.env.PHISHLENS_DEV === '1' || process.argv.includes('--d
 let mainWindow = null;
 let pendingRoute = null;
 const supervisor = new BackendSupervisor({ port: BACKEND_PORT });
+
+/**
+ * Native notification for high-risk and suspicious verdicts.
+ *
+ * Clicking one brings the window forward and opens that case, reusing the
+ * `phishlens:navigate` route the deep-link handler already defines rather than
+ * inventing a second way in.
+ */
+const notifier = new ThreatNotifier(supervisor, {
+    dataDir: app.getPath('userData'),
+    log: message => supervisor.record(message),
+    onOpenCase: caseId => {
+        const route = { route: 'case', caseId };
+        if (!mainWindow || mainWindow.isDestroyed()) {
+            createWindow(route);
+            return;
+        }
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.show();
+        mainWindow.focus();
+        if (supervisor.status === 'READY') {
+            mainWindow.webContents.send('phishlens:navigate', route);
+        } else {
+            // Delivered once the console is actually up, the same way a deep
+            // link that arrives too early is.
+            pendingRoute = route;
+        }
+    }
+});
 
 function packagedDashboardIndex() {
     const packaged = path.join(process.resourcesPath || '', 'dashboard', 'index.html');
@@ -258,6 +288,17 @@ if (!gotSingleInstanceLock) {
         // writes into the extension are the supervisor's.
         publishConfiguredExtension();
 
+        // Notification on this machine, for the person using it.
+        //
+        // Alerting previously meant an HTTP POST to a webhook if an operator had
+        // configured one - the right mechanism for a security team, and nothing
+        // at all for somebody watching their own mail on their own laptop.
+        // Without this, a verdict reaches them only if they go and look, which
+        // means the tool works only when they are already worried.
+        //
+        // Started after the backend, so the first poll has something to ask.
+        notifier.start();
+
         app.on('activate', () => {
             if (BrowserWindow.getAllWindows().length === 0) createWindow({ route: 'dashboard' });
         });
@@ -270,7 +311,7 @@ if (!gotSingleInstanceLock) {
 
 // An orphaned backend would hold the port and stop the app starting next time,
 // so every exit path stops the child this process started.
-app.on('before-quit', () => supervisor.stop());
+app.on('before-quit', () => { notifier.stop(); supervisor.stop(); });
 process.on('exit', () => supervisor.stop());
 process.on('SIGINT', () => { supervisor.stop(); app.quit(); });
 process.on('SIGTERM', () => { supervisor.stop(); app.quit(); });

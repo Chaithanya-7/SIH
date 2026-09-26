@@ -24,7 +24,8 @@
       "preload.js",
       "backendSupervisor.js",
       "startup.html",
-      "publishExtension.js"
+      "publishExtension.js",
+      "threatNotifier.js"
     ],
     "extraResources": [
       {

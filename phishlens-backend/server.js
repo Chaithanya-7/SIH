@@ -28,6 +28,7 @@ const nlpAnalyzer = require('./modules/nlpAnalyzer');
 const payloadChannel = require('./modules/payloadChannel');
 const trustedServiceAbuse = require('./modules/trustedServiceAbuse');
 const historicalMode = require('./modules/historicalMode');
+const assuranceEvidence = require('./modules/assuranceEvidence');
 const networkObserver = require('./modules/networkObserver');
 const connectionWatchlist = require('./modules/connectionWatchlist');
 const connectionFollowUp = require('./modules/connectionFollowUp');
@@ -331,6 +332,24 @@ async function processPipeline(emailContent, source = 'MANUAL_API', clientMessag
 
         // 12. 3-Tier Confidence Calculation Engine (also determines the final verdict)
         threatObject = confidenceEngine.calculate(threatObject);
+
+        // 12b. What was checked and came back clean.
+        //
+        //      Runs after the verdict, deliberately, and cannot change it -
+        //      nothing in this module touches `confidence` or `detection`. A
+        //      message that came back clean previously produced an empty
+        //      evidence list: zero findings, zero contributions, a green label
+        //      with nothing behind it. That is indistinguishable from an
+        //      analysis that fell over, and the reassuring reading is the more
+        //      common one.
+        //
+        //      It must never be netted off against suspicion. Phishing sent
+        //      through a real platform or a compromised account passes every
+        //      authentication check there is, because nothing about it is
+        //      forged - so subtracting assurance from a threat score would mean
+        //      the better an attacker's infrastructure, the safer their mail
+        //      looked.
+        threatObject = assuranceEvidence.assess(threatObject, parsedEmail);
 
         // 13. Contextual Policy Engine Evaluation
         const policyDecision = policyEngine.evaluate(threatObject);
