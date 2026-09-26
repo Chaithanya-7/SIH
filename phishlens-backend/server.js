@@ -29,6 +29,7 @@ const payloadChannel = require('./modules/payloadChannel');
 const trustedServiceAbuse = require('./modules/trustedServiceAbuse');
 const historicalMode = require('./modules/historicalMode');
 const assuranceEvidence = require('./modules/assuranceEvidence');
+const mailTransportFlow = require('./modules/mailTransportFlow');
 const networkObserver = require('./modules/networkObserver');
 const connectionWatchlist = require('./modules/connectionWatchlist');
 const connectionFollowUp = require('./modules/connectionFollowUp');
@@ -1181,6 +1182,42 @@ app.get('/api/cases', (req, res) => {
     }
 
     res.json({ success: true, count: allCases.length, cases: allCases });
+});
+
+/**
+ * Every message as a transport flow, the way a packet analyser lists traffic.
+ *
+ * A projection of facts already stored, computed at read time rather than
+ * written onto cases - so it covers every case ever recorded with no migration
+ * and no re-analysis, and it never becomes a finding in its own right.
+ *
+ * `column_provenance` travels with it because the shape makes an implicit
+ * promise that every column was observed. Several of them cannot be, for most
+ * messages: a Received header is free text and rarely records a port. Those
+ * fields come back null rather than filled in, and the UI is told why.
+ */
+app.get('/api/flow', (req, res) => {
+    let allCases = caseManager.getAllCases();
+
+    // The same isolation /api/cases applies. A different view of the same data
+    // must not be a way around who may see it.
+    if (req.user) {
+        if (req.user.role === 'EMPLOYEE') {
+            allCases = allCases.filter(c =>
+                (c.message?.recipient || '').toLowerCase().includes(req.user.email.toLowerCase()) ||
+                (c.message?.sender || '').toLowerCase().includes(req.user.email.toLowerCase())
+            );
+        } else if (req.user.organization_id) {
+            allCases = allCases.filter(c => !c.organization_id || c.organization_id === req.user.organization_id);
+        }
+    }
+
+    res.json({
+        success: true,
+        count: allCases.length,
+        flow: mailTransportFlow.projectAll(allCases),
+        column_provenance: mailTransportFlow.columnProvenance()
+    });
 });
 
 /**

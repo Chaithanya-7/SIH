@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Shield, ShieldAlert, Network, UserCheck, Zap, History, FileText, Activity, LayoutDashboard, Menu, ChevronLeft, Search, RefreshCw, AlertTriangle, CheckCircle2, Sliders } from 'lucide-react';
 import { api, desktopReady } from '../services/api';
 
-import ThreatFeed from './ThreatFeed';
+import MailFlowList from './MailFlowList';
 import CaseInvestigationView from './CaseInvestigationView';
 import EvidenceGraphView from './EvidenceGraphView';
 import ExecutiveView from './ExecutiveView';
@@ -348,8 +348,11 @@ export default function Dashboard() {
 
           {/* INVESTIGATIONS NAV */}
           {activeNav === 'investigations' && (
-            <div className="desktop-grid animate-fade-in" style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '20px' }}>
-              <ThreatFeed cases={cases} selectedCase={selectedCase} onSelectCase={setSelectedCase} />
+            /* List above, detail below: the arrangement a packet analyser uses,
+               and the only one a ten-column table fits in. The 320px side
+               column this replaced could not hold addresses and ports at all. */
+            <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              <MailFlowList cases={cases} selectedCase={selectedCase} onSelectCase={setSelectedCase} />
               <CaseInvestigationView selectedCase={selectedCase} onOpenReport={() => setIsReportModalOpen(true)} />
             </div>
           )}

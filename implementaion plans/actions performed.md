@@ -199,6 +199,77 @@ service. Place names stay at every zoom: they are what makes photography
 legible at all.
 Commit: (this commit)
 
+**A-079 - The mail list rebuilt as a packet analyser, and a self-inflicted wound**
+What: Answered the geolocation question, then rebuilt "All emails" as a
+Wireshark-style flow list with a real display-filter language.
+Status: `Done` - 394 backend + 20 console + 37 desktop tests passing
+Evidence:
+
+**Geolocation, answered by reading the code.** TShark provides *no* geolocation
+here - verified, no geo reference in `connectionEvidence.js` or
+`networkObserver.js`. Wireshark can do MaxMind lookups; PhishLens does not use
+it that way and does not need to. Geolocation comes from `geoIntelAdapter.js`
+(ipwho.is, free): country, country_code, region, city, latitude, longitude, ASN,
+ISP, organization. So the capability exists and nothing needed adding. Two
+honest gaps recorded rather than papered over: **no accuracy radius** (ipwho.is
+does not return one) and **it is a remote call**, so each address is sent to a
+third party - which sits awkwardly with the local-only constraint. A
+downloadable local database would fix both; not done unasked, since it means a
+new ~60 MB data file and an attribution obligation.
+
+**The flow list.** New `mailTransportFlow.js` projects each case into a
+transport row at *read time* via `GET /api/flow`, so every case ever stored gets
+the view with no migration. New `MailFlowList.jsx` replaces `ThreatFeed.jsx`
+(deleted; nothing else imported it). Columns in the order asked for: **No.**
+carrying the coloured ball (red / yellow / green from the verdict), Time, Email,
+Source, S.Port, Destination, D.Port, Protocol, Len, **Info** last - which is also
+where Wireshark puts it. Selecting a row expands the hop chain beneath, the way
+Wireshark expands a frame into layers.
+
+The layout had to change: `investigations` was a `320px 1fr` grid, and a
+ten-column table of addresses and ports cannot live in 320px. Now list above,
+detail below - which is Wireshark's own arrangement.
+
+**The honesty problem this shape creates.** A packet list implies every column
+was observed. A `Received:` header is free text and the great majority never
+record a port. So every field resolves to a real value or to null, null renders
+as a dash, and `column_provenance` travels with the payload so the UI can say
+which columns are legitimately empty and why. Filling the port column for every
+row would have been trivial and would have looked far more complete - and
+somebody would have quoted a number that was never real.
+
+**The display filter**, `displayFilter.js`, modelled on Wireshark's: `field op
+value`, `&&`/`||`/`!`, brackets, `contains`, `matches` for regex, and a bare
+field name meaning "present". Bar is green when valid, red when not, with the
+reason and character position beneath it. **It never fails open** - the test
+suite pins that down, because a typo like `verdict == HIGH_RSK` quietly matching
+nothing would render an empty list that reads as "no dangerous mail".
+
+Its own test caught a real bug: `Number(null)` is `0`, and `0` is finite, so the
+`Number.isFinite` guard let a missing port straight through and `sport < 1024`
+was true for every message that never recorded one. Emptiness is now checked
+before coercion.
+
+**A self-inflicted wound, recorded because it reached a commit.** While
+verifying the installed package I ran `npx asar extract-file ... package.json`
+from the desktop directory. `extract-file` writes to the current directory, so it
+**overwrote the repo's `package.json` with the trimmed copy from inside the
+asar** - losing `build`, `scripts`, `dependencies`, everything. I then committed
+it in `dd1744a` without re-running the desktop suite. Restored from `c524655`
+with the version bump re-applied.
+
+Two things worth keeping from it: the packaging test *did* catch it (three
+failures the moment it ran), and `npm test` produced no output at all beforehand
+because npm itself could not parse the manifest - which I read as an empty result
+rather than as the signal it was. The installer was built before the clobber, so
+the install is unaffected.
+
+**Not yet visible to the user:** the flow view is in the console bundle, and the
+installed 1.7.11 carries the bundle built before it existed. It needs another
+build and install to appear.
+Commit: (this commit)
+
+
 **A-078 - 1.7.11 built and installed**
 What: Version bump, console build, NSIS installer, install, and verification of
 the installed artefact.

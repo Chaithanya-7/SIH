@@ -117,6 +117,13 @@ export const api = {
     const res = await axios.get(`${API_BASE}/cases`);
     return res.data;
   },
+  // Every message as a transport flow, for the packet-analyser view. A
+  // projection of the same cases, computed server-side so there is one
+  // implementation of what each column means.
+  getFlow: async () => {
+    const res = await axios.get(`${API_BASE}/flow`);
+    return res.data;
+  },
   getCaseById: async (id) => {
     const res = await axios.get(`${API_BASE}/cases/${id}`);
     return res.data;

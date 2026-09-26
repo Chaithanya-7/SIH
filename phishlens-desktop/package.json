@@ -3,6 +3,88 @@
   "version": "1.7.11",
   "description": "PhishLens desktop application - the full SOC investigation console, installed on the workstation and registered as the handler for phishlens:// deep links from the browser extension.",
   "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "test": "node --test tests/*.test.js",
+    "stage": "node scripts/stage-backend.js",
+    "build": "npm run stage && electron-builder"
+  },
   "author": "PhishLens",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^44.4.3",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "local.phishlens.desktop",
+    "productName": "PhishLens",
+    "files": [
+      "main.js",
+      "preload.js",
+      "backendSupervisor.js",
+      "startup.html",
+      "publishExtension.js",
+      "threatNotifier.js"
+    ],
+    "extraResources": [
+      {
+        "from": "../phishlens-dashboard/dist",
+        "to": "dashboard"
+      },
+      {
+        "from": "../phishlens-backend",
+        "to": "backend",
+        "filter": [
+          "**/*",
+          "!data/**",
+          "!scratch/**",
+          "!tests/**",
+          "!.env",
+          "!test.json",
+          "!.gitignore",
+          "!**/*.log"
+        ]
+      },
+      {
+        "from": "build-staging/backend-deps/node_modules",
+        "to": "backend/node_modules",
+        "filter": [
+          "**/*",
+          "!.bin/**",
+          "!**/{test,tests,example,examples,.github,.nyc_output}/**",
+          "!**/*.{md,markdown,map,ts}",
+          "!**/{LICENSE,LICENCE,AUTHORS,CHANGELOG,HISTORY}*"
+        ]
+      },
+      {
+        "from": "../phishlens-extension",
+        "to": "phishlens-extension",
+        "filter": [
+          "**/*",
+          "!tests/**",
+          "!**/*.md",
+          "!provisioned.js"
+        ]
+      }
+    ],
+    "protocols": [
+      {
+        "name": "PhishLens",
+        "schemes": [
+          "phishlens"
+        ]
+      }
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "Utility"
+    },
+    "mac": {
+      "target": "dmg"
+    }
+  }
 }
