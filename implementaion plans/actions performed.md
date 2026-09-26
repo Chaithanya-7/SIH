@@ -199,6 +199,84 @@ service. Place names stay at every zoom: they are what makes photography
 legible at all.
 Commit: (this commit)
 
+**A-087 - Eleven commits that never reached GitHub**
+What: Found that recent work was being committed to `main` while every push
+named `test`, and published it.
+Status: `Done` - 111 commits fast-forwarded to `origin/main`
+Evidence: The checkout moved to `main` on 2026-09-24, and `test` is an ancestor
+of it - the two histories were unified there, so `main` now carries both the
+teammate's line and this one.
+
+Every commit since then went onto `main`. Every push read
+`git push -q origin test`, which pushes the **test branch ref**, not `HEAD` - so
+it kept succeeding, kept printing "pushed", and kept publishing a branch that
+had not moved since `3310fad`. Eleven commits sat locally, including the
+network-intelligence work, the flow view, both installers and every fix from
+today.
+
+The `-q` flag hid it: without it, git prints "Everything up-to-date". Reading
+the exit status of a push says only that the command ran, not that anything was
+transferred.
+
+Verified before publishing rather than after: `origin/main` is an ancestor of
+local `main`, so the push fast-forwards, rewrites nothing, and loses nothing -
+`git log main..origin/main` is empty.
+Commit: (this commit)
+
+**A-086 - Scan in the open tab, with a percentage that means something**
+What: Moved the backlog scan into the mail tab already open, added real 0-100%
+progress, and made a 500 say what threw.
+Status: `Done` - 406 backend + 20 console + 39 desktop tests passing
+Evidence:
+
+**The reader now works.** The popup moved from "found no messages in the list"
+to *"Stopped after 5 consecutive failures: PhishLens returned 500"* - it is
+finding messages and submitting them, and the backend is throwing.
+
+**The 500 could not be reproduced**, and establishing that was worth doing
+before guessing. Ruled out in turn: six realistic message shapes (multipart
+alternative, base64 PDF attachment, no Date header, unencoded unicode subject,
+HTML-only body, twelve-hop Received chain) - all 200; the **packaged** backend
+with its production-only dependency tree - all 200; and a **copy of the real
+data directory** with its existing learned model, thread index and watchlist -
+all 200.
+
+So the fault is in the bytes of an actual Gmail message, which cannot be
+guessed. Instead the failure now reports itself: the 500 carried `error.message`
+alone, and the popup showed "PhishLens returned 500." with nothing after it -
+which is what a *blank* message looks like. Not every throw has one. The reply
+now carries the error's name and the first stack frame, naming file and line.
+Deliberately no message content: that reply travels to a script inside a mail
+page.
+
+**Same-tab scanning, as asked.** The separate tab existed so paging would not
+move the page under somebody reading. It cost more than it saved - a browser
+throttles a tab it is not showing, so the list often never rendered and the scan
+read an empty document. It now uses the mail tab already open, says plainly that
+the list will move while it runs, and refuses with a clear message when no mail
+tab is open.
+
+**A percentage with an honest denominator.** `totalCount()` reads Gmail's own
+"1-50 of 2,267". Where that cannot be read the bar is **hidden entirely** and a
+count shown instead - a bar moving against an invented total implies knowledge
+of how much is left. Read once at the start, since re-reading each page would
+make the denominator move as mail arrives, and a bar that goes backwards is
+worse than none.
+
+**A forty-minute trap, now in memory.** The `totalCount` regex was written
+through a Python heredoc as a word-boundary pattern. Python treats backslash-b
+as a backspace byte (0x08), so the file received a regex that could never match.
+`grep` rendered it as `/of/i`, `toString()` looked right, and the identical body
+worked standalone - only `od -c` showed it. The escapes Python silently consumes
+are the recognised ones; unknown ones survive with a warning. Checked the whole
+extension for stray backspace bytes: none.
+
+**The same trap bit twice more while recording it.** The first attempt to write
+this entry died on a truncated hex escape, and the second ended its raw string
+early on an embedded triple quote. Written from a file now, with no escapes in
+the script at all.
+Commit: 3a833e1, recorded in the following commit
+
 **A-085 - The scan said it started and had not**
 What: Made the backlog scan wait for the message list to exist before claiming
 to be running.
