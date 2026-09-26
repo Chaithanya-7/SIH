@@ -199,6 +199,60 @@ service. Place names stay at every zoom: they are what makes photography
 legible at all.
 Commit: (this commit)
 
+**A-078 - 1.7.11 built and installed**
+What: Version bump, console build, NSIS installer, install, and verification of
+the installed artefact.
+Status: `Done` - **1.7.11 installed and running**; 381 backend + 37 desktop + 5
+console tests passing
+Evidence: Built to `dist-1711` (never `dist`, which stays locked). Installer
+`PhishLens Setup 1.7.11.exe`, 124,968,274 bytes. "building block map" was the
+final log line, as it always is.
+
+Checked before the install rather than trusting it: all 15 backend runtime
+dependencies present in `build-staging/backend-deps`, no major-version drift,
+and no dev-only package (`nodemon`, `pdf-parse`, `qrcode`, `jsdom`) leaked in.
+The staging's mtime was *older* than `package-lock.json`, which looked stale -
+checking the dependency list directly showed nothing was actually missing, so
+the lockfile had been touched without a dependency change.
+
+Verified in the **installed** copy, not the build output: seven new backend
+modules present, the console bundle is the one just built (hashes match), and
+`threatNotifier.js` inside `app.asar`. In the packaged extension: the backlog
+UI, `examineHistorical`, `BACKLOG_PACE_MS`, `pageHash`, `startBacklogScan`. In
+the console bundle: "What was checked", "Does not rule out", "This machine
+connected here", "Uniform 2024", "Analysed after the fact".
+
+Registry reads `PhishLens 1.7.11`; the backend answers `OPERATIONAL` on 3001,
+running inside `PhishLens.exe` as packaged Node rather than a separate process.
+
+**A fault the whole test suite would have missed.** Poking the running install,
+`/api/cases` returned **401** to the machine API key - which would have meant
+the notifier polls, is refused, logs once, and never raises a single
+notification. Silent, permanent, in a log nobody reads.
+
+Reasoning was not enough to settle it: the supervisor hands the same `apiKey`
+field to the backend's environment and to the notifier, so on paper they cannot
+differ. New `tests/notifierAccess.test.js` starts a real backend with a known
+`PHISHLENS_API_KEY`, in its own temporary data directory, and makes exactly the
+call the notifier makes. **200, with a case list** - the access path is sound. A
+wrong key is still refused, so the endpoint is not open.
+
+The external 401 therefore means the key *file* probed is not the one the running
+app loaded; the notifier never reads that file, so it is unaffected. Recorded
+honestly: the mechanism is proven, a live notification has **not** been seen
+fire.
+
+The same test also covers a trap found by reading: `requireAuth` gives a
+service-key request the synthetic identity `{ organization_id: 'org_dev' }`, and
+`/api/cases` filters by organisation - so the notifier could authenticate
+perfectly and be handed an empty list forever. The filter lets a case with no
+organisation through, which is what a single-user desktop install produces.
+
+Superseded build output still on disk: `dist` (2.59 GB) plus `dist-171`
+through `dist-1711` (0.52 GB each) - about 7.7 GB. Not deleted without asking.
+Commit: (this commit)
+
+
 **A-077 - Proof behind a clean verdict, notification on this machine, and the truth about map recency**
 What: Addressed the restated objective in three parts.
 Status: `Done` - 379 backend + 37 desktop + 5 console tests passing
