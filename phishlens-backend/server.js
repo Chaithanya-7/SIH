@@ -929,6 +929,21 @@ app.get('/api/health', async (req, res) => {
 
     res.json({
         status: 'OPERATIONAL',
+        /**
+         * Which key this backend expects, without revealing it.
+         *
+         * A truncated SHA-256 is enough for a client to compare the key it
+         * holds against the one that would be accepted, and useless to anybody
+         * who does not already have the key. It sits on the one route that
+         * needs no credential, which is the only place a client with the
+         * *wrong* key can still reach.
+         *
+         * This exists because diagnosing a rejected key otherwise takes an
+         * afternoon: every request comes back with the same 401 whether the key
+         * is stale, mistyped, or the backend never received one at all. Those
+         * need different things done about them and looked identical.
+         */
+        api_key_fingerprint: config.apiKeyFingerprint,
         services: {
             backend: 'READY',
             nativeDetection: nativeDetectionStatus,

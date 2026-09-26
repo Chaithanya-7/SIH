@@ -228,3 +228,66 @@ test('the manifest carries nothing the target browser rejects', () => {
     const missing = referenced.filter(f => !fs.existsSync(path.join(EXTENSION, f)));
     assert.deepStrictEqual(missing, [], 'the manifest names files that are not there');
 });
+
+test('a rejected key recovers instead of dead-ending', () => {
+    // The fault the user hit: the popup said "Not authorized — the configured
+    // API key was rejected", and there was no way out of it.
+    //
+    // A key saved on the options page outranks the provisioned one, and should:
+    // somebody who typed a value must not be overruled by a default. But that
+    // precedence had no way back. When the desktop application's key changed,
+    // the saved key kept winning, every request came back 401, and the only
+    // remedy was knowing to go and clear a field nobody had been told about.
+    const worker = fs.readFileSync(path.join(EXTENSION, 'background.js'), 'utf8');
+
+    assert.match(worker, /function authedFetch/, 'requests must go through something that can retry');
+    assert.match(worker, /provisionedApiKey/, 'the key that lost the precedence must still be carried');
+
+    // One retry, never a loop: a backend refusing both keys is a different
+    // fault, and hammering it turns a clear failure into a slow one.
+    const fn = worker.slice(worker.indexOf('async function authedFetch'), worker.indexOf('async function diagnoseKey'));
+    assert.match(fn, /401 && .*403|401.*\|\|.*403|status !== 401 && .*status !== 403/,
+        'it must retry on refusal specifically, not on every error');
+    assert.strictEqual((fn.match(/await attempt\(/g) || []).length, 2,
+        'exactly two attempts: the chosen key, then the provisioned one');
+
+    // And the requests that matter actually use it.
+    assert.match(worker, /authedFetch\('\/api\/ingest\/browser'/, 'the sweep must recover');
+    assert.match(worker, /authedFetch\('\/api\/summary'/, 'so must the badge');
+});
+
+test('the three reasons a key is refused are told apart', () => {
+    const worker = fs.readFileSync(path.join(EXTENSION, 'background.js'), 'utf8');
+    const popup = fs.readFileSync(path.join(EXTENSION, 'popup.js'), 'utf8');
+
+    // These need three different things done about them and produced one
+    // identical sentence. The health route needs no credential, which makes it
+    // the only thing still reachable when everything else is a 401.
+    assert.match(worker, /api_key_fingerprint/, 'the backend states which key it expects');
+    assert.match(worker, /BACKEND_HAS_NO_KEY/, 'a backend with no key refuses even a correct one');
+    assert.match(worker, /WRONG_KEY/, 'a different key is a different problem');
+    assert.match(worker, /REJECTED_DESPITE_MATCH/, 'and a matching key still refused is a third');
+
+    // A fingerprint, never the key: it identifies which key without carrying it.
+    assert.match(worker, /crypto\.subtle\.digest\('SHA-256'/, 'compared by digest');
+    assert.match(worker, /slice\(0, 12\)/, 'truncated, so it identifies without revealing');
+
+    assert.match(popup, /phishlens:key-diagnosis/, 'the popup must ask why');
+    assert.match(popup, /diagnosis\?\.diagnosis\?\.detail/, 'and show the reason rather than the generic line');
+});
+
+test('the fix is offered where the fault is reported', () => {
+    const popup = fs.readFileSync(path.join(EXTENSION, 'popup.js'), 'utf8');
+    const worker = fs.readFileSync(path.join(EXTENSION, 'background.js'), 'utf8');
+
+    // Describing a remedy on a page somebody has to go and find is how the
+    // original fault stayed unfixed.
+    assert.match(popup, /offerProvisionedKey/);
+    assert.match(popup, /phishlens:use-provisioned-key/);
+    assert.match(worker, /phishlens:use-provisioned-key/, 'and the worker must carry it out');
+
+    // It clears the saved key rather than overwriting it with another value,
+    // so the precedence resolves naturally to the provisioned one.
+    const handler = worker.slice(worker.indexOf("phishlens:use-provisioned-key"));
+    assert.match(handler.slice(0, 400), /apiKey: ''/);
+});

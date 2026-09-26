@@ -199,6 +199,69 @@ service. Place names stay at every zoom: they are what makes photography
 legible at all.
 Commit: (this commit)
 
+**A-081 - 8.3 GB reclaimed, and the rejected-key dead end fixed**
+What: Deleted the superseded build output, then diagnosed and fixed the
+extension's "Not authorized" state.
+Status: `Done` - 397 backend + 20 console + 37 desktop tests passing
+Evidence:
+
+**Disk.** Deleted `dist` and `dist-171` … `dist-1711`, **8.30 GB freed**
+(E: now 263.8 GB). `dist-1712` kept - it backs the current install.
+
+**The 500 was not mine.** Reproduced the browser-ingest path against a backend
+with its own temporary data directory: FULL_HEADERS **200**, BODY_ONLY **200**
+(SUSPICIOUS, 0.41). The three pipeline stages added recently do not throw on
+either shape, so the 500 was environment-specific rather than a regression.
+
+**The key rejection was real, and had a root cause I could act on.** The
+provisioned key matched the key file exactly - but `provisionedAt` read
+**2026-09-22**, four days stale, despite two installs that day. The app
+republishes the extension on every start, so it had not been publishing.
+Running `publishExtension` directly showed it works fine, so the app's call was
+throwing or not reached.
+
+Restarting the application resolved it: `/api/cases` and `/api/flow` both went
+**401 -> 200** with the key file's value, and `provisionedAt` updated. So the
+running backend had been holding a *different* key from the file - consistent
+with `loadOrCreateApiKey()` hitting its catch and returning a session-only key,
+which it does silently.
+
+**The design bug underneath, which is what actually needed fixing.** A key saved
+on the options page outranks the provisioned one - correctly, since somebody who
+typed a value must not be overruled by a default. But that precedence had **no
+way back**. When the backend's key changes, the saved key keeps winning, every
+request is a 401, and the only remedy is knowing to clear a field nobody has been
+told about. Three fixes:
+
+1. **`authedFetch`** carries both keys and, on 401/403 only, retries once with
+   the provisioned one. Exactly two attempts, never a loop - a backend refusing
+   both is a different fault and hammering it turns a clear failure into a slow
+   one. Ingestion and the badge both go through it.
+2. **`/api/health` reports `api_key_fingerprint`** - twelve hex of a SHA-256,
+   enough to compare, useless to anybody without the key, on the one route
+   reachable when everything else is a 401. `NO_KEY_SET` is a distinct answer,
+   because a backend started without a key refuses even a correct one and that
+   looked identical to a stale key from the client side.
+3. **The popup names the case and offers the fix in place.** "The configured API
+   key was rejected" is true and leads nowhere; it now distinguishes
+   BACKEND_HAS_NO_KEY, WRONG_KEY (with both fingerprints), REJECTED_DESPITE_MATCH
+   and BACKEND_TOO_OLD_TO_SAY, with a button that clears the saved key.
+
+Degrades honestly: against a backend that reports no fingerprint it says so
+rather than falling through to "the key matches and was still refused", which
+would be a confident claim about something never checked.
+
+**A mistake made and corrected inside this action:** running `publishExtension`
+as a probe overwrote the repository's `provisioned.js` with a placeholder key.
+Restored from the key file. It is git-ignored, so nothing reached a commit.
+
+**Reaches the user differently:** the extension is loaded *in place* from
+`E:\SIH\SIH\phishlens-extension` (per `extension-source.txt`), so reloading it
+in Chrome picks the fix up with no rebuild. The fingerprint needs the backend
+rebuilt and installed.
+Commit: (this commit)
+
+
 **A-080 - 1.7.12 built and installed, carrying the flow view**
 What: Built and installed 1.7.12 so the packet-analyser mail list is in the
 running application rather than only in the repository.

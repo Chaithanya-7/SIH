@@ -404,6 +404,34 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  /**
+   * Offers the one action that fixes the common case: stop using the key saved
+   * here, so the key the desktop application provisioned is used instead.
+   */
+  function offerProvisionedKey() {
+    const notice = document.getElementById('setup-notice');
+    if (!notice || notice.querySelector('.use-provisioned')) return;
+
+    const button = document.createElement('button');
+    button.className = 'btn-primary full use-provisioned';
+    button.type = 'button';
+    button.textContent = "Use the desktop app's key";
+    button.style.marginTop = '8px';
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      button.textContent = 'Switching…';
+      const done = await ask({ type: 'phishlens:use-provisioned-key' });
+      if (done?.ok) {
+        button.textContent = 'Done — rechecking';
+        setTimeout(() => loadSummary(), 600);
+      } else {
+        button.disabled = false;
+        button.textContent = "Use the desktop app's key";
+      }
+    });
+    notice.appendChild(button);
+  }
+
   async function loadSummary() {
     // Always, and before anything else that can return early. Whether the page
     // watcher is running is independent of whether the backend answers, and it
@@ -426,7 +454,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (response.status === 401 || response.status === 403) {
         connectionState.textContent = 'Not authorized';
-        showSetupNotice('The configured API key was rejected by the PhishLens backend.');
+
+        // "The key was rejected" is true and leads nowhere. The three reasons a
+        // key is refused - the backend has no key at all, it has a different
+        // one, or a key saved here has gone stale - need three different things
+        // done about them, and they all produced this same sentence.
+        //
+        // The worker compares fingerprints against the public health route,
+        // which is the one thing still reachable when every other request is a
+        // 401, and says which case this is.
+        const diagnosis = await ask({ type: 'phishlens:key-diagnosis' });
+        const detail = diagnosis?.diagnosis?.detail;
+
+        showSetupNotice(detail || 'The configured API key was rejected by the PhishLens backend.');
+
+        // And where a saved key is the problem, the fix is offered here rather
+        // than described on a page somebody has to go and find.
+        if (diagnosis?.has_provisioned_fallback || diagnosis?.diagnosis?.state === 'WRONG_KEY') {
+          offerProvisionedKey();
+        }
         return;
       }
       if (!response.ok) {

@@ -135,31 +135,154 @@ function readSettings() {
       const settled = { ...DEFAULTS };
       if (provisioned.apiBaseUrl) settled.apiBaseUrl = provisioned.apiBaseUrl;
       if (provisioned.apiKey) settled.apiKey = provisioned.apiKey;
+
+      const storedKey = (stored || {}).apiKey;
       Object.entries(stored || {}).forEach(([key, value]) => {
         if (value !== undefined && value !== null && value !== '') settled[key] = value;
       });
+
+      // Both keys are carried, not just the winner.
+      //
+      // A key saved on the options page outranks the provisioned one, and it
+      // should: somebody who typed a value must not be overruled by a default.
+      // But that precedence had no way back. When the desktop application's key
+      // changed - a reinstall, a regenerated key, a backend that fell back to a
+      // session-only one - the stored key kept winning, every request came back
+      // 401, and the extension sat on "Not authorized" with no path to recovery
+      // except knowing to go and clear a field.
+      //
+      // So the one it did not pick travels alongside, and authedFetch falls back
+      // to it when the backend refuses the first.
+      settled.provisionedApiKey = provisioned.apiKey || null;
+      settled.storedApiKey = storedKey || null;
+      settled.apiKeySource = storedKey ? 'options page' : (provisioned.apiKey ? 'desktop application' : 'none');
       resolve(settled);
     });
   });
 }
 
-async function refreshBadge() {
+/**
+ * A request that recovers from the wrong key instead of dying on it.
+ *
+ * Tries the key precedence picked, and on a 401 or 403 - and only when there is
+ * a genuinely different provisioned key to try - retries once with that. A
+ * success is remembered so the next request starts with the key that works, and
+ * so the popup can say which one it used and why.
+ *
+ * Deliberately one retry and no loop: a backend that refuses both keys is a
+ * different fault, and hammering it would turn a clear failure into a slow one.
+ */
+async function authedFetch(path, init = {}) {
   const settings = await readSettings();
+  const base = settings.apiBaseUrl.replace(/\/$/, '');
+
+  const attempt = key => fetch(`${base}${path}`, {
+    ...init,
+    headers: { ...(init.headers || {}), 'x-api-key': key }
+  });
+
   if (!settings.apiKey) {
-    await setBadge('', '#64748b');
-    return;
+    return { ok: false, status: 0, error: 'PhishLens has no API key configured. Open the extension options.', settings };
   }
 
+  let response = await attempt(settings.apiKey);
+  if (response.status !== 401 && response.status !== 403) {
+    return { ok: response.ok, status: response.status, response, settings, keyUsed: settings.apiKeySource };
+  }
+
+  const fallback = settings.provisionedApiKey;
+  if (!fallback || fallback === settings.apiKey) {
+    lastKeyDiagnosis = await diagnoseKey(base, settings);
+    return { ok: false, status: response.status, response, settings, keyUsed: settings.apiKeySource };
+  }
+
+  const retried = await attempt(fallback);
+  if (retried.ok) {
+    // The saved key is stale. Recorded rather than deleted - somebody typed it
+    // deliberately once, and silently discarding it would be its own surprise.
+    lastKeyDiagnosis = {
+      state: 'RECOVERED',
+      detail: 'The API key saved on the options page was rejected. The key the desktop application provisioned works, and is being used instead. Clear the saved key to stop this happening on every request.'
+    };
+    try { ext.storage.local.set({ apiKeyStale: true }); } catch (e) { /* storage may be unavailable */ }
+    return { ok: true, status: retried.status, response: retried, settings, keyUsed: 'desktop application (saved key was rejected)' };
+  }
+
+  lastKeyDiagnosis = await diagnoseKey(base, settings);
+  return { ok: false, status: retried.status, response: retried, settings, keyUsed: settings.apiKeySource };
+}
+
+/**
+ * Why the key was refused, in terms somebody can act on.
+ *
+ * The health route needs no credential, which makes it the one thing still
+ * reachable when every other request is a 401. It reports a fingerprint of the
+ * key the backend expects, so the three cases that used to look identical can
+ * finally be told apart: the backend has no key at all, it has a different one,
+ * or it has this one and something else is wrong.
+ */
+async function diagnoseKey(base, settings) {
   try {
-    const response = await fetch(`${settings.apiBaseUrl}/api/summary`, {
-      headers: { 'x-api-key': settings.apiKey }
-    });
-    if (!response.ok) {
+    const health = await fetch(`${base}/api/health`);
+    if (!health.ok) return { state: 'UNREACHABLE', detail: 'The PhishLens backend did not answer.' };
+
+    const body = await health.json();
+    const expected = body.api_key_fingerprint;
+
+    // An older backend does not report one. Saying so beats guessing: the
+    // alternative was falling through to "the key matches and was still
+    // refused", which is a confident claim about something never checked.
+    if (!expected) {
+      return {
+        state: 'BACKEND_TOO_OLD_TO_SAY',
+        detail: 'This PhishLens backend does not report which key it expects, so the cause cannot be narrowed from here. Restarting the desktop application resolves most rejected keys; updating it will make this message specific.'
+      };
+    }
+
+    if (expected === 'NO_KEY_SET') {
+      return {
+        state: 'BACKEND_HAS_NO_KEY',
+        detail: 'The PhishLens backend is running without an API key, so it refuses every key including a correct one. Restart the desktop application.'
+      };
+    }
+
+    const mine = await fingerprintOf(settings.apiKey);
+    if (expected && mine && expected !== mine) {
+      return {
+        state: 'WRONG_KEY',
+        detail: `The backend expects a key fingerprinted ${expected}; the one in use fingerprints ${mine}. Open the options page and clear the saved key so the desktop application's key is used.`
+      };
+    }
+
+    return { state: 'REJECTED_DESPITE_MATCH', detail: 'The key matches what the backend expects and was still refused. Restarting the desktop application usually clears this.' };
+  } catch (e) {
+    return { state: 'UNREACHABLE', detail: `The PhishLens backend could not be reached: ${e.message}` };
+  }
+}
+
+/** The same truncated SHA-256 the backend reports, computed here for comparison. */
+async function fingerprintOf(key) {
+  try {
+    const bytes = new TextEncoder().encode(String(key));
+    const digest = await crypto.subtle.digest('SHA-256', bytes);
+    return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 12);
+  } catch (e) {
+    return null;
+  }
+}
+
+/** The most recent explanation for a refused key, for the popup to show. */
+let lastKeyDiagnosis = null;
+
+async function refreshBadge() {
+  try {
+    const attempt = await authedFetch('/api/summary');
+    if (!attempt.ok) {
       await setBadge('!', '#f59e0b');
       return;
     }
 
-    const data = await response.json();
+    const data = await attempt.response.json();
     const highRisk = data.counts?.high_risk || 0;
     await setBadge(highRisk ? String(highRisk) : '', '#ef4444');
   } catch (err) {
@@ -239,18 +362,17 @@ ext.alarms?.onAlarm.addListener(alarm => {
  * keeps the API key out of a script injected into a page.
  */
 async function examineFromBrowser(payload) {
-  const settings = await readSettings();
-  if (!settings.apiKey) {
-    return { ok: false, error: 'PhishLens has no API key configured. Open the extension options.' };
-  }
-
   try {
-    const base = settings.apiBaseUrl.replace(/\/$/, '');
-    const response = await fetch(`${base}/api/ingest/browser`, {
+    // Through authedFetch, so a stale saved key recovers instead of failing
+    // every sweep for as long as it is saved.
+    const attempt = await authedFetch('/api/ingest/browser', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': settings.apiKey },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
+
+    if (attempt.status === 0) return { ok: false, error: attempt.error };
+    const response = attempt.response;
 
     if (!response.ok) {
       // The backend puts the reason in the body. Reporting only the status code
@@ -284,6 +406,36 @@ ext.runtime.onMessage.addListener((request, sender, sendResponse) => {
     refreshBadge().then(() => sendResponse({ success: true }));
     return true;
   }
+  // Why a key was refused, for the popup to show instead of "rejected".
+  if (request?.type === 'phishlens:key-diagnosis') {
+    readSettings().then(async settings => {
+      sendResponse({
+        ok: true,
+        diagnosis: lastKeyDiagnosis,
+        key_source: settings.apiKeySource,
+        has_provisioned_fallback: !!(settings.provisionedApiKey && settings.provisionedApiKey !== settings.apiKey),
+        fingerprint: await fingerprintOf(settings.apiKey)
+      });
+    });
+    return true;
+  }
+
+  // Clears a saved key so the desktop application's provisioned one is used.
+  // The one action that fixes the common case, offered where the fault is
+  // reported rather than three clicks away on an options page.
+  if (request?.type === 'phishlens:use-provisioned-key') {
+    try {
+      ext.storage.local.set({ apiKey: '', apiKeyStale: false }, () => {
+        lastKeyDiagnosis = null;
+        refreshBadge();
+        sendResponse({ ok: true });
+      });
+    } catch (e) {
+      sendResponse({ ok: false, error: e.message });
+    }
+    return true;
+  }
+
   if (request?.type === 'phishlens:examine') {
     examineFromBrowser(request.payload).then(sendResponse);
     return true;
