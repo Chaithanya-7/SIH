@@ -199,6 +199,46 @@ service. Place names stay at every zoom: they are what makes photography
 legible at all.
 Commit: (this commit)
 
+**A-080 - 1.7.12 built and installed, carrying the flow view**
+What: Built and installed 1.7.12 so the packet-analyser mail list is in the
+running application rather than only in the repository.
+Status: `Done` - **1.7.12 installed and running**; 394 backend + 20 console + 37
+desktop tests passing
+Evidence: `PhishLens Setup 1.7.12.exe`, 124,976,041 bytes, built to `dist-1712`.
+Registry reads `PhishLens 1.7.12`; backend `OPERATIONAL` with detection and
+database READY.
+
+Verified in the **installed** copy: the console bundle changed hash
+(`index-BIP_s01l.js`, was `index-46_ijwsj.js`) and carries "Apply a display
+filter", "S.Port", "D.Port", "Path of message", "never inferred" and "What was
+checked"; `mailTransportFlow.js` is present in the packaged backend; and
+`/api/flow` answers **401 rather than 404**, which is the right pair of facts -
+the route exists and is behind authentication.
+
+Three process corrections applied from the previous round, each of which had
+cost something:
+
+1. **Read-only inspection only.** Last time `npx asar extract-file` was run from
+   the desktop directory and overwrote the repository's `package.json` with the
+   trimmed copy from inside the bundle. Everything here was checked by reading
+   `win-unpacked/resources/` and the installed directory directly. Nothing was
+   extracted.
+2. **The manifest is asserted whole as part of the version bump**, not assumed:
+   the bump script now fails if `build.files`, `scripts` or `extraResources` has
+   gone missing.
+3. **All three suites run before the commit**, not two. The desktop suite is the
+   one that caught the clobber last time, and it was the one skipped.
+
+The running 1.7.11 was stopped before installing, and port 3001 confirmed free
+first - an upgrade over a running app risks a locked-file failure part way
+through, leaving neither version installed.
+
+Superseded build output now: `dist` (2.59 GB) and `dist-171` … `dist-1711`,
+about 8.2 GB. `dist-1712` backs the current install. Still not deleted without
+asking.
+Commit: (this commit)
+
+
 **A-079 - The mail list rebuilt as a packet analyser, and a self-inflicted wound**
 What: Answered the geolocation question, then rebuilt "All emails" as a
 Wireshark-style flow list with a real display-filter language.
