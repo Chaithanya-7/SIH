@@ -349,3 +349,26 @@ test('scan progress is only shown against a real total', () => {
     assert.match(popup, /renderProgress/, 'and be driven from the reported state');
     assert.match(popup, /percent === null/, 'and hidden entirely when the total is unknown');
 });
+
+test('the live watcher stands down while a backlog scan walks the same page', () => {
+    const content = fs.readFileSync(path.join(EXTENSION, 'content-gmail.js'), 'utf8');
+    const worker = fs.readFileSync(path.join(EXTENSION, 'background.js'), 'utf8');
+
+    // Both read the same rows from the same page. Both submitting them meant
+    // each message was sent twice, and the second collided with the first -
+    // which the backend answered with a 500 until it was taught otherwise.
+    const sweep = content.slice(content.indexOf('async function sweep()'), content.indexOf('function report('));
+    assert.match(sweep, /if \(backlog\.running\) return;/,
+        'the timer sweep must not run during a scan');
+
+    // The row is claimed before the fetch, not after the submit: between those
+    // two points anything else reading the page sees it as unexamined.
+    const historical = content.slice(content.indexOf('async function examineHistorical'));
+    const beforeFetch = historical.slice(0, historical.indexOf('await originalMessage'));
+    assert.match(beforeFetch, /remember\(key\)/, 'the key must be claimed before the network call');
+
+    // And a collision that does still happen is ordinary, not a failure -
+    // counting it as one is what stopped a scan after five.
+    assert.match(worker, /response\.status === 409/, 'the worker must recognise it');
+    assert.match(worker, /skipped: true/, 'and not report it as a failure');
+});

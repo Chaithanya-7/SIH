@@ -132,3 +132,79 @@ test('the service key is not filtered out of its own results by organisation', a
     assert.match(block, /!c\.organization_id \|\|/,
         'a case with no organisation must pass the filter, or a desktop install sees an empty list');
 });
+
+test('two sweeps reaching the same message is not a server error', async (t) => {
+    /**
+     * The fault that stopped a live scan dead.
+     *
+     * The live watcher sweeps every four seconds while a backlog scan walks the
+     * same page, so both submit the same rows. The second submission collided
+     * with the first inside the deduplication store and the pipeline threw,
+     * which the endpoint reported as a 500. Five of those in a row stopped the
+     * scan - on a mailbox where nothing was wrong with any single message.
+     *
+     * Reproduced directly before it was fixed: first 200, second 500.
+     */
+    const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'phishlens-race-'));
+    const port = PORT + 7;
+
+    const child = spawn(process.execPath, [SERVER], {
+        env: { ...process.env, PORT: String(port), PHISHLENS_API_KEY: KEY, PHISHLENS_DATA_DIR: dataDir, NODE_ENV: 'test', ENABLE_NETWORK_OBSERVER: 'false' },
+        stdio: ['ignore', 'pipe', 'pipe']
+    });
+    let output = '';
+    child.stdout.on('data', c => { output += c; });
+    child.stderr.on('data', c => { output += c; });
+    t.after(() => { child.kill(); try { fs.rmSync(dataDir, { recursive: true, force: true }); } catch (e) {} });
+
+    const send = body => new Promise((resolve, reject) => {
+        const payload = JSON.stringify(body);
+        const req = http.request({
+            hostname: '127.0.0.1', port, path: '/api/ingest/browser', method: 'POST',
+            headers: { 'x-api-key': KEY, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) },
+            timeout: 60000
+        }, res => {
+            let text = '';
+            res.on('data', d => { text += d; });
+            res.on('end', () => { let parsed = null; try { parsed = JSON.parse(text); } catch (e) {} resolve({ status: res.statusCode, body: parsed }); });
+        });
+        req.on('error', reject);
+        req.on('timeout', () => req.destroy(new Error('timed out')));
+        req.write(payload); req.end();
+    });
+
+    const until = Date.now() + 45000;
+    let up = false;
+    while (Date.now() < until && !up) {
+        try {
+            await new Promise((res, rej) => {
+                const r = http.get({ hostname: '127.0.0.1', port, path: '/api/health' }, x => { x.resume(); x.statusCode === 200 ? res() : rej(new Error('not ready')); });
+                r.on('error', rej); r.setTimeout(2000, () => r.destroy(new Error('t')));
+            });
+            up = true;
+        } catch (e) { await new Promise(r => setTimeout(r, 500)); }
+    }
+    assert.ok(up, `the backend did not start:\n${output.slice(-1500)}`);
+
+    const CRLF = String.fromCharCode(13, 10);
+    const raw = [
+        'From: "Sender" <a@example.com>', 'To: me@gmail.com', 'Subject: Submitted twice at once',
+        'Message-ID: <race-test-1@example.com>', 'Date: Sat, 27 Sep 2026 10:00:00 +0000',
+        'Content-Type: text/plain; charset=utf-8'
+    ].join(CRLF) + CRLF + CRLF + 'identical body';
+
+    const payload = { source: 'mail.google.com', provider_message_id: 'race-test-1', raw, evidence: 'FULL_HEADERS' };
+    const [first, second] = await Promise.all([send(payload), send(payload)]);
+
+    const statuses = [first.status, second.status].sort();
+    assert.deepStrictEqual(statuses, [200, 409],
+        `one submission should succeed and the other be told it is already in hand, got ${statuses.join(' and ')}`);
+
+    const collided = [first, second].find(r => r.status === 409);
+    assert.strictEqual(collided.body.already_in_progress, true,
+        'the caller must be able to tell this apart from a real failure');
+    assert.match(collided.body.error, /Nothing is wrong/i);
+
+    // And it must never be a 500, which is what made a healthy scan look broken.
+    assert.ok(!statuses.includes(500), 'a concurrent duplicate must never be reported as a server error');
+});

@@ -454,6 +454,12 @@ async function examineFromBrowser(payload) {
     if (attempt.status === 0) return { ok: false, error: attempt.error };
     const response = attempt.response;
 
+    // Another sweep already has this message in hand. Ordinary, and not a
+    // failure: counting it as one is what stopped a scan after five of them.
+    if (response.status === 409) {
+        return { ok: true, skipped: true, reason: 'Already being analysed by another sweep.' };
+    }
+
     if (!response.ok) {
       // The backend puts the reason in the body. Reporting only the status code
       // turned a diagnosable fault into "returned 500", which says nothing about

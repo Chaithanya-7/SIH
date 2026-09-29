@@ -226,6 +226,14 @@
     }
 
     async function sweep() {
+        // The live sweep stands down while a backlog scan is walking this same
+        // page. They read the same rows, and both submitting them meant the
+        // second submission of each message collided with the first - the
+        // backend answered 500, and five of those stopped the scan.
+        //
+        // Standing down also halves the request rate at the mail provider
+        // during a scan, which the pacing exists to keep low.
+        if (backlog.running) return;
         if (!enabled || sweeping || Date.now() < quietUntil) return;
         sweeping = true;
 
@@ -470,6 +478,12 @@
      */
     async function examineHistorical(entry) {
         const key = `${location.hostname}:${entry.id}`;
+        // Claimed before the fetch rather than after the submit. Between those
+        // two points is a window in which anything else reading this page would
+        // see the row as unexamined and take it too.
+        if (seen.has(key)) return null;
+        remember(key);
+
         const raw = await originalMessage(entry.id);
 
         const payload = raw
@@ -477,7 +491,6 @@
             : { source: location.hostname, provider_message_id: entry.id, evidence: 'BODY_ONLY', analysis_mode: 'HISTORICAL', ...provider.fallback(entry) };
 
         const result = await submit(payload);
-        remember(key);
         if (result?.verdict) flag(entry.row, result.verdict, result.confidence);
         return result;
     }

@@ -199,6 +199,41 @@ service. Place names stay at every zoom: they are what makes photography
 legible at all.
 Commit: (this commit)
 
+**A-089 - The 500 found: the watcher and the scan were fighting over the same messages**
+What: Root-caused the ingestion 500 and stopped it.
+Status: `Done` - 425 backend + 20 console + 39 desktop tests passing
+Evidence: Four rounds of reproduction had failed: six realistic message shapes,
+then eleven hostile ones (windows-1252, unterminated multipart, a 30 KB header
+line, a From with no address, no From at all, twelve attachments, a 1 MB HTML
+body, an unparseable Date, a broken encoded-word, an SVG declared `text/plain`,
+an empty body) - **every one returned 200**, and the SVG correctly came back
+HIGH_RISK. The packaged backend and a copy of the real data directory also
+returned 200 throughout.
+
+So it was never the message. It was **two of them at once**.
+
+`server.js` threw when the deduplication store reported a message already in
+flight, and the endpoint reported that throw as a **500**. The live watcher
+sweeps every four seconds; a backlog scan walks the same page; both submit the
+same rows. Reproduced directly - two concurrent submissions of one message,
+**first 200, second 500**. Five of those in a row stopped the scan, on a mailbox
+where nothing was wrong with any single message.
+
+Three fixes:
+1. **A concurrent duplicate answers 409**, with a body saying nothing is wrong,
+   and is never counted as a failure. It is not a server error: another path is
+   already handling that exact message.
+2. **The live sweep stands down while a scan runs in that tab.** They read the
+   same rows, and it halves the request rate at the mail provider during a scan
+   - which the pacing exists to keep low.
+3. **A row is claimed before the fetch, not after the submit.** Between those
+   two points anything else reading the page sees it as unexamined.
+
+Also fixed alongside: a dedup record pointing at a case that no longer exists
+threw, making a recoverable state permanent - every retry hit the same record
+and failed identically. It re-analyses now.
+Commit: (this commit)
+
 **A-088 - Multi-source IP geolocation with an honest radius**
 What: Replaced the single-provider location with five sources, cross-source
 intersection, and a radius that covers what they disagree about.

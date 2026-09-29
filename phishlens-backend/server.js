@@ -153,11 +153,33 @@ async function processPipeline(emailContent, source = 'MANUAL_API', clientMessag
                 if (existingCase) {
                     return existingCase;
                 }
-                throw new Error(`Dedup record ${messageKey} references missing case ${dedupCheck.record.case_id}.`);
+                // The ledger says this was analysed and the case is gone -
+                // cleared by hand, or lost. Re-analysing is the recoverable
+                // answer; throwing made a recoverable state permanent, because
+                // every retry hit the same record and failed the same way.
+                console.warn(`[Dedup] ${messageKey} references case ${dedupCheck.record.case_id}, which no longer exists. Analysing again.`);
             }
 
             if (dedupCheck.isDuplicate && dedupCheck.isProcessing) {
-                throw new Error(`Message ${messageKey} is already being processed.`);
+                /**
+                 * Another path is already analysing this exact message.
+                 *
+                 * That is not a server error and it must not be reported as
+                 * one. It happens by design: the live watcher sweeps every four
+                 * seconds while a backlog scan walks the same page, and both
+                 * submit the same rows. Reproduced directly - two concurrent
+                 * submissions of one message, the first 200, the second 500.
+                 *
+                 * Five of those in a row stopped the scan, on a mailbox where
+                 * nothing was wrong with a single message.
+                 *
+                 * Raised as a typed condition the caller can recognise rather
+                 * than a generic throw, so the endpoint can answer "already in
+                 * hand" instead of "the server broke".
+                 */
+                const inFlight = new Error(`Message ${messageKey} is already being analysed by another sweep.`);
+                inFlight.code = 'ALREADY_IN_PROGRESS';
+                throw inFlight;
             }
         }
 
@@ -1070,6 +1092,17 @@ app.post('/api/ingest/browser', express.json({ limit: '35mb' }), async (req, res
         // of these became undiagnosable: by the time it was looked for, the
         // application had been restarted and the only trace was a 500 the
         // extension had already reduced to a status code.
+        // Two sweeps reaching the same message is ordinary, not a fault. It is
+        // answered plainly and never counted as a failure, or a healthy scan
+        // would look like a failing one.
+        if (error?.code === 'ALREADY_IN_PROGRESS') {
+            return res.status(409).json({
+                success: false,
+                already_in_progress: true,
+                error: 'This message is already being analysed by another sweep. Nothing is wrong; it will appear once that finishes.'
+            });
+        }
+
         console.error('[BrowserIngest] Failed to examine a submitted message:', error);
         ingestionRegistry.recordFailure('browser_watch', error);
 
