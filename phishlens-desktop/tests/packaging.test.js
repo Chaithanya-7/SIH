@@ -431,3 +431,28 @@ test('the health check reads the body it needs rather than discarding it', () =>
     assert.match(fn, /this\.lastHealth = JSON\.parse/, 'the health body must be kept');
     assert.match(fn, /statusCode !== 200/, 'and a non-200 must still be a plain failure');
 });
+
+test('a failing startup step does not silently abandon the rest', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
+
+    // These ran as a bare sequence inside an async handler with no catch on it.
+    // A throw anywhere - and starting the backend does real work with files,
+    // ports and a child process - abandoned everything after it *silently*. The
+    // window was already up and the backend already spawned, so the application
+    // looked entirely normal while the extension was never reconfigured, the
+    // notifier never started, and the backend key self-check never ran.
+    //
+    // Observed across three installs: the extension's provisioning timestamp
+    // stayed hours old while the application reported READY.
+    assert.match(main, /const step = async \(what, run\)/, 'each step must be guarded on its own');
+
+    for (const what of ['starting the backend', 'configuring the browser extension', 'starting notifications']) {
+        assert.ok(main.includes(`step('${what}'`), `"${what}" must run as a guarded step`);
+    }
+
+    // And the chain itself must not be able to reject into nothing.
+    assert.match(main, /\}\)\.catch\(err => \{/, 'the whenReady chain needs a catch');
+    assert.match(main, /The startup sequence failed/, 'which records what happened');
+});
