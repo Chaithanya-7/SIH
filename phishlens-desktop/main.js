@@ -284,11 +284,42 @@ if (!gotSingleInstanceLock) {
         ensureProtocolClaimed();
 
         createWindow(deepLinkFromArgv(process.argv) || { route: 'dashboard' });
-        await supervisor.start();
+
+        /**
+         * Each startup step survives the one before it failing.
+         *
+         * These ran in a bare sequence inside an async handler with no catch on
+         * it. A throw anywhere - and `supervisor.start()` does real work with
+         * files, ports and a child process - abandoned everything after it
+         * *silently*: the window was already up and the backend already
+         * spawned, so the application looked completely normal while the
+         * extension was never reconfigured, the notifier never started and, once
+         * it existed, the key self-check never ran.
+         *
+         * That is consistent with every install this session, where the
+         * extension's provisioning timestamp stayed hours old while the
+         * application reported READY.
+         *
+         * So each step is guarded on its own and a failure is recorded rather
+         * than ending the sequence.
+         */
+        const step = async (what, run) => {
+            try {
+                await run();
+            } catch (err) {
+                // Built from a character code: a literal newline inside this
+                // template is what an earlier scripted edit injected here.
+                const NL = String.fromCharCode(10);
+                const where = err && err.stack ? err.stack.split(NL).slice(0, 3).join(' | ') : String(err);
+                supervisor.record(`[Startup] ${what} failed: ${where}`);
+            }
+        };
+
+        await step('starting the backend', () => supervisor.start());
 
         // Published after the backend starts, because the address and key it
         // writes into the extension are the supervisor's.
-        publishConfiguredExtension();
+        await step('configuring the browser extension', () => publishConfiguredExtension());
 
         // Notification on this machine, for the person using it.
         //
@@ -299,11 +330,15 @@ if (!gotSingleInstanceLock) {
         // means the tool works only when they are already worried.
         //
         // Started after the backend, so the first poll has something to ask.
-        notifier.start();
+        await step('starting notifications', () => notifier.start());
 
         app.on('activate', () => {
             if (BrowserWindow.getAllWindows().length === 0) createWindow({ route: 'dashboard' });
         });
+    }).catch(err => {
+        // A rejection here used to disappear entirely. Whatever else is broken,
+        // it must not also be invisible.
+        supervisor.record(`[Startup] The startup sequence failed: ${err && err.stack ? err.stack : err}`);
     });
 
     app.on('window-all-closed', () => {
