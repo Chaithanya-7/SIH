@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Popup, Tooltip, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Circle, Popup, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -734,6 +734,29 @@ export default function GlobalThreatMap({ points = [], coverage }) {
                             keepBuffer={3}
                         />
                     ))}
+                    {/* How wide each answer actually is.
+                        Drawn beneath the markers and in real kilometres, so it
+                        grows and shrinks with the map the way a distance should.
+                        A marker on its own is a claim of a precise place, and
+                        for most addresses that claim is not supportable: a
+                        commercial database reports the city its registry record
+                        names, which may be nowhere near the hardware. The ring
+                        is the width of what the sources actually agreed on. */}
+                    {ordered.filter(p => p.radius_km > 0 && !p.anycast).map(point => (
+                        <Circle
+                            key={`uncertainty-${point.ip}`}
+                            center={[point.latitude, point.longitude]}
+                            radius={point.radius_km * 1000}
+                            pathOptions={{
+                                color: severityColours[point.severity] || severityColours.LOW,
+                                fillColor: severityColours[point.severity] || severityColours.LOW,
+                                fillOpacity: 0.07,
+                                weight: 1,
+                                dashArray: '4 4',
+                                interactive: false
+                            }}
+                        />
+                    ))}
                     {ordered.map(point => {
                         const meta = SEVERITY[point.severity] || SEVERITY.LOW;
                         const messages = point.messages || [];
@@ -764,6 +787,26 @@ export default function GlobalThreatMap({ points = [], coverage }) {
                                         </div>
                                         <div style={{ color: '#555', fontSize: '0.72rem', marginBottom: '8px' }}>
                                             {point.ip}{point.isp ? ` · ${point.isp}` : ''}{point.asn ? ` (${point.asn})` : ''}
+                                        </div>
+
+                                        {/* How the location was arrived at, beside the
+                                            location itself. A coordinate with no account
+                                            of where it came from invites more trust than
+                                            any of these sources can carry. */}
+                                        <div style={{ fontSize: '0.69rem', color: '#666', marginBottom: '8px', lineHeight: 1.45 }}>
+                                            {point.anycast ? (
+                                                <span style={{ color: '#b3261e' }}>
+                                                    Announced from many places at once. No single coordinate describes it; this is one instance.
+                                                </span>
+                                            ) : (
+                                                <>
+                                                    Accurate to about <strong>{point.radius_km ?? 50} km</strong>
+                                                    {point.location_confidence !== null && point.location_confidence !== undefined
+                                                        ? ` · ${Math.round(point.location_confidence * 100)}% confident`
+                                                        : ''}
+                                                    {point.located_by?.length ? <><br />From: {point.located_by.join(', ')}</> : null}
+                                                </>
+                                            )}
                                         </div>
 
                                         {/* A contacted destination is not a place a

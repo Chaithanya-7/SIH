@@ -2,6 +2,7 @@ const geoIntelAdapter = require('../adapters/geoIntelAdapter');
 const anonymizationIntelAdapter = require('../adapters/anonymizationIntelAdapter');
 const reputationIntelAdapter = require('../adapters/reputationIntelAdapter');
 const ipClassifier = require('./ipClassifier');
+const ipGeolocationEngine = require('./ipGeolocationEngine');
 const dnsblReputation = require('./dnsblReputation');
 const dnsAdapter = require('../adapters/dnsAdapter');
 
@@ -34,6 +35,28 @@ class InfraEnricher {
         threatObject.infrastructure.classification = ipClassifier.classify(originIp);
 
         threatObject.infrastructure.geolocation = geoResult;
+
+        /**
+         * The origin address, located properly.
+         *
+         * Several independent sources, clustered, with a radius that covers
+         * what they disagree about - rather than one provider's confident city.
+         *
+         * Run for the **origin only**, deliberately. The engine makes three or
+         * four requests to free services per address, and a message can carry a
+         * dozen relay hops; forty-odd requests per message would be slow and
+         * would be abusing services that cost nothing precisely because nobody
+         * hammers them. The origin is the address a verdict is about, so it is
+         * the one worth spending on. Every other hop keeps the single cheap
+         * lookup and says so.
+         */
+        threatObject.infrastructure.origin_geolocation = originIp
+            ? await ipGeolocationEngine.locate(originIp).catch(err => ({
+                status: 'NOT_LOCATED',
+                ip: originIp,
+                reason: `The geolocation engine failed: ${err.message}`
+            }))
+            : { status: 'NOT_LOCATED', reason: 'No origin address was selected from the relay chain, so there is nothing to locate.' };
         threatObject.infrastructure.anonymization = anonResult;
         threatObject.infrastructure.reputation = repResult;
 
@@ -88,16 +111,31 @@ class InfraEnricher {
             const geo = (ip === originIp && originGeo) ? originGeo : await geoIntelAdapter.lookupIp(ip);
             if (geo.status !== 'AVAILABLE' || geo.latitude === null || geo.longitude === null) return null;
 
+            // The origin carries the multi-source answer's radius and
+            // confidence; the other hops carry the single-provider lookup and
+            // are marked so, because a dot drawn from one database must not
+            // look like one drawn from five agreeing sources.
+            const located = (ip === originIp) ? threatObject.infrastructure?.origin_geolocation : null;
+            const multiSource = located?.status === 'LOCATED';
+
             return {
                 ip,
                 role,
-                latitude: geo.latitude,
-                longitude: geo.longitude,
-                city: geo.city,
+                latitude: multiSource ? located.latitude : geo.latitude,
+                longitude: multiSource ? located.longitude : geo.longitude,
+                city: multiSource ? (located.city || geo.city) : geo.city,
                 country: geo.country,
-                country_code: geo.country_code,
+                country_code: multiSource ? (located.country_code || geo.country_code) : geo.country_code,
                 asn: geo.asn,
-                isp: geo.isp
+                isp: geo.isp,
+                // How wide the answer really is. A single-provider lookup is
+                // city-accurate at best, so it gets a city-sized radius rather
+                // than none - a missing radius would read as certainty.
+                radius_km: multiSource ? located.radius_km : 50,
+                location_confidence: multiSource ? located.confidence : null,
+                location_precision: multiSource ? located.precision : 'CITY',
+                located_by: multiSource ? located.agreeing_sources : ['ipwho.is'],
+                anycast: multiSource ? located.anycast : false
             };
         }));
 

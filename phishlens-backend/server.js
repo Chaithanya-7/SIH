@@ -1516,6 +1516,13 @@ app.get('/api/overview', (req, res) => {
                     // role mean something different from the rest: every other
                     // marker is somewhere a message came from, this one is
                     // somewhere this machine went afterwards.
+                    // Carried to the map so a marker can show how wide the
+                    // answer is. A dot with no radius reads as a precise place.
+                    radius_km: point.radius_km ?? null,
+                    location_confidence: point.location_confidence ?? null,
+                    location_precision: point.location_precision || null,
+                    located_by: point.located_by || null,
+                    anycast: point.anycast === true,
                     observed_host: point.observed_host || null,
                     port: point.port ?? null,
                     protocol: point.protocol || null,

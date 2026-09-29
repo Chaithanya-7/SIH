@@ -199,6 +199,62 @@ service. Place names stay at every zoom: they are what makes photography
 legible at all.
 Commit: (this commit)
 
+**A-088 - Multi-source IP geolocation with an honest radius**
+What: Replaced the single-provider location with five sources, cross-source
+intersection, and a radius that covers what they disagree about.
+Status: `Done` - 423 backend + 20 console + 39 desktop tests passing
+Evidence: The user supplied a list of 22 techniques and asked for them to be
+applied "smartly and selectively". Every candidate source was **called before
+being built on**, not assumed.
+
+**Implemented (free, keyless, passive):**
+- **RIPE IPmap** (`ipmap-api.ripe.net`) - several engines, and it reports which
+  contributed. A location from its latency and IXP engines is weighted above one
+  from reverse-DNS alone.
+- **MaxMind GeoLite via RIPEstat** - a second, genuinely different lineage.
+- **RIPEstat network-info** - announcing prefix and origin AS.
+- **PeeringDB netfac** - where the originating network has equipment. A
+  *constraint*, never a position.
+- **Router hostname** - a Hoiho-style dictionary, matching whole segments only.
+- **Anycast detection**, from IPmap's own engine.
+- **Cross-source intersection, probabilistic fusion, radius and confidence.**
+
+**Declined, with reasons recorded in `state().not_implemented`:** RIPE Atlas
+active measurement, RTT triangulation and multilateration (needs credits earned
+by hosting a probe, and commissions measurements against somebody else's
+infrastructure); traceroute and intermediate-hop geolocation (sends packets to
+attacker infrastructure **from the machine being protected**, confirming
+somebody is there - and needs raw sockets and admin on Windows); CAIDA ITDK,
+the Hoiho corpus and alias resolution (multi-gigabyte datasets behind
+registration); BGPStream (native library per platform).
+
+**Three refusals the fusion makes, each with a test:**
+1. **Anycast gets no coordinate.** Measured: 8.8.8.8 returns Singapore from
+   IPmap and the United States from MaxMind, and both are right.
+2. **Disagreement is never averaged.** The mean of Singapore and Virginia is the
+   middle of the Pacific, which no source claims and a map would draw as
+   confidently as anything else. The better-supported cluster wins and the
+   radius admits the gap.
+3. **Two databases are not two opinions.** Commercial geolocation shares
+   registry lineage, so agreement between them is close to one source speaking
+   twice. Confidence is scored on independent *lineages*, not source count -
+   measured on a real address: two agreeing databases give 0.35, not 0.8.
+
+The radius is never tighter than the coarsest source holding the answer up, nor
+tighter than the sources disagree. The map now draws it as a dashed ring in real
+kilometres, and the marker popup names which sources produced the location.
+
+**Cost decision:** the full engine runs for the **origin address only**. It makes
+three or four requests per address and a message can carry a dozen relay hops;
+forty requests per message would abuse services that are free precisely because
+nobody hammers them. Other hops keep the single cheap lookup and are labelled as
+such.
+
+Stated on every answer: this locates infrastructure, not a person - usually a
+rented or compromised server in a datacentre in a city the sender may never have
+visited.
+Commit: (this commit)
+
 **A-087 - Eleven commits that never reached GitHub**
 What: Found that recent work was being committed to `main` while every push
 named `test`, and published it.
