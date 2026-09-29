@@ -37,7 +37,9 @@ const supervisor = new BackendSupervisor({ port: BACKEND_PORT });
  * inventing a second way in.
  */
 const notifier = new ThreatNotifier(supervisor, {
-    dataDir: app.getPath('userData'),
+    // A function, not a value: resolved when the notifier starts, which is
+    // after app.whenReady(). See threatNotifier's constructor.
+    dataDir: () => app.getPath('userData'),
     log: message => supervisor.record(message),
     onOpenCase: caseId => {
         const route = { route: 'case', caseId };

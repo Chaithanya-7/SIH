@@ -56,14 +56,36 @@ function freePort() {
     return 3400 + Math.floor(Math.random() * 500);
 }
 
-test('a key is generated on first run and reused afterwards', () => {
+test('the key is not read until the application is ready', () => {
+    // It used to be loaded in the constructor, which runs at module scope -
+    // before app.whenReady(). Electron resolves the data directory from the
+    // application name, and that is not reliably settled that early, so the key
+    // read there is not necessarily the one the rest of the application uses.
+    //
+    // Measured twice on a real install: launched by the installer, the backend
+    // came up expecting a key fingerprinted 5145e2b19987 while the key file and
+    // the provisioned extension both held 873edc69f1e8. Launched by hand a
+    // minute later, the same binary came up correct. Every request from the
+    // extension and the console was refused in between, with the application
+    // reporting READY and the backend reporting OPERATIONAL.
+    const supervisor = new BackendSupervisor({ port: freePort() });
+    assert.strictEqual(supervisor.apiKey, null,
+        'constructing the supervisor must not touch the data directory');
+});
+
+test('a key is generated on first use and reused afterwards', () => {
     const port = freePort();
     const first = new BackendSupervisor({ port });
+
+    // What start() does, at the point start() does it.
+    first.apiKey = first.loadOrCreateApiKey();
     assert.ok(first.apiKey && first.apiKey.length >= 32, 'a usable key must be generated');
+    assert.ok(fs.existsSync(first.keyFile()), 'and persisted');
 
     const second = new BackendSupervisor({ port });
-    assert.strictEqual(second.apiKey, first.apiKey, 'the same installation must keep the same key across restarts');
-    assert.ok(fs.existsSync(first.keyFile()), 'the key must be persisted');
+    second.apiKey = second.loadOrCreateApiKey();
+    assert.strictEqual(second.apiKey, first.apiKey,
+        'the same installation must keep the same key across restarts');
 });
 
 /**
@@ -242,11 +264,43 @@ test('a channel marked disabled stays disabled even with credentials present', (
 test('channel settings cannot override the port, the key or the data directory', () => {
     const source = fs.readFileSync(path.join(__dirname, '..', 'backendSupervisor.js'), 'utf8');
 
-    const spread = source.indexOf('...this.channelEnvironment(');
-    assert.ok(spread > 0, 'the channel settings must be spread into the backend environment');
+    // Searched inside the spawn's environment object rather than the whole
+    // file. A comment elsewhere that merely mentions one of these settings used
+    // to satisfy indexOf and mask where the real assignment sits.
+    const envStart = source.indexOf('...this.channelEnvironment(');
+    assert.ok(envStart > 0, 'the channel settings must be spread into the backend environment');
+    const envBlock = source.slice(envStart, source.indexOf('stdio:', envStart));
 
     for (const setting of ['PORT: String(this.port)', 'PHISHLENS_API_KEY: this.apiKey', 'PHISHLENS_DATA_DIR:']) {
-        assert.ok(source.indexOf(setting) > spread,
-            `${setting} must come after the channel settings, so a file cannot move it`);
+        assert.ok(envBlock.includes(setting),
+            `${setting} must be set after the channel settings, so a file cannot move it`);
     }
+});
+
+test('a backend that comes up with the wrong key is restarted, not accepted', () => {
+    // Reproduced on three consecutive installs: launched by the installer, the
+    // backend came up expecting a key fingerprinted 5145e2b19987 while the key
+    // file held 873edc69f1e8, and every request from the extension and the
+    // console was refused - with the application reporting READY and the
+    // backend reporting OPERATIONAL. The same binary launched by hand a minute
+    // later was correct, every time.
+    //
+    // The cause is not established: the installed code is right, the packaged
+    // backend given that key directly behaves correctly, and there is no second
+    // key file on the machine. What is established is the symptom, and that a
+    // restart clears it. Leaving a user with a silently refusing install while
+    // that is understood would be the wrong trade.
+    const source = fs.readFileSync(path.join(__dirname, '..', 'backendSupervisor.js'), 'utf8');
+    const start = source.slice(source.indexOf('async start()'), source.indexOf('channelEnvironment'));
+
+    assert.match(start, /theirsNow !== mineNow/, 'it must compare what the backend accepts against what it holds');
+    assert.match(start, /Restarting it once/, 'and restart rather than accept the mismatch');
+
+    // Once, not in a loop: a second failure means something this does not
+    // understand, and a restart loop would hide it behind a flickering app.
+    assert.match(start, /setStatus\('DEGRADED'/, 'a recurrence must be reported, not retried forever');
+    assert.match(start, /Closing PhishLens completely/, 'with the remedy that is known to work');
+
+    // The check needs the health body, which checkHealth now keeps.
+    assert.match(source, /this\.lastHealth = JSON\.parse/, 'the health body must be retained for this');
 });

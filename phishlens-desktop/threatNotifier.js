@@ -60,7 +60,14 @@ class ThreatNotifier {
         this.supervisor = supervisor;
         this.onOpenCase = onOpenCase;
         this.log = log;
-        this.stateFile = dataDir ? path.join(dataDir, 'notified-cases.json') : null;
+        // Kept as given rather than resolved now. The same trap as the
+        // supervisor's key: this is constructed at module scope, before
+        // app.whenReady(), and a path derived from the application's data
+        // directory is not reliably settled that early. Here the cost is only a
+        // duplicated round of notifications rather than a broken key, but it is
+        // the same mistake and it resolves in start() instead.
+        this.dataDir = dataDir;
+        this.stateFile = null;
 
         this.timer = null;
         /** Case ids already notified about, so a restart is not a second round. */
@@ -68,7 +75,6 @@ class ThreatNotifier {
         this.lastError = null;
         this.raised = 0;
 
-        this.load();
     }
 
     load() {
@@ -98,6 +104,13 @@ class ThreatNotifier {
 
     start() {
         if (this.timer) return;
+
+        // Resolved here, after the application is ready.
+        if (!this.stateFile) {
+            const dir = typeof this.dataDir === 'function' ? this.dataDir() : this.dataDir;
+            this.stateFile = dir ? path.join(dir, 'notified-cases.json') : null;
+            this.load();
+        }
         if (!Notification.isSupported()) {
             this.log('[Notifier] This system does not support notifications; nothing will be raised.');
             return;

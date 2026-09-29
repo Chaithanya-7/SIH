@@ -199,6 +199,56 @@ service. Place names stay at every zoom: they are what makes photography
 legible at all.
 Commit: (this commit)
 
+**A-090 - 1.7.15, and a key mismatch made self-correcting rather than understood**
+What: Shipped the geolocation engine, the new map and the race fix; then chased
+the installer-launch key mismatch as far as evidence allowed and made it heal
+itself.
+Status: `Done` - 425 backend + 20 console + 41 desktop tests passing; **1.7.15
+installed**
+Evidence:
+
+**The 500 is gone** (A-089) and the reader works, so the live path is sound in
+test. 1.7.14 then 1.7.15 were built and installed, each verified in the
+*installed* copy: the geolocation engine, hostname reader, network-intel
+adapter, the race fix, and the new map (uncertainty ring, source attribution,
+Sentinel-2 option, the separated caption) are all present in the package.
+
+**The remaining fault, chased hard and not solved.** After an installer launch
+the backend comes up expecting a key fingerprinted `5145e2b19987` while the key
+file and the provisioned extension both hold `873edc69f1e8`. Every request is
+then refused while the application reports READY and the backend reports
+OPERATIONAL. **A manual restart fixes it every time** - same binary, same disk,
+same user.
+
+Ruled out by measurement, not reasoning:
+- No `PHISHLENS_API_KEY` in User, Machine or Process environment.
+- No second `desktop-api-key` anywhere under AppData or the install directory.
+- Not `.env.example` (ships, but its value fingerprints `79ef599b03c8`).
+- Not any file in the data directory, nor any plausible string - all fingerprinted
+  and compared.
+- The **packaged backend is fine**: run directly with that key it reports
+  `873edc69f1e8` and authenticates. The backend is not the problem.
+- The process holding the port **is** the supervisor's own child, with the
+  expected command line and parent.
+- The installed code **is** 1.7.15, with the lazy key load.
+
+A first hypothesis - that `app.getPath('userData')` was unsettled at module
+scope, before `app.whenReady()` - was implemented anyway, because reading the
+key in a constructor that runs that early is wrong regardless. It did **not**
+fix the symptom. Recorded as tried and insufficient rather than quietly dropped.
+
+**So it was made self-correcting.** After spawning, the supervisor compares the
+fingerprint the backend publishes against the key it holds, and restarts the
+backend once if they differ. A recurrence sets status DEGRADED with both
+fingerprints and the remedy, rather than retrying forever behind a flickering
+application. Leaving somebody with an install that silently refuses everything,
+while the cause is understood, was the wrong trade.
+
+Also fixed: a test asserting the spawn environment's ordering searched the whole
+file, so a comment mentioning `PHISHLENS_API_KEY` satisfied it. It reads the
+environment object itself now.
+Commit: (this commit)
+
 **A-089 - The 500 found: the watcher and the scan were fighting over the same messages**
 What: Root-caused the ingestion 500 and stopped it.
 Status: `Done` - 425 backend + 20 console + 39 desktop tests passing

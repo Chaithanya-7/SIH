@@ -63,7 +63,29 @@ class BackendSupervisor extends EventEmitter {
         this.startedAt = null;
         this.attachedToExisting = false;
         this.stopping = false;
-        this.apiKey = this.loadOrCreateApiKey();
+        /**
+         * Deliberately not loaded here.
+         *
+         * This constructor runs at module scope, which is *before*
+         * `app.whenReady()`. Electron resolves `app.getPath('userData')` from
+         * the application name, and that name is not reliably settled that
+         * early - so the key file this reads at construction time is not
+         * necessarily the one the rest of the application uses.
+         *
+         * Measured, twice, on this machine: an application launched by the
+         * installer came up with a backend expecting a key fingerprinted
+         * 5145e2b19987, while the key file on disk and the provisioned
+         * extension both held 873edc69f1e8. The same application launched by
+         * hand a minute later came up with 873edc69f1e8 and everything worked.
+         * Same binary, same disk, same user - only the launch differed.
+         *
+         * The symptom was every request from the extension and the console
+         * being refused, with the application reporting READY and the backend
+         * reporting OPERATIONAL, after every single install.
+         *
+         * So it is loaded in start(), which runs from app.whenReady().
+         */
+        this.apiKey = null;
     }
 
     // ---------- credentials ----------
@@ -187,6 +209,11 @@ class BackendSupervisor extends EventEmitter {
     async start() {
         this.stopping = false;
 
+        // After app.whenReady(), so userData resolves to the directory the rest
+        // of the application uses. See the constructor for what reading it too
+        // early cost.
+        if (!this.apiKey) this.apiKey = this.loadOrCreateApiKey();
+
         // Attaching rather than duplicating: two backends over one data
         // directory would corrupt the case store and break the audit chain.
         this.setStatus('STARTING', 'Checking whether a PhishLens backend is already running…');
@@ -250,7 +277,58 @@ class BackendSupervisor extends EventEmitter {
             return false;
         }
 
-        return this.spawnBackend(backendDir);
+        const spawned = await this.spawnBackend(backendDir);
+        if (!spawned) return false;
+
+        /**
+         * Confirm the backend we just started actually accepts our key.
+         *
+         * The spawn passes this application's key explicitly, after the channel
+         * settings, so in principle this cannot fail. In practice it did, reproducibly, on three
+         * consecutive installs: launched by the installer, the backend came up
+         * expecting a key fingerprinted 5145e2b19987 while the key file held
+         * 873edc69f1e8, and every request from the extension and the console
+         * was refused. The same binary launched by hand a minute later was
+         * correct every time.
+         *
+         * The cause is still not established - the installed code is right, the
+         * packaged backend given that key directly behaves correctly, and no
+         * second key file exists on the machine. What *is* established is the
+         * symptom and that a restart clears it.
+         *
+         * So rather than leave a user with an application reporting READY and a
+         * backend refusing everything, the mismatch is detected and the backend
+         * restarted once. If it recurs, it is reported rather than hidden,
+         * because a second failure means something this does not understand.
+         */
+        const mineNow = this.keyFingerprint(this.apiKey);
+        const theirsNow = this.lastHealth?.api_key_fingerprint;
+
+        if (theirsNow && mineNow && theirsNow !== mineNow) {
+            this.record(`[Supervisor] The backend started with a key this application does not hold (it expects ${theirsNow}, we have ${mineNow}). Restarting it once.`);
+
+            this.stop();
+            this.stopping = false;
+            this.restarts = 0;
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            const again = await this.spawnBackend(backendDir);
+            const theirsAfter = this.lastHealth?.api_key_fingerprint;
+
+            if (again && theirsAfter && theirsAfter !== mineNow) {
+                const detail = `The PhishLens backend keeps starting with a different key than this application holds `
+                    + `(it expects ${theirsAfter}, we have ${mineNow}). The console and the browser extension will be refused. `
+                    + 'Closing PhishLens completely and starting it again clears this.';
+                this.record(`[Supervisor] ${detail}`);
+                this.setStatus('DEGRADED', detail);
+                return true;
+            }
+
+            this.record("[Supervisor] The restarted backend accepts this application's key.");
+            return again;
+        }
+
+        return spawned;
     }
 
     /**
