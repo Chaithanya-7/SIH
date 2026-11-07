@@ -255,21 +255,7 @@ each absence costs. To install oletools:
 
 ```bash
 pip install oletools
-```
-
-### A note on Wireshark
-
-It **cannot read your mail**, and nothing here pretends otherwise. Every mail
-path worth watching is TLS — webmail over HTTPS, IMAP on 993, SMTP on 465 or
-587 — so a capture is ciphertext. Reading it would mean installing a certificate
-authority and intercepting your own browser, which is an attack on the person
-being protected.
-
-What stays readable without breaking anything is the metadata: the server name
-in a TLS ClientHello is sent before encryption begins, and DNS questions are
-plain unless the resolver is DoH. That answers the one question the message
-cannot: *this link was dangerous, and four minutes later this machine connected
-to it.* That is the difference between a warning and a clicked link.
+``
 
 ---
 
